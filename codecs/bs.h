@@ -37,46 +37,33 @@ struct bitstream {
 	uint8_t* end;
 	int bits_left;
 };
-
 typedef struct bitstream bs_t;
 
 #define _OPTIMIZE_BS_ 1
-
 #if ( _OPTIMIZE_BS_ > 0 )
 #ifndef FAST_U8
 #define FAST_U8
 #endif
 #endif
 
+static inline bs_t* bs_new(uint8_t* buf, size_t size);
+static inline void bs_free(bs_t* b);
+static inline bs_t* bs_clone( bs_t* dest, const bs_t* src );
+static inline void  bs_init(bs_t* b, uint8_t* buf, size_t size);
+static inline uint32_t bs_byte_aligned(bs_t* b);
+static inline int bs_eof(bs_t* b);
+static inline int bs_overrun(bs_t* b);
+static inline int bs_pos(bs_t* b);
 
-static bs_t* bs_new(uint8_t* buf, size_t size);
-static void bs_free(bs_t* b);
-static bs_t* bs_clone( bs_t* dest, const bs_t* src );
-static bs_t*  bs_init(bs_t* b, uint8_t* buf, size_t size);
-static uint32_t bs_byte_aligned(bs_t* b);
-static int bs_eof(bs_t* b);
-static int bs_overrun(bs_t* b);
-static int bs_pos(bs_t* b);
-
-static uint32_t bs_peek_u1(bs_t* b);
-static uint32_t bs_read_u1(bs_t* b);
-static uint32_t bs_read_u(bs_t* b, int n);
-static uint32_t bs_read_f(bs_t* b, int n);
-static uint32_t bs_read_u8(bs_t* b);
-static uint32_t bs_read_ue(bs_t* b);
-static int32_t  bs_read_se(bs_t* b);
-
-static void bs_write_u1(bs_t* b, uint32_t v);
-static void bs_write_u(bs_t* b, int n, uint32_t v);
-static void bs_write_f(bs_t* b, int n, uint32_t v);
-static void bs_write_u8(bs_t* b, uint32_t v);
-static void bs_write_ue(bs_t* b, uint32_t v);
-static void bs_write_se(bs_t* b, int32_t v);
-
-static int bs_read_bytes(bs_t* b, uint8_t* buf, int len);
-static int bs_write_bytes(bs_t* b, uint8_t* buf, int len);
-static int bs_skip_bytes(bs_t* b, int len);
-static uint32_t bs_next_bits(bs_t* b, int nbits);
+static inline uint32_t bs_peek_u1(bs_t* b);
+static inline uint32_t bs_read_u1(bs_t* b);
+static inline uint32_t bs_read_u(bs_t* b, int n);
+static inline uint32_t bs_read_f(bs_t* b, int n);
+static inline uint32_t bs_read_u8(bs_t* b);
+static inline uint32_t bs_read_ue(bs_t* b);
+static inline int32_t  bs_read_se(bs_t* b);
+static inline void     bs_skip_u(bs_t* b, int n);
+static inline void     bs_skip_u1(bs_t* b);
 
 #define get_bits(gb, n)        (bs_read_u(gb, n))
 #define skip_bits(gb, n)       (bs_skip_u(gb, n))
@@ -89,15 +76,44 @@ static uint32_t bs_next_bits(bs_t* b, int nbits);
 #define get_se_golomb_long(gb) (bs_read_se(gb))
 #define get_ue_golomb_31(gb)   (bs_read_ue(gb))
 
+static inline int decode012(struct bitstream *gb)
+{
+    int n;
+    n = get_bits1(gb);
+    if (n == 0)
+        return 0;
+    else
+        return get_bits1(gb) + 1;
+}
+
+static inline int decode210(struct bitstream *gb)
+{
+    if (get_bits1(gb))
+        return 0;
+    else
+        return 2 - get_bits1(gb);
+}
+
+static inline int get_bits_count(struct bitstream *gb)
+{
+    return gb->bits_left;
+}
+
+static inline void trailing_bits(struct bitstream *gb)
+{
+	while (!bs_byte_aligned(gb)) {
+		skip_bits1(gb);
+	}
+}
+
 // IMPLEMENTATION
 
-static inline bs_t* bs_init(bs_t* b, uint8_t* buf, size_t size)
+static inline void bs_init(bs_t* b, uint8_t* buf, size_t size)
 {
     b->start = buf;
     b->p = buf;
     b->end = buf + size;
     b->bits_left = 8;
-    return b;
 }
 
 static inline bs_t* bs_new(uint8_t* buf, size_t size)

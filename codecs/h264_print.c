@@ -420,14 +420,14 @@ void h264_print_pps(struct h264_pps *pps)
 void h264_print_ref_pic_list_modification(struct h264_ref_pic_list_modification *list,
 					  char *which)
 {
-	int i;
+	int i = 0;
 	printf("\tref_pic_list_modification_flag_%s = %d\n", which, list->flag);
 	for (i = 0; list->list[i].op != 3; i++) {
 		int op = list->list[i].op;
 		printf("\tmodification_of_pic_nums_idc_%s[%d] = %d\n", which, i, op);
 		printf("\tabs_diff_pic_num_minus1_%s[%d] = %d\n", which, i, list->list[i].param);
 	}
-	printf("\tmodification_of_pic_nums_idc_%s = 3\n", which);
+	printf("\tmodification_of_pic_nums_idc_%s[%d] = 3\n", which, i);
 }
 
 void h264_print_pred_weight_table(struct h264_slice *sl)
@@ -461,6 +461,7 @@ void h264_print_pred_weight_table(struct h264_slice *sl)
 
 void h264_print_dec_ref_pic_marking(struct h264_slice *sl)
 {
+	int i;
 	if (sl->nal_unit_type == H264_NAL_SLICE_IDR) {
 		printf("\tno_output_of_prior_pics_flag = %d\n",
 		       sl->no_output_of_prior_pics_flag);
@@ -468,7 +469,7 @@ void h264_print_dec_ref_pic_marking(struct h264_slice *sl)
 	} else {
 		printf("\tadaptive_ref_pic_marking_mode_flag = %d\n",
 		       sl->adaptive_ref_pic_marking_mode_flag);
-		for (int i = 0; i < sl->nb_mmco; i++) {
+		for (i = 0; i < sl->nb_mmco; i++) {
 			int opcode = sl->mmcos[i].opcode;
 			if (opcode == H264_MMCO_END)
 				break;
@@ -476,8 +477,8 @@ void h264_print_dec_ref_pic_marking(struct h264_slice *sl)
 			case H264_MMCO_END:
 				break;
 			case H264_MMCO_FORGET_SHORT:
-				printf("\tmmco_forget_short = %d\n",
-				       sl->mmcos[i].short_pic_num);
+				printf("\tmmco_forget_short[%d] = %d\n",
+				       i, sl->mmcos[i].short_pic_num);
 				break;
 			case H264_MMCO_SHORT_TO_LONG:
 				printf("\tmmco_short_to_long = %d %d\n",

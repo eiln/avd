@@ -23,40 +23,13 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef UTIL_H
-#define UTIL_H
+#ifndef __UTIL_H__
+#define __UTIL_H__
 
-#include <stdlib.h>
 #include <stdio.h>
-#include <inttypes.h>
-#include <assert.h>
+#include <stdlib.h>
 
-#define ADDARRAY(a, e) \
-	do { \
-	if ((a ## num) >= (a ## max)) { \
-		if (!(a ## max)) \
-			(a ## max) = 16; \
-		else \
-			(a ## max) *= 2; \
-		(a) = realloc((a), (a ## max)*sizeof(*(a))); \
-	} \
-	(a)[(a ## num)++] = (e); \
-	} while(0)
-
-#define FINDARRAY(a, tmp, pred)				\
-	({							\
-		int __i;					\
-								\
-		for (__i = 0; __i < (a ## num); __i++) {	\
-			tmp = (a)[__i];				\
-			if (pred)				\
-				break;				\
-		}						\
-								\
-		tmp = ((pred) ? tmp : NULL);			\
-	})
-
-/* ceil(log2(x)) */
+/* ceil log2 */
 static inline int clog2(uint64_t x) {
 	if (!x)
 		return x;
@@ -94,35 +67,31 @@ static inline int clog2(uint64_t x) {
 #define bflmask(a) ((2ull << ((a)-1)) - 1)
 #define insrt(a, b, c, d) ((a) = ((a) & ~(bflmask(c) << (b))) | ((d) & bflmask(c)) << (b))
 
-struct envy_loc {
-	int lstart;
-	int cstart;
-	int lend;
-	int cend;
-	const char *file;
-};
+static inline char *read_file(const char *path, unsigned long *size)
+{
+	char *data;
+	unsigned long fsize;
 
-#define LOC_FORMAT(loc, str) "%s:%d.%d-%d.%d: " str, (loc).file, (loc).lstart, (loc).cstart, (loc).lend, (loc).cend
+	FILE *fp = fopen(path, "rb");
+	if (!fp)
+		return NULL;
 
-uint32_t elf_hash(const char *str);
+	fseek(fp, 0, SEEK_END);
+	fsize = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
 
-FILE *find_in_path(const char *name, const char *path, char **pfullname);
+	data = malloc(fsize);
+	if (!data) {
+		fprintf(stderr, "not enough mem!\n");
+		fclose(fp);
+		return NULL;
+	}
 
-struct astr {
-	char *str;
-	size_t len;
-};
+	fread(data, fsize, 1, fp);
+	fclose(fp);
 
-void print_escaped_astr(FILE *out, struct astr *astr);
+	*size = fsize;
+	return data;
+}
 
-char *aprintf(const char *format, ...);
-
-FILE *open_input(const char *filename);
-
-#ifdef NDEBUG
-#undef assert
-#define UNUSED(x) ((void)(x))
-#define assert(expression) UNUSED(expression)
-#endif
-
-#endif
+#endif /* __UTIL_H__ */
