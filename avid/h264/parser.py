@@ -67,9 +67,7 @@ class AVDH264Parser:
 
 		# I know this sucks but it's just not possible to write cpython
 		# bindings for a stream parser. This also makes N/A fields explicit
-		task = subprocess.Popen(["cat", path], stdout=subprocess.PIPE)
-		res = subprocess.check_output([f'{self.bin_path}'], stdin=task.stdout, text=True)
-		task.wait()
+		res = subprocess.check_output([f'{self.bin_path}', path], text=True)
 
 		lines = res.splitlines()
 		start = [i for i,line in enumerate(lines) if "{" in line]

@@ -67,10 +67,10 @@ static inline int clog2(uint64_t x) {
 #define bflmask(a) ((2ull << ((a)-1)) - 1)
 #define insrt(a, b, c, d) ((a) = ((a) & ~(bflmask(c) << (b))) | ((d) & bflmask(c)) << (b))
 
-static inline char *read_file(const char *path, unsigned long *size)
+static inline char *read_file(const char *path, int *size)
 {
 	char *data;
-	unsigned long fsize;
+	int fsize;
 
 	FILE *fp = fopen(path, "rb");
 	if (!fp)
@@ -79,10 +79,13 @@ static inline char *read_file(const char *path, unsigned long *size)
 	fseek(fp, 0, SEEK_END);
 	fsize = ftell(fp);
 	fseek(fp, 0, SEEK_SET);
+	if (!fsize) {
+		fclose(fp);
+		return NULL;
+	}
 
 	data = malloc(fsize);
 	if (!data) {
-		fprintf(stderr, "not enough mem!\n");
 		fclose(fp);
 		return NULL;
 	}

@@ -24,17 +24,20 @@
 #include "h264.h"
 #include "util.h"
 
-int main()
+int main(int argc, char *argv[])
 {
-	uint8_t *bytes = 0;
-	int bytesnum = 0;
-	int bytesmax = 0;
-	int c;
-	while ((c = getchar()) != EOF) {
-		ADDARRAY(bytes, c);
+	int bytesnum, err;
+	if (argc <= 1) {
+		fprintf(stderr, "usage: ./deh264 [path to .h264]\n");
+		return -1;
 	}
+	char *data = read_file(argv[1], &bytesnum);
+	uint8_t *bytes = (uint8_t *)data;
+	if (!data || !bytesnum)
+		return -1;
 
-	struct h264_decoder *dec = malloc(sizeof(*dec));
+	struct h264_decoder decoder;
+	struct h264_decoder *dec = &decoder;
 	int nal_start, nal_end;
 	while (bytesnum > 0) {
 		h264_find_nal_unit(bytes, bytesnum, &nal_start, &nal_end);
@@ -43,7 +46,8 @@ int main()
 		bytes += (nal_end - nal_start);
 		bytesnum -= nal_end;
 	}
-	free(dec);
+
+	free(data);
 
 	return 0;
 }
