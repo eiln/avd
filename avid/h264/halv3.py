@@ -128,7 +128,7 @@ class AVDH264HalV3(AVDHal):
 
 		if (sl.luma_weight_l0_flag_0 == 0):
 			avd_set(x)
-			if (len(sl.modification_of_pic_nums_idc_l0) == 1 and sl.modification_of_pic_nums_idc_l0[0] == 3): # ???
+			if (sl.modification_of_pic_nums_idc_l0[0] == 3): # ???
 				return
 			avd_set(0x2de04201, "slc_770_cmd_weights_weights", 0)
 			avd_set(0x2df0ffff, "slc_8f0_cmd_weights_offsets", 0)
