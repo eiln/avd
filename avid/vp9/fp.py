@@ -43,7 +43,7 @@ class AvdV3VP9InstHeader(ConstructClass):
 	def __init__(self):
 		super().__init__()
 
-class AvdV3VP9FrameParams(ConstructClass):
+class AvdVP9V3FrameParams(ConstructClass):
 	subcon = Struct(
 		"pio" / AvdV3PiodmaHeader,
 		"hdr" / AvdV3VP9InstHeader,

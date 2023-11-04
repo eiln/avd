@@ -83,9 +83,11 @@ class AVDH264Parser(AVDParser):
 
 			if (unit.nal_unit_type == H264_NAL_SPS):
 				assert(unit.seq_parameter_set_id < H264_MAX_SPS_COUNT)
+				unit.idx = unit.seq_parameter_set_id
 				sps_list[unit.seq_parameter_set_id] = unit
 			elif (unit.nal_unit_type == H264_NAL_PPS):
 				assert(unit.pic_parameter_set_id < H264_MAX_PPS_COUNT)
+				unit.idx = unit.pic_parameter_set_id
 				pps_list[unit.pic_parameter_set_id] = unit
 			else:
 				slices.append(unit)
