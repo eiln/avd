@@ -3,23 +3,26 @@
 # Copyright 2023 Eileen Yoon <eyn@gmx.com>
 
 from collections import namedtuple
-from .utils import dotdict
+from .types import *
+from .utils import *
 
 class AVDInst(namedtuple('AVDInst', ['val', 'name', 'pos', 'idx'])):
     def __repr__(self):
         if  self.name.startswith("hdr"):
-            n = 35
+            n = ANSI_PURPLE
         elif self.name.startswith("slc"):
-            n = 36
+            n = ANSI_CYAN
         elif self.name.startswith("fw"):
-            n = 33
+            n = ANSI_YELLOW
         else:
-            n = 37
+            n = ANSI_WHITE
         c = "\033[1;%dm" % n
         disp_name = c + self.name + "\033[0m"
         if isinstance(self.idx, int):
             disp_name += f"{c}[\033[0m{self.idx}{c}]\033[0m"
-        return f' {hex(self.val).rjust(2+8)} | [{str(self.pos).rjust(2)}] {disp_name}'
+        disp_val = f"{hex(self.val).rjust(2+8)}"
+        disp_idx = f"[{hl(str(self.pos).rjust(2), ANSI_GREEN)}]"
+        return f'{disp_idx} {disp_val} | {disp_name}'
 
 class AVDHal:
     def __init__(self, ctx=None):

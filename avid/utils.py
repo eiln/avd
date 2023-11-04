@@ -27,9 +27,21 @@ def ulog2(u):
     s = (u > 0x3   ) << 1; u >>= s; t |= s
     return (t | (u >> 1))
 
+ANSI_RED    = 31
+ANSI_GREEN  = 32
+ANSI_YELLOW = 33
+ANSI_BLUE   = 34
+ANSI_PURPLE = 35
+ANSI_CYAN   = 36
+ANSI_WHITE  = 37
+
+def hl(x, n):
+    if (n == None): return x
+    return f"\033[1;{n}m{str(x)}\033[0m"
+
 def cassert(x, y, f=False):
     if (x != y):
-    	print(f"\033[1;31m[ASSERT] {hex(x)} vs. {hex(y)}\033[0m")
+        print(hl(f"[ASSERT] {hex(x)} vs. {hex(y)}", ANSI_RED))
     if not (f):
         assert(x == y)
 

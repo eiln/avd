@@ -2,28 +2,25 @@
 # SPDX-License-Identifier: MIT
 # Copyright 2023 Eileen Yoon <eyn@gmx.com>
 
-from ..utils import dotdict
+from ..parser import AVDParser, AVDSlice
 from .types import *
 
 import ctypes
-import subprocess
 from math import ceil
-from pathlib import Path
 
-class AVDH264Slice(dotdict):
+class AVDH264Slice(AVDSlice):
+	def __init__(self):
+		super().__init__()
+		self._banned_keys = ["payload", "nal_unit_type", "idx"]
+		self._reprwidth = 38
+
 	def __repr__(self):
-		s = "slice: nal_unit_type: %d\n" % (self.nal_unit_type)
-		for key in list(self.keys()):
-			if (key in ["payload", "nal_unit_type"]): continue
-			val = self[key]
-			if (isinstance(val, int) or isinstance(val, float)):
-				s += "\t%s: %d\n" % (key, val)
-			elif (isinstance(val, list)):
-				s += "\t%s: [%s]\n" % (key, ", ".join([str(v) for v in val]))
+		s = "\n[slice: %d nal_unit_type: %d]\n" % (self.idx, self.nal_unit_type)
+		s += self.show_entries()
 		return s
 
 	def get_payload(self):
-		def transform(dat): # match macOS
+		def transform(dat): # match macOS behavior
 			new = b'\x00' + dat
 			return new[:2] + b'\x00.' + new[4:]
 		payload = transform(self.payload)
@@ -39,11 +36,20 @@ class AVDH264Slice(dotdict):
 	def get_payload_size(self):
 		return len(self.get_payload()) - self.get_payload_offset()
 
-class AVDH264Parser:
+class AVDH264Parser(AVDParser):
 	def __init__(self):
-		self.bin_path = (Path(__file__).parent / '../../codecs/deh264').resolve()
-		lib_path = (Path(__file__).parent / '../../codecs/libh264.so').resolve()
-		self.lib = ctypes.cdll.LoadLibrary(lib_path)
+		super().__init__("deh264", "libh264.so")
+		self.arr_keys = [("modification_of_pic_nums_idc_l0", H264_MAX_REFS),
+				("modification_of_pic_nums_idc_l1", H264_MAX_REFS),
+				("abs_diff_pic_num_minus1_l0", H264_MAX_REFS),
+				("abs_diff_pic_num_minus1_l1", H264_MAX_REFS),
+				("mmco_forget_short", H264_MAX_MMCO_COUNT),
+				("mmco_short_to_long", H264_MAX_MMCO_COUNT),
+				("mmco_forget_long", H264_MAX_MMCO_COUNT),
+				("mmco_this_to_long", H264_MAX_MMCO_COUNT),
+				("mmco_forget_long_max", H264_MAX_MMCO_COUNT),
+		]
+		self.slccls = AVDH264Slice
 
 	def get_payloads(self, path):
 		buf = open(path, "rb").read()
@@ -64,62 +70,24 @@ class AVDH264Parser:
 
 	def parse(self, path):
 		payloads = self.get_payloads(path)
-
-		# I know this sucks but it's just not possible to write cpython
-		# bindings for a stream parser. This also makes N/A fields explicit
-		res = subprocess.check_output([f'{self.bin_path}', path], text=True)
-
-		lines = res.splitlines()
-		start = [i for i,line in enumerate(lines) if "{" in line]
-		end = [i for i,line in enumerate(lines) if "}" in line]
-		assert(len(start) == len(end))
+		units = self.get_headers(path)
 
 		slice_idx = 0
-		sps_count = 0
-		pps_count = 0
-		sps_list = [None] * AVD_H264_MAX_SPS
-		pps_list = [None] * AVD_H264_MAX_PPS
+		sps_list = [None] * H264_MAX_SPS_COUNT
+		pps_list = [None] * H264_MAX_PPS_COUNT
 		slices = []
-		for i,(start, end) in enumerate(list(zip(start, end))):
-			group = lines[start:end]
-
-			unit = AVDH264Slice()
-			unit.idx = i
-
-			content = group[:]
-			content = [line.strip() for line in content if (line.startswith("\t")) and ("=" in line)]
-			for kv in content:
-				key = kv.split()[0].split("[", 1)[0]
-				val = kv.split()[2]
-				val = float(val) if '.' in val else int(val)
-				arr_keys = ["modification_of_pic_nums_idc_l0", "modification_of_pic_nums_idc_l1", "abs_diff_pic_num_minus1_l0", "abs_diff_pic_num_minus1_l1", "mmco_forget_short", "mmco_short_to_long", "mmco_forget_long", "mmco_this_to_long", "mmco_forget_long_max"]
-				if any(a in key for a in arr_keys):
-					for a in arr_keys:
-						if (a in key):
-							if a not in unit:
-								unit[a] = [val]
-							else:
-								unit[a].append(val)
-				else:
-					key = kv.split()[0].replace("[", "_").replace("]", "_").replace("__", "_").rstrip("_")
-					if ((key in unit)):
-						unit[key] = [unit[key]] if not isinstance(unit[key], list) else unit[key]
-						unit[key].append(val)
-					else:
-						unit[key] = val
-
+		for i,unit in enumerate(units):
 			if (unit.nal_unit_type == H264_NAL_SEI): continue
+			unit.idx = slice_idx
 			unit.payload = payloads[i]
 
 			if (unit.nal_unit_type == H264_NAL_SPS):
-				assert(unit.seq_parameter_set_id < AVD_H264_MAX_SPS)
+				assert(unit.seq_parameter_set_id < H264_MAX_SPS_COUNT)
 				sps_list[unit.seq_parameter_set_id] = unit
-				sps_count += 1
 			elif (unit.nal_unit_type == H264_NAL_PPS):
-				assert(unit.pic_parameter_set_id < AVD_H264_MAX_PPS)
+				assert(unit.pic_parameter_set_id < H264_MAX_PPS_COUNT)
 				pps_list[unit.pic_parameter_set_id] = unit
-				pps_count += 1
 			else:
 				slices.append(unit)
-
+				slice_idx += 1
 		return sps_list, pps_list, slices

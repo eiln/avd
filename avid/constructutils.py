@@ -6,6 +6,7 @@ from construct import *
 from construct.core import evaluate
 from construct.lib import HexDisplayedInteger, stringtypes, reprstring
 from .utils import *
+from math import ceil
 
 def ZPadding(size):
     return Const(bytes(size), Bytes(size))
@@ -408,7 +409,7 @@ class ConstructClass(ConstructClassBase, Container):
             elif isinstance(v, ListContainer) or isinstance(v, list):
                 tmp = []
                 stride = 4
-                for n in range(len(v) // stride):
+                for n in range(ceil(len(v) / stride)):
                     y = v[n*stride:(n+1)*stride]
                     if (not sum(y)):
                         t = "-"

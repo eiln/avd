@@ -307,6 +307,7 @@ class AVDH264Decoder:
 				ctx.unused_refs.append(oldest)
 		else:
 			for pic_num_diff in sl.mmco_forget_short:
+				if (pic_num_diff == None): break
 				pic_num = sl.pic.pic_num - (pic_num_diff + 1)
 				pic_num &= ctx.max_frame_num - 1
 				pic = [x for x in ctx.dpb_list if x.pic_num == pic_num]

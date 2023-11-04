@@ -385,7 +385,8 @@ class AVDEmulator:
 
 	def save_inst(self, addr, val):
 		if (self.inst_only):
-			s = "[EMU]   %s" % (f'{hex(val).rjust(2+8)} | [{self.hl(str(len(self.inst_stream)).rjust(2))}]')
+			disp_name = "unk_%d" % (len(self.inst_stream))
+			s = "[EMU] %s" % (f'[{self.hl(str(len(self.inst_stream)).rjust(2))}] {hex(val).rjust(2+8)} |')
 			if (self.show_bits):
 				s += f' {bitrepr32(val)}'
 			print(s)
