@@ -6,49 +6,33 @@ sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
 import argparse
 import os
-from termcolor import colored
-
-from avid.h264.decoder import AVDH264Decoder
-from avid.h264.fp import *
+from avid.utils import *
+from avid.vp9.decoder import AVDVP9Decoder
+from avid.vp9.fp import *
 
 def test(fp0, fp1, args):
 	cands = [
 	"hdr_28_height_width_shift3",
-	"hdr_2c_sps_param",
-	"hdr_34_cmd_start_hdr",
-	"hdr_38_pixfmt",
-	"hdr_3c_height_width",
-	"hdr_44_is_idr_mask",
-	"hdr_48_3de",
-	"hdr_54_height_width",
-	"hdr_58_const_3a",
+	#"hdr_2c_sps_param",
+	"hdr_30_cmd_start_hdr",
+	"hdr_34_const_20",
+	"hdr_38_height_width_shift3",
 
-	("hdr_9c_pps_tile_addr_lsb8", 4),
-	"hdr_bc_sps_tile_addr_lsb8",
+	"hdr_108_pps1_tile_addr_lsb8",
+	"hdr_118_pps0_tile_addr_lsb8",
+	"hdr_104_pps2_tile_addr_incr_lsb8",
 
-	"hdr_c0_curr_ref_addr_lsb7",
-	"hdr_d0_ref_hdr",
-	"hdr_110_ref0_addr_lsb7",
-	"hdr_150_ref1_addr_lsb7",
-	"hdr_190_ref2_addr_lsb7",
-	"hdr_1d0_ref3_addr_lsb7",
+	"hdr_e0_pps2_tile_const_addr_lsb8",
+	"hdr_e8_sps0_tile_addr_lsb8",
+	"hdr_f0_sps0_tile_addr_lsb8_zero",
+	"hdr_f4_sps1_tile_addr_lsb8",
 
-	"hdr_210_y_addr_lsb8",
-	"hdr_214_uv_addr_lsb8",
-	"hdr_218_width_align",
-	"hdr_21c_width_align",
+	"hdr_11c_cur_rvra_addr_lsb7",
 
-	"slc_6e4_cmd_ref_type",
-	"slc_6e8_cmd_ref_list_0",
-	"slc_728_cmd_ref_list_1",
-	"slc_770_cmd_weights_weights",
-	"slc_8f0_cmd_weights_offsets",
-	"slc_a70_cmd_slice_qpy",
-	"slc_a74_cmd_a3",
-	"slc_a7c_cmd_d8",
-
-	#"inp_8b4d4_slice_addr_low",
-	#"inp_8b4d8_slice_hdr_size",
+	"hdr_168_y_addr_lsb8",
+	"hdr_16c_uv_addr_lsb8",
+	"hdr_170_width_align",
+	"hdr_174_width_align",
 	]
 	s = ""
 	for cand in cands:
@@ -66,7 +50,7 @@ def test(fp0, fp1, args):
 			for n in range(num):
 				if (x0[n] == x1[n]): continue
 				if (x1[n] != 0): # they fill out reference frames for IDR
-					t = colored("%s[%d]: 0x%x 0x%x\n" % (name, n, x0[n], x1[n]), "red")
+					t = hl("%s[%d]: 0x%x 0x%x\n" % (name, n, x0[n], x1[n]), ANSI_RED)
 					if not args.soft:
 						print(t)
 						assert(x0[n] == x1[n])
@@ -75,7 +59,7 @@ def test(fp0, fp1, args):
 		else:
 			if (x0 == x1): continue
 			if (x1 != 0): # they fill out reference frames for IDR
-				t = colored("%s: 0x%x 0x%x\n" % (name, x0, x1), "red")
+				t = hl("%s: 0x%x 0x%x\n" % (name, x0, x1), ANSI_RED)
 				if not args.soft:
 					print(t)
 					assert(x0 == x1)
@@ -93,20 +77,20 @@ if __name__ == "__main__":
 	parser.add_argument('-s', '--soft', action='store_true', help="don't assert")
 	args = parser.parse_args()
 
-	dec = AVDH264Decoder()
-	dec.hal.stfu = True
+	dec = AVDVP9Decoder()
+	#dec.hal.stfu = True
 	slices = dec.parse(args.path)
 	paths = os.listdir(os.path.join(args.prefix, args.dir))
 	paths = sorted([os.path.join(args.prefix, args.dir, path) for path in paths if "param" in path or "frame" in path])
 	paths = paths if args.all else paths[:args.num]
 	for i,path in enumerate(paths):
 		#print(path)
-		fp0 = AvdH264V3FrameParams.parse(open(path, "rb").read())
+		fp0 = AvdVP9V3FrameParams.parse(open(path, "rb").read())
 		sl = slices[i]
 		print(sl)
+		print(fp0)
 		inst = dec.generate(sl)
 		fp1 = dec.hal.fp
-		#print(fp0)
 		#print(fp1)
 		res = test(fp0, fp1, args)
 		if (res):

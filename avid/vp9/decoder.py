@@ -37,9 +37,14 @@ class AVDVP9Decoder:
 		ctx.access_idx = 0
 		ctx.active_sl = None
 
-		ctx.y_addr = 0x910100
-		ctx.uv_addr = 0x914900
+		ctx.y_addr = 0x768100
+		ctx.uv_addr = 0x76c900
 		ctx.slice_data_addr = 0x774000
+
+		# m1n1 compat
+		ctx.width = 128
+		ctx.height = 64
+		ctx.inst_fifo_iova = 0x2c000
 
 	def init_slice(self):
 		ctx = self.ctx

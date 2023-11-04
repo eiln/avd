@@ -3,6 +3,7 @@
 # Copyright 2023 Eileen Yoon <eyn@gmx.com>
 
 from ..parser import AVDParser, AVDSlice
+from ..types import *
 from .types import *
 
 import ctypes
@@ -13,6 +14,7 @@ class AVDH264Slice(AVDSlice):
 		super().__init__()
 		self._banned_keys = ["payload", "nal_unit_type", "idx"]
 		self._reprwidth = 38
+		self.mode = "h264"
 
 	def __repr__(self):
 		s = "\n[slice: %d nal_unit_type: %d]\n" % (self.idx, self.nal_unit_type)

@@ -9,7 +9,7 @@ from .utils import dotdict
 
 class AVDSlice(dotdict):
 	def __init__(self):
-		self._banned_keys = ["idx"]
+		self._banned_keys = ["idx", "payload"]
 		self._reprwidth = 36
 
 	def show_list_entry(self, key, val):

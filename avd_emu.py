@@ -191,7 +191,7 @@ class AVDEmulator:
 		cmd[ 0] = 0x800 | AVD_CM3_CMD_DECODE
 		cmd[ 1] = ((fifo1_idx % AVD_DART1_FIFO_COUNT) << 16) | fifo1_idx
 		cmd[ 2] = fifo1_iova
-		cmd[ 3] = fifo1_idx
+		cmd[ 3] = fifo1_idx + 1
 		cmd[ 4] = 0x3
 		cmd[ 5] = 0x108ef38 + (AVD_CM3_FIFO_WIDTH * (fifo1_idx % AVD_CM3_FIFO_COUNT))
 		cmd[ 6] = 0x108ef40 + (AVD_CM3_FIFO_WIDTH * (fifo1_idx % AVD_CM3_FIFO_COUNT))

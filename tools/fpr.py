@@ -6,8 +6,8 @@ sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
 import argparse
 import os
-#import numpy as np
-#np.set_printoptions(formatter={'int':lambda x: "0x%05x" % (x)})
+import numpy as np
+np.set_printoptions(formatter={'int':lambda x: "0x%06x" % (x)})
 
 from avid.types import *
 import struct
@@ -41,13 +41,13 @@ if __name__ == "__main__":
 	else:
 		raise ValueError("Not supported")
 
-	#out = []
-	for path in paths:
+	out = []
+	for i,path in enumerate(paths):
 		params = open(path, "rb").read()
 		fp = fpcls.parse(params)
 		print(fp)
-		print("="*80)
-		print()
-		#out.append((fp.hdr.hdr_c0_curr_ref_addr_lsb7[0],))
+		#print("="*80)
+		#print()
+		out.append((fp.hdr.hdr_48_incr_addr, fp.hdr.hdr_4c_incr_size))
 	#out = np.array(out) # useful for finding regressions
 	#print(out)
