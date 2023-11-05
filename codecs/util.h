@@ -97,4 +97,14 @@ static inline char *read_file(const char *path, int *size)
 	return data;
 }
 
+static inline int write_to_file(const char *path, char *data, int size)
+{
+	FILE *fp = fopen(path, "wb");
+	if (!fp)
+		return -1;
+	fwrite(data, size, 1, fp);
+	fclose(fp);
+	return 0;
+}
+
 #endif /* __UTIL_H__ */

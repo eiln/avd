@@ -43,7 +43,7 @@ int main(int argc, char *argv[])
 	if (!ivctx || (*(uint32_t *)ivctx->h.fourcc != FOURCC_VP09))
 		goto free_data;
 
-	for (i = 0; i < 64; i++) {
+	for (i = 0; i < 1; i++) {
 		VP9Context context;
 		VP9Context *s = &context;
 		err = ivf_read_frame(ivctx);
@@ -51,6 +51,7 @@ int main(int argc, char *argv[])
 			goto free_ivf;
 
 		err = vp9_decode_uncompressed_header(s, ivctx->f.buf, ivctx->f.size);
+		err = vp9_decode_compressed_header(s);
 		vp9_print_header(s);
 	}
 

@@ -29,6 +29,7 @@
 #include "vp9_shared.h"
 
 int vp9_decode_uncompressed_header(VP9Context *s, const uint8_t *data, size_t size);
+int vp9_decode_compressed_header(VP9Context *s);
 void vp9_print_header(VP9Context *s);
 
 #endif /* __VP9_H__ */

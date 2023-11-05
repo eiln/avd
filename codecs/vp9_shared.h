@@ -27,6 +27,8 @@
 #define __VP9_SHARED_H__
 
 #include "bs.h"
+#include "vpx_rac.h"
+#include "vp9_data.h"
 
 #include "libavutil/pixdesc.h"
 #include "libavcodec/avcodec.h"
@@ -255,55 +257,36 @@ enum MVJoint {
 	MV_JOINT_HV,
 };
 
-typedef struct ProbContext {
-    uint8_t y_mode[4][9];
-    uint8_t uv_mode[10][9];
-    uint8_t filter[4][2];
-    uint8_t mv_mode[7][3];
-    uint8_t intra[4];
-    uint8_t comp[5];
-    uint8_t single_ref[5][2];
-    uint8_t comp_ref[5];
-    uint8_t tx32p[2][3];
-    uint8_t tx16p[2][2];
-    uint8_t tx8p[2];
-    uint8_t skip[3];
-    uint8_t mv_joint[3];
-    struct {
-        uint8_t sign;
-        uint8_t classes[10];
-        uint8_t class0;
-        uint8_t bits[10];
-        uint8_t class0_fp[2][3];
-        uint8_t fp[3];
-        uint8_t class0_hp;
-        uint8_t hp;
-    } mv_comp[2];
-    uint8_t partition[4][4][3];
-} ProbContext;
-
 typedef struct VP9Filter {
     uint8_t level[8 * 8];
     uint8_t /* bit=col */ mask[2 /* 0=y, 1=uv */][2 /* 0=col, 1=row */]
                               [8 /* rows */][4 /* 0=16, 1=8, 2=4, 3=inner4 */];
 } VP9Filter;
 
-typedef struct VP9TileData VP9TileData;
 
-typedef struct VPXRangeCoder {
-    int high;
-    int bits; /* stored negated (i.e. negative "bits" is a positive number of
-                 bits left) in order to eliminate a negate in cache refilling */
-    const uint8_t *buffer;
-    const uint8_t *end;
-    unsigned int code_word;
-    int end_reached;
-} VPXRangeCoder;
+#define TX_SIZE_CONTEXTS 2
+#define TX_4X4 0    // 4x4 transform
+#define TX_8X8 1    // 8x8 transform
+#define TX_16X16 2  // 16x16 transform
+#define TX_32X32 3  // 32x32 transform
+#define TX_SIZES 4
+
+#define REF_TYPES 2  // intra=0, inter=1
+/* Middle dimension reflects the coefficient position within the transform. */
+#define COEF_BANDS 6
+#define COEFF_CONTEXTS 6
+#define BAND_COEFF_CONTEXTS(band) ((band) == 0 ? 3 : COEFF_CONTEXTS)
+#define UNCONSTRAINED_NODES 3
+
+// Only need this for fixed-size arrays, for structs just assign.
+#define vp9_copy(dest, src)              \
+  do {                                   \
+    assert(sizeof(dest) == sizeof(src)); \
+    memcpy(dest, src, sizeof(src));      \
+  } while (0)
 
 typedef struct VP9Context {
 	VP9SharedContext s;
-	VP9TileData *td;
-
 	struct bitstream gb;
 	VPXRangeCoder c;
 
@@ -329,6 +312,13 @@ typedef struct VP9Context {
 		uint8_t lim_lut[64];
 		uint8_t mblim_lut[64];
 	} filter_lut;
+
+	struct vp9_prob_context p;
+	struct vp9_prob_context prob_ctx[4];
+	const uint8_t *partition_probs;
+	const uint8_t *uv_mode_probs;
+
+#if 0
 	struct {
 		ProbContext p;
 		uint8_t coef[4][2][2][6][6][3];
@@ -337,6 +327,7 @@ typedef struct VP9Context {
 		ProbContext p;
 		uint8_t coef[4][2][2][6][6][11];
 	} prob;
+#endif
 
 	// contextual (above) cache
 	uint8_t *above_partition_ctx;
