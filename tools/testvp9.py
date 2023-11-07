@@ -18,16 +18,15 @@ def test(fp0, fp1, args):
 	"hdr_34_const_20",
 	"hdr_38_height_width_shift3",
 
+	"hdr_104_probs_addr_lsb8",
 	"hdr_108_pps1_tile_addr_lsb8",
 	"hdr_118_pps0_tile_addr_lsb8",
-	"hdr_104_pps2_tile_addr_incr_lsb8",
 
 	"hdr_e0_pps2_tile_const_addr_lsb8",
 	"hdr_e8_sps0_tile_addr_lsb8",
-	"hdr_f0_sps0_tile_addr_lsb8_zero",
 	"hdr_f4_sps1_tile_addr_lsb8",
 
-	"hdr_11c_cur_rvra_addr_lsb7",
+	"hdr_11c_curr_rvra_addr_lsb7",
 
 	"hdr_168_y_addr_lsb8",
 	"hdr_16c_uv_addr_lsb8",

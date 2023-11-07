@@ -375,6 +375,7 @@ class ConstructClassBase(Reloadable, metaclass=ReloadableConstructMeta):
         return Construct.build(self, obj, **contextkw)
 
 class ConstructClass(ConstructClassBase, Container):
+    _spacecnt = 2
     def diff(self, other, show_all=False):
         return self.__str__(other=other, show_all=show_all)
 
@@ -385,48 +386,20 @@ class ConstructClass(ConstructClassBase, Container):
                    and not callable(self[k]))
 
     def __str__(self, ignore=[], other=None, show_all=False) -> str:
-        str = "  \033[1;37m" + self.__class__.__name__ + ":\033[0m\n"
-
+        #s = "  \033[1;37m" + self.__class__.__name__ + ":\033[0m\n"
+        s = ""
         keys = list(self)
         keys.sort(key = lambda x: self._off.get(x, (-1, 0))[0])
         for key in keys:
-            if key in self._off:
-                offv, sizeof = self._off[key]
-                if offv == -1:
-                    print(key, offv, sizeof)
-                    continue
-            if key in ignore or key.startswith('_'):
-                continue
-            if "pad" in key: continue
-
-            str += f"\t\033[0;36m{key.ljust(32)}\033[0m = "
-
-            v = getattr(self, key)
-            if isinstance(v, stringtypes):
-                val_repr = reprstring(v)
-            elif isinstance(v, int):
-                val_repr = hex(v)
-            elif isinstance(v, ListContainer) or isinstance(v, list):
-                tmp = []
-                stride = 4
-                for n in range(ceil(len(v) / stride)):
-                    y = v[n*stride:(n+1)*stride]
-                    if (not sum(y)):
-                        t = "-"
-                        continue
-                    else:
-                    	if ("lsb" in key):
-                    		t = ", ".join(["0x%05x" % x for x in y])
-                    	else:
-                    		t = ", ".join([hex(x) for x in y])
-                    if (n != 0):
-                    	t = "\t".ljust(len("\t") + 32 + 3) + t
-                    tmp.append(t)
-                val_repr = "\n".join(tmp)
+            if key.startswith("_") or "pad" in key: continue
+            s += f"\033[0;36m{key}:\033[0m\n"
+            val = getattr(self, key)
+            if (hasattr(self, "_spacecnt")):
+                n = self._spacecnt
             else:
-                continue
-            str += val_repr + "\n"
-        return str + "\n"
+                n = 2
+            s += str(val) + "\n" * n
+        return s
 
     def _dump(self):
         print(f"# {self.__class__.__name__}")
@@ -482,6 +455,8 @@ class ConstructClass(ConstructClassBase, Container):
                 val = int(self[key])
             except:
                 continue
+        if (hasattr(self, "_post_parse")):
+            self = self._post_parse(self)
         return self
 
     def _apply_classful(self, obj):

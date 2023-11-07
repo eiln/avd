@@ -5,13 +5,57 @@
 from construct import *
 from construct.lib import *
 from .constructutils import *
+from math import ceil
 
 u8 = Hex(Int8ul)
 u16 = Hex(Int16ul)
 u32 = Hex(Int32ul)
 u64 = Hex(Int64ul)
 
-class AvdV3PiodmaHeader(ConstructClass):
+class AvdFrameParams(ConstructClass):
+    def __init__(self):
+        super().__init__()
+
+    def __str__(self, ignore=[], other=None, show_all=False) -> str:
+        str = "  \033[1;37m" + self.__class__.__name__ + ":\033[0m\n"
+
+        keys = list(self)
+        keys.sort(key = lambda x: self._off.get(x, (-1, 0))[0])
+        for key in keys:
+            if key in ignore or key.startswith('_'):
+                continue
+            if "pad" in key: continue
+
+            str += f"\t\033[0;36m{key.ljust(32)}\033[0m = "
+
+            v = getattr(self, key)
+            if isinstance(v, stringtypes):
+                val_repr = reprstring(v)
+            elif isinstance(v, int):
+                val_repr = hex(v)
+            elif isinstance(v, ListContainer) or isinstance(v, list):
+                tmp = []
+                stride = 4
+                for n in range(ceil(len(v) / stride)):
+                    y = v[n*stride:(n+1)*stride]
+                    if (not sum(y)):
+                        t = "-"
+                        continue
+                    else:
+                    	if ("lsb" in key):
+                    		t = ", ".join(["0x%05x" % x for x in y])
+                    	else:
+                    		t = ", ".join([hex(x) for x in y])
+                    if (n != 0):
+                    	t = "\t".ljust(len("\t") + 32 + 3) + t
+                    tmp.append(t)
+                val_repr = "\n".join(tmp)
+            else:
+                continue
+            str += val_repr + "\n"
+        return str + "\n"
+
+class AvdV3PiodmaHeader(AvdFrameParams):
 	subcon = Struct(
 		"pio_piodma1_word" / u32,
 		"pio_4_codec" / ExprValidator(u32, obj_ >= 0 and obj_ <= 4), # 32 fucking bits for max 4 codes it doesn't need, this will be a recurring theme
@@ -19,7 +63,7 @@ class AvdV3PiodmaHeader(ConstructClass):
 		"pio_c_notused" / u32,
 		"pio_10_notused" / u32,
 		"pio_14_deadcafe_notused" / ExprValidator(u32, obj_ == 0xdeadcafe),
-		"pio_18_101_notused" / ExprValidator(u32, obj_ == 0x10101),
+		"pio_18_101_notused" / u32,
 		"pio_1c_slice_count" / u32,
 		"pio_20_piodma3_offset" / u32, #ExprValidator(u32, obj_ == 0x8b4c0)
 		"pio_24_pad" / ZPadding(0x4),

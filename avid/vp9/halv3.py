@@ -62,7 +62,8 @@ class AVDVP9HalV3(AVDHal):
 		avd_set(0x4020002, "fw_dma_config_2")
 		avd_set(0x2020202, "fw_dma_config_3")
 		avd_set(0x240, "hdr_e0_pps2_tile_const_addr_lsb8")
-		avd_set(0x40 + ((ctx.access_idx % 4) * 0x80), "hdr_104_pps2_tile_addr_incr_lsb8")
+
+		avd_set((ctx.probs_addr + ((ctx.access_idx % 4) * 0x8000)) >> 8, "hdr_104_probs_addr_lsb8")
 
 		# set e8_addr_lsb8
 		# 0x8dc0 0x8dc0 0x8dc0 0x8dc0 0x8dc0 0x8dc0 0x8dc0
@@ -97,7 +98,7 @@ class AVDVP9HalV3(AVDHal):
 
 		avd_set(0x8cc0, "hdr_e8_sps0_tile_addr_lsb8", 0)
 		avd_set(0x8d40, "hdr_e8_sps0_tile_addr_lsb8", 1)
-		avd_set(0x0000, "hdr_f0_sps0_tile_addr_lsb8_zero")
+		avd_set(0x0000, "hdr_e8_sps0_tile_addr_lsb8", 2)
 		avd_set(0x8e40, "hdr_f4_sps1_tile_addr_lsb8", 0)
 		avd_set(0x8ec0, "hdr_f4_sps1_tile_addr_lsb8", 1)
 		avd_set(0x8fc0, "hdr_f4_sps1_tile_addr_lsb8", 3)
@@ -114,10 +115,10 @@ class AVDVP9HalV3(AVDHal):
 			if (sl.idx >= 22 and not sl.idx & 1):
 				z =  0x180
 			y = 0x3500 + z
-		avd_set(0xef80 + x, "hdr_11c_cur_rvra_addr_lsb7", 0)
-		avd_set(0xeb82 + y, "hdr_11c_cur_rvra_addr_lsb7", 1)
-		avd_set(0xf080 + x, "hdr_11c_cur_rvra_addr_lsb7", 2)
-		avd_set(0xec12 + y, "hdr_11c_cur_rvra_addr_lsb7", 3)
+		avd_set(0xef80 + x, "hdr_11c_curr_rvra_addr_lsb7", 0)
+		avd_set(0xeb82 + y, "hdr_11c_curr_rvra_addr_lsb7", 1)
+		avd_set(0xf080 + x, "hdr_11c_curr_rvra_addr_lsb7", 2)
+		avd_set(0xec12 + y, "hdr_11c_curr_rvra_addr_lsb7", 3)
 
 		avd_set(0x8f40, "hdr_f4_sps1_tile_addr_lsb8", 2)
 

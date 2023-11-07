@@ -4,7 +4,7 @@
 
 from ..fp import *
 
-class AvdH264V3PiodmaHeader(ConstructClass):
+class AvdH264V3PiodmaHeader(AvdFrameParams):
 	subcon = Struct(
 		"pio_piodma1_word" / u32,
 		"pio_4_codec" / ExprValidator(u32, obj_ >= 0 and obj_ <= 4), # 32 fucking bits for max 4 codes it doesn't need, this will be a recurring theme
@@ -20,7 +20,7 @@ class AvdH264V3PiodmaHeader(ConstructClass):
 	def __init__(self):
 		super().__init__()
 
-class AvdH264V3InstHeader(ConstructClass):
+class AvdH264V3InstHeader(AvdFrameParams):
 	subcon = "AvdH264V3InstHeader" / Struct(
 		"hdr_28_height_width_shift3" / u32,
 		"hdr_2c_sps_param" / u32,
@@ -58,7 +58,7 @@ class AvdH264V3InstHeader(ConstructClass):
 	def __init__(self):
 		super().__init__()
 
-class AvdH264V3DumbFuckingWasteofMemory(ConstructClass):
+class AvdH264V3DumbFuckingWasteofMemory(AvdFrameParams):
 	subcon = Struct(
 		"dfw_220_pad" / ZPadding(0x60),
 		"dfw_280_chunk0" / Bytes(0x1e4),
@@ -69,7 +69,7 @@ class AvdH264V3DumbFuckingWasteofMemory(ConstructClass):
 	def __init__(self):
 		super().__init__()
 
-class AvdH264V3Slice(ConstructClass):
+class AvdH264V3Slice(AvdFrameParams):
 	subcon = Struct(
 		"slc_6e0_piodma2_word" / u32,
 		"slc_6e4_cmd_ref_type" / u32,
@@ -91,7 +91,7 @@ class AvdH264V3Slice(ConstructClass):
 	def __init__(self):
 		super().__init__()
 
-class AvdH264V3Input(ConstructClass):
+class AvdH264V3Input(AvdFrameParams):
 	subcon = Struct(
 		"inp_8b4c0_piodma1_word" / u32,
 		"inp_8b4c4_zero" / ExprValidator(u32, obj_ == 0),
@@ -105,7 +105,7 @@ class AvdH264V3Input(ConstructClass):
 	def __init__(self):
 		super().__init__()
 
-class AvdH264V3FrameParams(ConstructClass):
+class AvdH264V3FrameParams(AvdFrameParams):
 	subcon = Struct(
 		"pio" / AvdH264V3PiodmaHeader,
 		"hdr" / AvdH264V3InstHeader,

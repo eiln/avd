@@ -41,6 +41,10 @@ class AVDVP9Decoder:
 		ctx.uv_addr = 0x76c900
 		ctx.slice_data_addr = 0x774000
 
+		ctx.probs_size = 0x774
+		ctx.probs_count = 4
+		ctx.probs_addr = 0x4000  # 0x4000 + (round_up(ctx.probs_size), 0x4000) * ctx.probs_count
+
 		# m1n1 compat
 		ctx.width = 128
 		ctx.height = 64
