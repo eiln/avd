@@ -194,7 +194,7 @@ int vp9_decode_uncompressed_header(VP9Context *s, const uint8_t *data, size_t si
     int c, i, j, ret, sharp;
     int last_invisible;
 
-    uint64_t start_pos = (uint64_t)(void *)s->gb.p;
+    uint64_t start_pos = (uint64_t)(void *)data;
     bs_init(&s->gb, (uint8_t *)data, size);
     if (get_bits(&s->gb, 2) != 0x2) {
         fprintf(stderr, "Invalid frame marker\n");
@@ -572,7 +572,6 @@ int vp9_decode_compressed_header(VP9Context *s, const uint8_t *data, size_t size
         fprintf(stderr, "Marker bit was set\n");
         return AVERROR_INVALIDDATA;
     }
-    printf("sz: %d\n", size);
 
     s->prob.p = s->prob_ctx[c].p;
 

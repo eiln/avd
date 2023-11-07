@@ -27,7 +27,7 @@
 
 int main(int argc, char *argv[])
 {
-	int i, err;
+	int i, num, err;
 	if (argc <= 1) {
 		fprintf(stderr, "usage: ./devp9 [path to .ivf] [optional count]\n");
 		return -1;
@@ -37,14 +37,14 @@ int main(int argc, char *argv[])
 	if (!data)
 		return -1;
 
-	int num = 1;
-	if (argc >= 3) {
-		num = atoi(argv[2]);
-	}
-
 	struct ivf_context *ivctx = ivf_init(data);
-	if (!ivctx || (*(uint32_t *)ivctx->h.fourcc != FOURCC_VP90))
+	if (!ivctx || (*(uint32_t *)ivctx->h.fourcc != FOURCC_VP90) || !ivctx->h.frame_count)
 		goto free_data;
+
+	if (argc >= 3)
+		num = atoi(argv[2]);
+	else
+		num = ivctx->h.frame_count;
 
 	VP9Context context;
 	VP9Context *s = &context;
