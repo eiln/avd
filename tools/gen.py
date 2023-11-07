@@ -27,5 +27,6 @@ if __name__ == "__main__":
 	units = dec.parse(args.input)
 	n = len(units) if args.all else args.num
 	for unit in units[:n]:
+		print(unit)
 		inst = dec.generate(unit)
 		print()

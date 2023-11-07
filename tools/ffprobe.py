@@ -18,7 +18,7 @@ def det_format(path):
 		return AVD_MODE_H265
 	if ext in [".ivf", "ivp9"]:
 		dmx = IVFDemuxer()
-		return dmx.setup(path)
+		return dmx.read_mode(path)
 	raise ValueError("unsupported format (%s)" % (ext))
 
 if __name__ == "__main__":
