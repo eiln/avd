@@ -23,58 +23,53 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef __VP9_SHARED_H__
-#define __VP9_SHARED_H__
+#ifndef __VP9_DEC_H__
+#define __VP9_DEC_H__
 
 #include "bs.h"
 #include "vpx_rac.h"
-#include "vp9_data.h"
 
 #include "libavutil/pixdesc.h"
 #include "libavcodec/avcodec.h"
 
+#define VP9_MAX_REF_FRAMES     4
 #define VP9_REFS_PER_FRAME     3
-#define VP9_REF_FRAMES_LOG2    3
-#define VP9_REF_FRAMES         (1 << VP9_REF_FRAMES_LOG2)
-#define VP9_FRAME_CONTEXTS_LOG2 2
+#define VP9_MIN_TILE_WIDTH_B64 4
+#define VP9_MAX_TILE_WIDTH_B64 64
+#define VP9_NUM_REF_FRAMES 8
 
-enum TxfmMode {
-	TX_4X4,
-	TX_8X8,
-	TX_16X16,
-	TX_32X32,
-	N_TXFM_SIZES,
-	TX_SWITCHABLE = N_TXFM_SIZES,
-	N_TXFM_MODES
-};
+// block transform size
+typedef uint8_t TX_SIZE;
+#define TX_4X4 ((TX_SIZE)0)    // 4x4 transform
+#define TX_8X8 ((TX_SIZE)1)    // 8x8 transform
+#define TX_16X16 ((TX_SIZE)2)  // 16x16 transform
+#define TX_32X32 ((TX_SIZE)3)  // 32x32 transform
+#define TX_SIZES ((TX_SIZE)4)
 
-// clang-format off
-enum TxfmType {
-	DCT_DCT,
-	DCT_ADST,
-	ADST_DCT,
-	ADST_ADST,
-	N_TXFM_TYPES,
-};
+// frame transform mode
+typedef enum {
+  ONLY_4X4 = 0,        // only 4x4 transform used
+  ALLOW_8X8 = 1,       // allow block transform size up to 8x8
+  ALLOW_16X16 = 2,     // allow block transform size up to 16x16
+  ALLOW_32X32 = 3,     // allow block transform size up to 32x32
+  TX_MODE_SELECT = 4,  // transform specified for each block
+  TX_MODES = 5,
+} TX_MODE;
+#define TX_SWITCHABLE 4
 
-enum IntraPredMode {
-	VERT_PRED,
-	HOR_PRED,
-	DC_PRED,
-	DIAG_DOWN_LEFT_PRED,
-	DIAG_DOWN_RIGHT_PRED,
-	VERT_RIGHT_PRED,
-	HOR_DOWN_PRED,
-	VERT_LEFT_PRED,
-	HOR_UP_PRED,
-	TM_VP8_PRED,
-	LEFT_DC_PRED,
-	TOP_DC_PRED,
-	DC_128_PRED,
-	DC_127_PRED,
-	DC_129_PRED,
-	N_INTRA_PRED_MODES
-};
+typedef enum {
+  DCT_DCT = 0,    // DCT  in both horizontal and vertical
+  ADST_DCT = 1,   // ADST in vertical, DCT in horizontal
+  DCT_ADST = 2,   // DCT  in vertical, ADST in horizontal
+  ADST_ADST = 3,  // ADST in both directions
+  TX_TYPES = 4
+} TX_TYPE;
+
+typedef enum {
+  VP9_LAST_FLAG = 1 << 0,
+  VP9_GOLD_FLAG = 1 << 1,
+  VP9_ALT_FLAG = 1 << 2,
+} VP9_REFFRAME;
 
 enum FilterMode {
 	FILTER_8TAP_SMOOTH,
@@ -83,13 +78,6 @@ enum FilterMode {
 	FILTER_BILINEAR,
 	N_FILTERS,
 	FILTER_SWITCHABLE = N_FILTERS,
-};
-
-enum BlockPartition {
-	PARTITION_NONE,    // [ ] <-.
-	PARTITION_H,       // [-]   |
-	PARTITION_V,       // [|]   |
-	PARTITION_SPLIT,   // [+] --'
 };
 
 enum InterPredMode {
@@ -105,68 +93,25 @@ enum CompPredMode {
 	PRED_SWITCHABLE,
 };
 
-enum BlockLevel {
-    BL_64X64,
-    BL_32X32,
-    BL_16X16,
-    BL_8X8,
-};
-
-enum BlockSize {
-    BS_64x64,
-    BS_64x32,
-    BS_32x64,
-    BS_32x32,
-    BS_32x16,
-    BS_16x32,
-    BS_16x16,
-    BS_16x8,
-    BS_8x16,
-    BS_8x8,
-    BS_8x4,
-    BS_4x8,
-    BS_4x4,
-    N_BS_SIZES,
-};
-
-#define DECLARE_ALIGNED(n, t, v) t __attribute__((aligned(n))) v
-
-typedef struct VP9mv {
-	DECLARE_ALIGNED(4, int16_t, x);
-	int16_t y;
-} VP9mv;
-
-typedef struct VP9mvrefPair {
-	VP9mv mv[2];
-	int8_t ref[2];
-} VP9mvrefPair;
-
 #if 0
 #define AVERROR_INVALIDDATA -1
-
-typedef struct AVBuffer AVBuffer;
-typedef struct AVBufferRef {
-	AVBuffer *buffer;
-	uint8_t *data;
-	int      size;
-} AVBufferRef;
 #endif
 
 typedef struct ThreadFrame {
 	int width;
 	int height;
-	AVBufferRef *buf[1];
+	int rows;
+	int cols;
+	int subsampling_x;
+	int subsampling_y;
+	int bit_depth;
 	int key_frame;
 } ThreadFrame;
 
 typedef struct VP9Frame {
 	ThreadFrame tf;
-	void *extradata; ///< RefStruct reference
 	uint8_t *segmentation_map;
-	VP9mvrefPair *mv;
 	int uses_2pass;
-
-	void *hwaccel_picture_private; ///< RefStruct reference
 } VP9Frame;
 
 /* bitstream header */
@@ -227,11 +172,10 @@ typedef struct VP9BitstreamHeader {
 			uint8_t lflvl[4][2];
 		} feat[MAX_SEGMENT];
 	} segmentation;
-	enum TxfmMode txfmmode;
+	TX_MODE txfmmode;
 	enum CompPredMode comppredmode;
 	struct {
 		unsigned log2_tile_cols, log2_tile_rows;
-		unsigned tile_cols, tile_rows;
 	} tiling;
 
 	int uncompressed_header_size;
@@ -240,7 +184,6 @@ typedef struct VP9BitstreamHeader {
 
 typedef struct VP9SharedContext {
 	VP9BitstreamHeader h;
-
 	ThreadFrame refs[8];
 #define CUR_FRAME	 0
 #define REF_FRAME_MVPAIR 1
@@ -248,35 +191,46 @@ typedef struct VP9SharedContext {
 	VP9Frame frames[3];
 } VP9SharedContext;
 
-#define REF_INVALID_SCALE 0xFFFF
-
-enum MVJoint {
-	MV_JOINT_ZERO,
-	MV_JOINT_H,
-	MV_JOINT_V,
-	MV_JOINT_HV,
-};
-
 typedef struct VP9Filter {
     uint8_t level[8 * 8];
     uint8_t /* bit=col */ mask[2 /* 0=y, 1=uv */][2 /* 0=col, 1=row */]
                               [8 /* rows */][4 /* 0=16, 1=8, 2=4, 3=inner4 */];
 } VP9Filter;
 
+typedef uint8_t vp9_coeff_probs_model[2][6][6][3];
+typedef unsigned int vp9_coeff_count_model[2][6][6][4];
 
-#define TX_SIZE_CONTEXTS 2
-#define TX_4X4 0    // 4x4 transform
-#define TX_8X8 1    // 8x8 transform
-#define TX_16X16 2  // 16x16 transform
-#define TX_32X32 3  // 32x32 transform
-#define TX_SIZES 4
+/* Symbols for coding magnitude class of nonzero components */
+#define MV_CLASSES 11
 
-#define REF_TYPES 2  // intra=0, inter=1
-/* Middle dimension reflects the coefficient position within the transform. */
-#define COEF_BANDS 6
-#define COEFF_CONTEXTS 6
-#define BAND_COEFF_CONTEXTS(band) ((band) == 0 ? 3 : COEFF_CONTEXTS)
-#define UNCONSTRAINED_NODES 3
+#define CLASS0_BITS 1 /* bits at integer precision for class 0 */
+#define CLASS0_SIZE (1 << CLASS0_BITS)
+#define MV_OFFSET_BITS (MV_CLASSES + CLASS0_BITS - 2)
+#define MV_FP_SIZE 4
+
+#define MV_MAX_BITS (MV_CLASSES + CLASS0_BITS + 2)
+#define MV_MAX ((1 << MV_MAX_BITS) - 1)
+#define MV_VALS ((MV_MAX << 1) + 1)
+
+#define MV_IN_USE_BITS 14
+#define MV_UPP ((1 << MV_IN_USE_BITS) - 1)
+#define MV_LOW (-(1 << MV_IN_USE_BITS))
+
+typedef struct nmv_component_counts {
+    unsigned int sign[2];
+    unsigned int classes[MV_CLASSES];
+    unsigned int class0[CLASS0_SIZE];
+    unsigned int bits[MV_OFFSET_BITS][2];
+    unsigned int class0_fp[CLASS0_SIZE][MV_FP_SIZE];
+    unsigned int fp[MV_FP_SIZE];
+    unsigned int class0_hp[2];
+    unsigned int hp[2];
+} nmv_component_counts;
+
+typedef struct nmv_context_counts {
+    unsigned int joints[4];
+    nmv_component_counts comps[2];
+} nmv_context_counts;
 
 // Only need this for fixed-size arrays, for structs just assign.
 #define vp9_copy(dest, src)              \
@@ -285,23 +239,100 @@ typedef struct VP9Filter {
     memcpy(dest, src, sizeof(src));      \
   } while (0)
 
+#define vp9_zero(dest) memset(&(dest), 0, sizeof(dest))
+#define vp9_zero_array(dest, n) memset(dest, 0, (n) * sizeof(*(dest)))
+
+struct VP9Context;
+
+struct __attribute__((packed, scalar_storage_order("little-endian"))) tx_probs {
+    uint8_t p32x32[2][3];
+    uint8_t p16x16[2][2];
+    uint8_t p8x8[2][1];
+};
+
+struct tx_counts {
+    unsigned int p32x32[2][4];
+    unsigned int p16x16[2][3];
+    unsigned int p8x8[2][2];
+    unsigned int tx_totals[4];
+};
+
+typedef struct __attribute__((packed, scalar_storage_order("little-endian"))) nmv_component {
+    uint8_t sign;
+    uint8_t classes[MV_CLASSES - 1];
+    uint8_t class0[CLASS0_SIZE - 1];
+    uint8_t bits[MV_OFFSET_BITS];
+    uint8_t class0_fp[CLASS0_SIZE][MV_FP_SIZE - 1];
+    uint8_t fp[MV_FP_SIZE - 1];
+    uint8_t class0_hp;
+    uint8_t hp;
+} nmv_component;
+
+typedef struct __attribute__((packed, scalar_storage_order("little-endian"))) nmv_context {
+    uint8_t joints[3];
+    nmv_component comps[2];
+} nmv_context;
+
+#define PLANE_TYPES 2
+#define REF_TYPES 2  // intra=0, inter=1
+#define COEF_BANDS 6
+#define UNCONSTRAINED_NODES 3
+#define COEFF_CONTEXTS 6
+#define BAND_COEFF_CONTEXTS(band) ((band) == 0 ? 3 : COEFF_CONTEXTS)
+
+typedef struct __attribute__((packed, scalar_storage_order("little-endian"))) ProbContext {
+    uint8_t y_mode[4][9];
+    uint8_t uv_mode[10][9];
+    uint8_t partition[16][3];
+    uint8_t switchable_interp[4][2];
+    uint8_t inter_mode[7][3];
+    uint8_t intra_inter[4];
+    uint8_t comp_inter[5];
+    uint8_t single_ref[5][2];
+    uint8_t comp_ref[5];
+    struct tx_probs tx;
+    uint8_t skip[3];
+    nmv_context nmvc;
+    uint8_t coef[4][2][2][6][6][3];
+} ProbContext;
+
+typedef struct VP9FrameCounts {
+	unsigned int y_mode[4][10];
+	unsigned int uv_mode[10][10];
+	unsigned int partition[16][4];
+	unsigned int coef[4][2][2][6][6][4];
+	unsigned int eob_branch[4][2][2][6][6];
+	unsigned int switchable_interp[4][3];
+	unsigned int inter_mode[7][4];
+	unsigned int intra_inter[4][2];
+	unsigned int comp_inter[5][2];
+	unsigned int single_ref[5][2][2];
+	unsigned int comp_ref[5][2];
+	struct tx_counts tx;
+	unsigned int skip[3][2];
+	nmv_context_counts mv;
+} VP9FrameCounts;
+
 typedef struct VP9Context {
 	VP9SharedContext s;
 	struct bitstream gb;
 	VPXRangeCoder c;
+	VP9FrameCounts counts;
 
 	int profile;
 	unsigned properties;
 	int pass, active_tile_cols;
 
-	uint8_t ss_h, ss_v;
+    int w, h;
+	uint8_t bd;
+	uint8_t sx, sy;
+	//uint8_t ss_h, ss_v;
 	uint8_t last_bpp, bpp_index, bytesperpixel;
 	uint8_t last_keyframe;
 	// sb_cols/rows, rows/cols and last_fmt are used for allocating all internal
 	// arrays, and are thus per-thread. w/h and gf_fmt are synced between threads
 	// and are therefore per-stream. pix_fmt represents the value in the header
 	// of the currently processed frame.
-	int w, h;
 	enum AVPixelFormat pix_fmt, last_fmt, gf_fmt;
 	enum AVColorSpace colorspace;
 	enum AVPixelFormat color_range;
@@ -313,21 +344,12 @@ typedef struct VP9Context {
 		uint8_t mblim_lut[64];
 	} filter_lut;
 
-	struct vp9_prob_context p;
-	struct vp9_prob_context prob_ctx[4];
-	const uint8_t *partition_probs;
-	const uint8_t *uv_mode_probs;
-
-#if 0
 	struct {
 		ProbContext p;
-		uint8_t coef[4][2][2][6][6][3];
 	} prob_ctx[4];
 	struct {
 		ProbContext p;
-		uint8_t coef[4][2][2][6][6][11];
 	} prob;
-#endif
 
 	// contextual (above) cache
 	uint8_t *above_partition_ctx;
@@ -342,7 +364,6 @@ typedef struct VP9Context {
 	uint8_t *above_comp_ctx; // 1bit
 	uint8_t *above_ref_ctx; // 2bit
 	uint8_t *above_filter_ctx;
-	VP9mv (*above_mv_ctx)[2];
 
 	// whole-frame cache
 	uint8_t *intra_pred_data[3];
@@ -352,10 +373,6 @@ typedef struct VP9Context {
 	int block_alloc_using_2pass;
 	uint16_t mvscale[3][2];
 	uint8_t mvstep[3][2];
-
-	// frame specific buffer pools
-	struct FFRefStructPool *frame_extradata_pool;
-	int frame_extradata_pool_size;
 } VP9Context;
 
-#endif /* __VP9_SHARED_H__ */
+#endif /* __VP9_DEC_H__ */

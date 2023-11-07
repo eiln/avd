@@ -1,159 +1,96 @@
 /*
- * Copyright (C) 2006  Aurelien Jacobs <aurel@gnuage.org>
+ *  Copyright (c) 2010 The WebM project authors. All Rights Reserved.
  *
- * This file is part of FFmpeg.
- *
- * FFmpeg is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * FFmpeg is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+ *  Use of this source code is governed by a BSD-style license
+ *  that can be found in the LICENSE file in the root of the source
+ *  tree. An additional intellectual property rights grant can be found
+ *  in the file PATENTS.  All contributing project authors may
+ *  be found in the AUTHORS file in the root of the source tree.
  */
 
-/**
- * @file
- * Common VP5-VP9 range decoder stuff
- */
+#ifndef VPX_VPX_DSP_BITREADER_H_
+#define VPX_VPX_DSP_BITREADER_H_
 
-#ifndef AVCODEC_VPX_RAC_H
-#define AVCODEC_VPX_RAC_H
+#include <stddef.h>
+#include <stdio.h>
+#include <limits.h>
 
-#include <stdint.h>
-
-#include "libavutil/attributes.h"
-#include "bytestream.h"
-
-typedef struct VPXRangeCoder {
-    int high;
-    int bits; /* stored negated (i.e. negative "bits" is a positive number of
-                 bits left) in order to eliminate a negate in cache refilling */
-    const uint8_t *buffer;
-    const uint8_t *end;
-    unsigned int code_word;
-    int end_reached;
-} VPXRangeCoder;
-
-static const uint8_t ff_vpx_norm_shift[256]= {
- 8,7,6,6,5,5,5,5,4,4,4,4,4,4,4,4,
- 3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
- 2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
- 2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
- 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
- 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
- 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
- 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
- 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
- 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
- 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
- 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-};
-
-static inline int ff_vpx_init_range_decoder(VPXRangeCoder *c, const uint8_t *buf, int buf_size)
-{
-    c->high = 255;
-    c->bits = -16;
-    c->buffer = buf;
-    c->end = buf + buf_size;
-    c->end_reached = 0;
-    if (buf_size < 1)
-        return AVERROR_INVALIDDATA;
-    c->code_word = bytestream_get_be24(&c->buffer);
-    return 0;
-}
-
-/**
- * returns 1 if the end of the stream has been reached, 0 otherwise.
- */
-static av_always_inline int vpx_rac_is_end(VPXRangeCoder *c)
-{
-    if (c->end <= c->buffer && c->bits >= 0)
-        c->end_reached ++;
-    return c->end_reached > 10;
-}
-
-static av_always_inline unsigned int vpx_rac_renorm(VPXRangeCoder *c)
-{
-    int shift = ff_vpx_norm_shift[c->high];
-    int bits = c->bits;
-    unsigned int code_word = c->code_word;
-
-    c->high   <<= shift;
-    code_word <<= shift;
-    bits       += shift;
-    if(bits >= 0 && c->buffer < c->end) {
-        code_word |= bytestream_get_be16(&c->buffer) << bits;
-        bits -= 16;
-    }
-    c->bits = bits;
-    return code_word;
-}
-
-#if   ARCH_ARM
-#include "arm/vpx_arith.h"
-#elif ARCH_X86
-#include "x86/vpx_arith.h"
+#ifdef __cplusplus
+extern "C" {
 #endif
 
-#ifndef vpx_rac_get_prob
-#define vpx_rac_get_prob vpx_rac_get_prob
-static av_always_inline int vpx_rac_get_prob(VPXRangeCoder *c, uint8_t prob)
-{
-    unsigned int code_word = vpx_rac_renorm(c);
-    unsigned int low = 1 + (((c->high - 1) * prob) >> 8);
-    unsigned int low_shift = low << 16;
-    int bit = code_word >= low_shift;
+typedef size_t BD_VALUE;
+#define BD_VALUE_SIZE ((int)sizeof(BD_VALUE) * CHAR_BIT)
 
-    c->high = bit ? c->high - low : low;
-    c->code_word = bit ? code_word - low_shift : code_word;
+// This is meant to be a large, positive constant that can still be efficiently
+// loaded as an immediate (on platforms like ARM, for example).
+// Even relatively modest values like 100 would work fine.
+#define LOTS_OF_BITS 0x40000000
 
-    return bit;
+typedef void (*vpx_decrypt_cb)(void *decrypt_state, const unsigned char *input,
+                               unsigned char *output, int count);
+
+typedef struct {
+  // Be careful when reordering this struct, it may impact the cache negatively.
+  BD_VALUE value;
+  unsigned int range;
+  int count;
+  const uint8_t *buffer_end;
+  const uint8_t *buffer;
+  vpx_decrypt_cb decrypt_cb;
+  void *decrypt_state;
+  uint8_t clear_buffer[sizeof(BD_VALUE) + 1];
+} vpx_reader;
+typedef vpx_reader VPXRangeCoder;
+
+int vpx_reader_init(vpx_reader *r, const uint8_t *buffer, size_t size,
+                    vpx_decrypt_cb decrypt_cb, void *decrypt_state);
+int vpx_read(vpx_reader *r, int prob);
+void vpx_reader_fill(vpx_reader *r);
+
+const uint8_t *vpx_reader_find_end(vpx_reader *r);
+
+static inline int vpx_reader_has_error(vpx_reader *r) {
+  // Check if we have reached the end of the buffer.
+  //
+  // Variable 'count' stores the number of bits in the 'value' buffer, minus
+  // 8. The top byte is part of the algorithm, and the remainder is buffered
+  // to be shifted into it. So if count == 8, the top 16 bits of 'value' are
+  // occupied, 8 for the algorithm and 8 in the buffer.
+  //
+  // When reading a byte from the user's buffer, count is filled with 8 and
+  // one byte is filled into the value buffer. When we reach the end of the
+  // data, count is additionally filled with LOTS_OF_BITS. So when
+  // count == LOTS_OF_BITS - 1, the user's data has been exhausted.
+  //
+  // 1 if we have tried to decode bits after the end of stream was encountered.
+  // 0 No error.
+  return r->count > BD_VALUE_SIZE && r->count < LOTS_OF_BITS;
 }
+
+static inline int vpx_read_bit(vpx_reader *r) {
+  return vpx_read(r, 128);  // vpx_prob_half
+}
+
+static inline int vpx_read_literal(vpx_reader *r, int bits) {
+  int literal = 0, bit;
+
+  for (bit = bits - 1; bit >= 0; bit--) literal |= vpx_read_bit(r) << bit;
+
+  return literal;
+}
+
+static inline int vpx_read_tree(vpx_reader *r, const int8_t *tree,
+                                const uint8_t *probs) {
+  int8_t i = 0;
+
+  while ((i = tree[i + vpx_read(r, probs[i >> 1])]) > 0) continue;
+
+  return -i;
+}
+
+#ifdef __cplusplus
+}  // extern "C"
 #endif
 
-#ifndef vpx_rac_get_prob_branchy
-// branchy variant, to be used where there's a branch based on the bit decoded
-static av_always_inline int vpx_rac_get_prob_branchy(VPXRangeCoder *c, int prob)
-{
-    unsigned long code_word = vpx_rac_renorm(c);
-    unsigned low = 1 + (((c->high - 1) * prob) >> 8);
-    unsigned low_shift = low << 16;
-
-    if (code_word >= low_shift) {
-        c->high     -= low;
-        c->code_word = code_word - low_shift;
-        return 1;
-    }
-
-    c->high = low;
-    c->code_word = code_word;
-    return 0;
-}
-#endif
-
-static av_always_inline int vpx_rac_get(VPXRangeCoder *c)
-{
-    unsigned int code_word = vpx_rac_renorm(c);
-    /* equiprobable */
-    int low = (c->high + 1) >> 1;
-    unsigned int low_shift = low << 16;
-    int bit = code_word >= low_shift;
-    if (bit) {
-        c->high   -= low;
-        code_word -= low_shift;
-    } else {
-        c->high = low;
-    }
-
-    c->code_word = code_word;
-    return bit;
-}
-
-#endif /* AVCODEC_VPX_RAC_H */
+#endif  // VPX_VPX_DSP_BITREADER_H_

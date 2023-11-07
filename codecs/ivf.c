@@ -23,13 +23,13 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "ivf.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#define IVF_SIGNATURE 0x46494b44 /* DKIF */
+#include "ivf.h"
+
+#define IVF_SIGNATURE 0x46494b44  /* DKIF */
 
 static inline unsigned int avio_r8(unsigned char **b)
 {

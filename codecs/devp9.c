@@ -25,13 +25,11 @@
 #include "ivf.h"
 #include "util.h"
 
-#define FOURCC_VP09   0x30395056
-
 int main(int argc, char *argv[])
 {
 	int i, err;
 	if (argc <= 1) {
-		fprintf(stderr, "usage: ./devp9 [path to .ivf]\n");
+		fprintf(stderr, "usage: ./devp9 [path to .ivf] [optional count]\n");
 		return -1;
 	}
 	int size;
@@ -39,20 +37,31 @@ int main(int argc, char *argv[])
 	if (!data)
 		return -1;
 
+	int num = 1;
+	if (argc >= 3) {
+		num = atoi(argv[2]);
+	}
+
 	struct ivf_context *ivctx = ivf_init(data);
-	if (!ivctx || (*(uint32_t *)ivctx->h.fourcc != FOURCC_VP09))
+	if (!ivctx || (*(uint32_t *)ivctx->h.fourcc != FOURCC_VP90))
 		goto free_data;
 
-	for (i = 0; i < 1; i++) {
-		VP9Context context;
-		VP9Context *s = &context;
+	VP9Context context;
+	VP9Context *s = &context;
+	memset(s, 0, sizeof(*s));
+	char* path;
+	for (i = 0; i < num; i++) {
 		err = ivf_read_frame(ivctx);
 		if (err)
 			goto free_ivf;
 
 		err = vp9_decode_uncompressed_header(s, ivctx->f.buf, ivctx->f.size);
-		err = vp9_decode_compressed_header(s);
+		err = vp9_decode_compressed_header(s, ivctx->f.buf, s->s.h.compressed_header_size);
+
 		vp9_print_header(s);
+		asprintf(&path, "out/p%d.bin", i);
+		vp9_save_probs(s, path);
+		vp9_adapt_probs(s);
 	}
 
 free_ivf:
