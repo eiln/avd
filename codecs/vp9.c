@@ -113,7 +113,7 @@ static int vp9_read_colorspace_details(VP9Context *s)
 }
 
 static void vp9_init_mode_probs(VP9Context *s) {
-    ProbContext *p = &s->prob.p;
+    VP9ProbContext *p = &s->prob.p;
     vp9_copy(p->uv_mode, vp9_default_if_uv_probs);
     vp9_copy(p->y_mode, vp9_default_if_y_probs);
     vp9_copy(p->switchable_interp, default_switchable_interp_prob);
@@ -129,7 +129,7 @@ static void vp9_init_mode_probs(VP9Context *s) {
 
 static void vp9_setup_past_independence(VP9Context *s)
 {
-    ProbContext *p = &s->prob.p;
+    VP9ProbContext *p = &s->prob.p;
     int i;
 
     // reset loopfilter defaults
@@ -564,7 +564,7 @@ int vp9_decode_compressed_header(VP9Context *s, const uint8_t *data, size_t size
     int c, i, j, k, l, m, n, err;
 
     c = s->s.h.framectxid;
-    ProbContext *p = &s->prob.p;
+    VP9ProbContext *p = &s->prob.p;
 
     data += s->s.h.uncompressed_header_size;
     err = vpx_reader_init(&s->c, s->gb.p, size, NULL, NULL);

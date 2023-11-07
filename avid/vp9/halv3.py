@@ -151,7 +151,7 @@ class AVDVP9HalV3(AVDHal):
 		avd_set = self.avd_set
 		avd_set(0x2d800000, "fw_cmd_set_slice_data")
 		header_size = sl.compressed_header_size + sl.uncompressed_header_size
-		payload_size = sl.payload.size - header_size
+		payload_size = sl.frame.size - header_size
 		avd_set(ctx.slice_data_addr + header_size, "inp_8b4d4_slice_addr_low")
 		avd_set(payload_size, "inp_8b4d8_slice_hdr_size")
 

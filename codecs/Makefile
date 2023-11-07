@@ -9,7 +9,7 @@ VP9_OBJECTS := $(patsubst %,build/%,$(VP9_OBJECTS))
 
 all: h264 vp9
 h264: deh264 libh264.so
-vp9: devp9
+vp9: devp9 libvp9.so
 
 build/%.o: %.c
 	@mkdir -p "$(dir $@)"
@@ -23,6 +23,9 @@ devp9: $(VP9_OBJECTS)
 
 libh264.so: $(H264_OBJECTS)
 	$(CC) -shared -pthread -fPIC -fno-strict-aliasing libh264.c -o $@ $^
+
+libvp9.so: $(VP9_OBJECTS)
+	$(CC) -shared -pthread -fPIC -fno-strict-aliasing libvp9.c -o $@ $^
 
 clean:
 	rm -rf build/* out/*

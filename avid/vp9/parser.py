@@ -2,10 +2,13 @@
 # SPDX-License-Identifier: MIT
 # Copyright 2023 Eileen Yoon <eyn@gmx.com>
 
-from ..parser import AVDParser, AVDSlice
+from ..parser import *
 from ..types import *
 from .types import *
 from construct import *
+import ctypes
+import io
+from contextlib import redirect_stdout
 
 IVFHeader = Struct(
 	"signature" / ExprValidator(PaddedString(4, encoding='u8'), obj_ == "DKIF"),
@@ -27,24 +30,22 @@ IVFFrameHeader = Struct(
 )
 assert(IVFFrameHeader.sizeof() == 12)
 
-class IVFFrame:
-	def __init__(self, f, b):
-		self.payload = b
-		self.size = f.size
-		self.timestamp = f.timestamp
-
 class IVFDemuxer:
 	def __init__(self):
 		self.stream = None
 		self.pos = 0
 
-	def setup(self, path):
+	def read_header(self, path):
 		self.pos = 0
 		self.stream = open(path, "rb").read()
 		h = IVFHeader.parse(self.stream[:32])
-		self.pos += 32
-		print("[IVF] codec: %s %dx%d frames: %d" % (h.fourcc, h.width, h.height, h.frame_count))
 		self.header = h
+		print("[IVF] codec: %s %dx%d frames: %d" % (h.fourcc, h.width, h.height, h.frame_count))
+		self.pos += 32
+		return h
+
+	def read_mode(self, path):
+		h = self.read_header(path)
 		if (h.fourcc == "VP90"):
 			return AVD_MODE_VP9
 		if (h.fourcc == "AV01"):
@@ -52,7 +53,7 @@ class IVFDemuxer:
 		raise ValueError("unsupported fourcc (%s)" % (h.fourcc))
 
 	def read_all(self, path):
-		mode = self.setup(path)
+		self.read_header(path)
 		slices = []
 		for n in range(self.header.frame_count):
 			slices.append(self.read_frame())
@@ -63,7 +64,7 @@ class IVFDemuxer:
 		self.pos += 12
 		b = self.stream[self.pos:self.pos+f.size]
 		self.pos += f.size
-		return IVFFrame(f, b)
+		return AVDFrame(b, f.size, f.timestamp)
 
 class AVDVP9Slice(AVDSlice):
 	def __init__(self):
@@ -76,11 +77,15 @@ class AVDVP9Slice(AVDSlice):
 		return s
 
 	def get_payload(self):
-		return self.payload.payload
+		return self.frame.payload
 
 class AVDVP9Parser(AVDParser):
 	def __init__(self):
-		super().__init__("devp9", "")
+		super().__init__("devp9", "libvp9.so")
+		self.lib.libvp9_init.restype = ctypes.c_void_p
+		self.lib.libvp9_free.argtypes = [ctypes.c_void_p]
+		self.lib.libvp9_decode.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int]
+
 		self.arr_keys = [
 			("ref_frame_idx", VP9_REF_FRAMES),
 			("ref_frame_sign_bias", VP9_REF_FRAMES),
@@ -91,9 +96,18 @@ class AVDVP9Parser(AVDParser):
 		self.reader = IVFDemuxer()
 
 	def parse(self, path):
-		headers = self.get_headers(path)
-		slices = self.reader.read_all(path)
-		assert(len(headers) <= len(slices))
+		frames = self.reader.read_all(path)
+		handle = self.lib.libvp9_init()
+		if (handle == None):
+			raise RuntimeError("Failed to init libvp9")
+		out = OutputGrabber()
+		out.start()
+		for frame in frames:
+			err = self.lib.libvp9_decode(handle, frame.payload, frame.size)
+		out.stop()
+		self.lib.libvp9_free(handle)
+		headers = self.parse_headers(out.capturedtext)
+		assert(len(headers) == len(frames))
 		for i,hdr in enumerate(headers):
-			hdr.payload = slices[i]
+			hdr.frame = frames[i]
 		return headers

@@ -176,8 +176,8 @@ static void vp9_adapt_mode_probs(VP9Context *s)
 {
     int c, i, j, k, l, m, n;
     c = s->s.h.framectxid;
-    ProbContext *pp = &s->prob_ctx[c].p;
-    ProbContext *p = &s->prob.p;
+    VP9ProbContext *pp = &s->prob_ctx[c].p;
+    VP9ProbContext *p = &s->prob.p;
     VP9FrameCounts *counts = &s->counts;
 
     for (i = 0; i < 4; i++)
@@ -290,7 +290,7 @@ static void adapt_coef_probs(VP9Context *s, int tx_size,
                              unsigned int count_sat,
                              unsigned int update_factor) {
     int c = s->s.h.framectxid;
-    ProbContext *pp = &s->prob_ctx[c].p;
+    VP9ProbContext *pp = &s->prob_ctx[c].p;
     const vp9_coeff_probs_model *const pre_probs = pp->coef[tx_size];
     vp9_coeff_probs_model *const probs = s->prob.p.coef[tx_size];
     vp9_coeff_count_model *counts = s->counts.coef[tx_size];
