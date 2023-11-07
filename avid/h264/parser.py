@@ -7,6 +7,7 @@ from ..types import *
 from .types import *
 
 import ctypes
+import subprocess
 from math import ceil
 
 class AVDH264Slice(AVDSlice):
@@ -40,7 +41,7 @@ class AVDH264Slice(AVDSlice):
 
 class AVDH264Parser(AVDParser):
 	def __init__(self):
-		super().__init__("deh264", "libh264.so")
+		super().__init__(bin_path="deh264", lib_path="libh264.so")
 		self.arr_keys = [("modification_of_pic_nums_idc_l0", H264_MAX_REFS),
 				("modification_of_pic_nums_idc_l1", H264_MAX_REFS),
 				("abs_diff_pic_num_minus1_l0", H264_MAX_REFS),
@@ -53,7 +54,7 @@ class AVDH264Parser(AVDParser):
 		]
 		self.slccls = AVDH264Slice
 
-	def get_payloads(self, path):
+	def parse_payloads(self, path):
 		buf = open(path, "rb").read()
 		bufpos = 0
 		bytesnum = len(buf)
@@ -71,8 +72,9 @@ class AVDH264Parser(AVDParser):
 		return nalus
 
 	def parse(self, path):
-		payloads = self.get_payloads(path)
-		units = self.get_headers(path)
+		payloads = self.parse_payloads(path)
+		out = subprocess.check_output([f'{self.bin_path}', path], text=True)
+		units = self.parse_headers(out)
 
 		slice_idx = 0
 		sps_list = [None] * H264_MAX_SPS_COUNT

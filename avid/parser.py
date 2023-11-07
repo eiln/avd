@@ -5,7 +5,6 @@
 import ctypes
 import os
 import struct
-import subprocess
 import sys
 import threading
 import time
@@ -118,7 +117,8 @@ class OutputGrabber(object):
 
 class AVDParser:
 	def __init__(self, bin_path, lib_path):
-		self.bin_path = (Path(__file__).parent / ('../codecs/%s' % (bin_path))).resolve()
+		if (bin_path):
+			self.bin_path = (Path(__file__).parent / ('../codecs/%s' % (bin_path))).resolve()
 		if (lib_path):
 			lib_path = (Path(__file__).parent / ('../codecs/%s' % (lib_path))).resolve()
 			self.lib = ctypes.cdll.LoadLibrary(lib_path)
@@ -128,8 +128,6 @@ class AVDParser:
 	def parse_headers(self, stdout):
 		# I know this sucks but it's just not possible to write cpython
 		# bindings for a stream parser. This also makes N/A fields explicit
-		#res = subprocess.check_output([f'{self.bin_path}', path], text=True)
-
 		lines = stdout.splitlines()
 		start = [i for i,line in enumerate(lines) if "{" in line]
 		end = [i for i,line in enumerate(lines) if "}" in line]
