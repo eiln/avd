@@ -717,6 +717,49 @@ int vp9_decode_compressed_header(VP9Context *s, const uint8_t *data, size_t size
         s->prob_ctx[s->s.h.framectxid].p = s->prob.p;
     }
 
+    /* Start of AVD-specific hacks, hopefully none more. Notice this comes _after_
+     * updating the global context. Below is from libvpx/vp9/common/vp9_onyxc_int.h.
+
+        static INLINE int frame_is_intra_only(const VP9_COMMON *const cm) {
+          return cm->frame_type == KEY_FRAME || cm->intra_only;
+        }
+
+        static INLINE void set_partition_probs(const VP9_COMMON *const cm,
+                                               MACROBLOCKD *const xd) {
+          xd->partition_probs =
+              frame_is_intra_only(cm)
+                  ? &vp9_kf_partition_probs[0]
+                  : (const vpx_prob(*)[PARTITION_TYPES - 1]) cm->fc->partition_prob;
+        }
+
+        static INLINE void vp9_init_macroblockd(VP9_COMMON *cm, MACROBLOCKD *xd,
+                                                tran_low_t *dqcoeff) {
+          int i;
+          // some stuff
+          set_partition_probs(cm, xd);
+        }
+
+     * Very confusingly 9.3.2. "Probability Selection Process" specifically states
+     * !keyframe && intraonly frames use the kf probability tables (as opposed to
+     * the default/if probs), but libavcodec and libvpx both check for (keyframe
+     * || intraonly), so let's assume that.
+     *
+     * On keyframes, macOS loads the _kf_ partition table, as if it was decoding
+     * the first macroblock. It's not a driver bug because the hardware faults
+     * and requires hard-reboot if loaded the default table. And it's not "always
+     * take kf in independence" either because it's not reflected in the global
+     * context (that'd shift the adapted probs). Same for uv_mode.
+     *
+     * So is it "the probs instantaneously at the decoding the first macroblock"?
+     * It is not because we do not load the kf variant of y_mode. That also faults.
+     */
+#if 1
+    if (s->s.h.keyframe || s->s.h.intraonly) {
+        vp9_copy(s->prob.p.partition, vp9_kf_partition_probs);
+        vp9_copy(s->prob.p.uv_mode, vp9_kf_uv_mode_probs);
+    }
+#endif
+
     return 0;
 }
 

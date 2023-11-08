@@ -32,5 +32,6 @@ extern const uint8_t vp9_kf_uv_mode_probs[10][9];
 extern const uint8_t vp9_default_if_y_probs[4][9];
 extern const uint8_t vp9_default_if_uv_probs[10][9];
 extern const uint8_t vp9_default_partition_probs[16][3];
+extern const uint8_t vp9_kf_partition_probs[16][3];
 
 #endif /* AVCODEC_VP9DATA_H */
