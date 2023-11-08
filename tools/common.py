@@ -108,6 +108,20 @@ def bitrepr(size, bits):
 
 def bitrepr32(x): return bitrepr(4, struct.pack("<I", x))
 
+def cassert(x, y, f=False):
+    if (x != y):
+        print(hl(f"[ASSERT] {hex(x)} vs. {hex(y)}", ANSI_RED))
+    if not (f):
+        assert(x == y)
+
+def bassert(x, y, f=False): # cassert was "c" for compare. now it looks stupid
+    if (x != y):
+        print(hl(f"[ASSERT]", ANSI_RED))
+        diff = chexdiff32(x, y)
+        print(diff)
+    if not (f):
+        assert(x == y)
+
 def ffprobe(path):
 	import os
 	fname, ext = os.path.splitext(path)

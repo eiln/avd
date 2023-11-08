@@ -39,12 +39,6 @@ def hl(x, n):
     if (n == None): return x
     return f"\033[1;{n}m{str(x)}\033[0m"
 
-def cassert(x, y, f=False):
-    if (x != y):
-        print(hl(f"[ASSERT] {hex(x)} vs. {hex(y)}", ANSI_RED))
-    if not (f):
-        assert(x == y)
-
 class dotdict(dict):
     __setattr__ = dict.__setitem__
     __delattr__ = dict.__delitem__

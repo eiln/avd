@@ -3,11 +3,11 @@
 # Copyright 2023 Eileen Yoon <eyn@gmx.com>
 
 from ..parser import *
+from .probs import *
 from .types import *
+
 from construct import *
 import ctypes
-import io
-from contextlib import redirect_stdout
 
 IVFHeader = Struct(
 	"signature" / ExprValidator(PaddedString(4, encoding='u8'), obj_ == "DKIF"),
@@ -69,6 +69,7 @@ class AVDVP9Slice(AVDSlice):
 	def __init__(self):
 		super().__init__()
 		self.mode = "vp09"
+		self._banned_keys = ["idx", "frame", "probs", "probs_data"]
 
 	def __repr__(self):
 		s = "\n[slice: %d key_frame: %d]\n" % (self.idx, not self.frame_type)
@@ -77,6 +78,9 @@ class AVDVP9Slice(AVDSlice):
 
 	def get_payload(self):
 		return self.frame.payload
+
+	def get_probs(self):
+		return self.probs_data
 
 class AVDVP9Parser(AVDParser):
 	def __init__(self):
@@ -101,12 +105,17 @@ class AVDVP9Parser(AVDParser):
 			raise RuntimeError("Failed to init libvp9")
 		out = OutputGrabber()
 		out.start()
+		probs_all = []
 		for frame in frames:
 			err = self.lib.libvp9_decode(handle, frame.payload, frame.size)
+			probs = ctypes.string_at(handle, LibVP9Probs.sizeof()) # this isnt great but it works
+			probs_all.append(probs)
 		out.stop()
 		self.lib.libvp9_free(handle)
 		headers = self.parse_headers(out.capturedtext)
-		assert(len(headers) == len(frames))
+		assert(len(headers) == len(frames) == len(probs_all))
 		for i,hdr in enumerate(headers):
 			hdr.frame = frames[i]
+			hdr.probs = LibVP9Probs.parse(probs_all[i])
+			hdr.probs_data = hdr.probs.to_avdprobs(hdr.probs)
 		return headers
