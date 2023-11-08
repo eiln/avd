@@ -107,3 +107,16 @@ def bitrepr(size, bits):
 	return ''.join(['%u' % x for x in out])
 
 def bitrepr32(x): return bitrepr(4, struct.pack("<I", x))
+
+def ffprobe(path):
+	import os
+	fname, ext = os.path.splitext(path)
+	if ext in [".h264", ".264"]:
+		return "h264"
+	if ext in [".h265", ".265"]:
+		return "h265"
+	if ext in [".ivf", "ivp9"]:
+		from avid.vp9.parser import IVFDemuxer
+		dmx = IVFDemuxer()
+		return dmx.read_mode(path)
+	raise ValueError("unsupported format (%s)" % (ext))

@@ -3,7 +3,6 @@
 # Copyright 2023 Eileen Yoon <eyn@gmx.com>
 
 from collections import namedtuple
-from .types import *
 from .utils import *
 
 class AVDInst(namedtuple('AVDInst', ['val', 'name', 'pos', 'idx'])):

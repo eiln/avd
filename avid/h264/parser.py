@@ -3,7 +3,6 @@
 # Copyright 2023 Eileen Yoon <eyn@gmx.com>
 
 from ..parser import AVDParser, AVDSlice
-from ..types import *
 from .types import *
 
 import ctypes

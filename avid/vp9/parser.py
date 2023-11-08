@@ -3,7 +3,6 @@
 # Copyright 2023 Eileen Yoon <eyn@gmx.com>
 
 from ..parser import *
-from ..types import *
 from .types import *
 from construct import *
 import ctypes
@@ -47,9 +46,9 @@ class IVFDemuxer:
 	def read_mode(self, path):
 		h = self.read_header(path)
 		if (h.fourcc == "VP90"):
-			return AVD_MODE_VP9
+			return "vp09"
 		if (h.fourcc == "AV01"):
-			return AVD_MODE_AV1
+			return "av01"
 		raise ValueError("unsupported fourcc (%s)" % (h.fourcc))
 
 	def read_all(self, path):

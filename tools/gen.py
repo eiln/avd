@@ -5,7 +5,7 @@ import sys, pathlib
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
 import argparse
-from ffprobe import *
+from tools.common import ffprobe
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(prog='Generate instruction stream')
@@ -14,11 +14,11 @@ if __name__ == "__main__":
 	parser.add_argument('-a', '--all', action='store_true', help="run all")
 	args = parser.parse_args()
 
-	mode = det_format(args.input)
-	if  (mode == AVD_MODE_H264):
+	mode = ffprobe(args.input)
+	if  (mode == "h264"):
 		from avid.h264.decoder import AVDH264Decoder
 		dec = AVDH264Decoder()
-	elif (mode == AVD_MODE_VP9):
+	elif (mode == "vp09"):
 		from avid.vp9.decoder import AVDVP9Decoder
 		dec = AVDVP9Decoder()
 	else:
