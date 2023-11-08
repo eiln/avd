@@ -86,8 +86,8 @@ def test(fp0, fp1, args):
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(prog='Crappy unit test')
-	parser.add_argument('-i', '--path', type=str, help="path to .h264")
-	parser.add_argument('-d','--dir', type=str, help="matching .h264 trace dir")
+	parser.add_argument('-i', '--path', type=str, required=True, help="path to .h264")
+	parser.add_argument('-d','--dir', type=str, required=True, help="matching .h264 trace dir")
 	parser.add_argument('-p','--prefix', type=str, default="", help="dir prefix")
 	parser.add_argument('-n', '--num', type=int, default=1, help="count from start")
 	parser.add_argument('-a', '--all', action='store_true', help="run all")

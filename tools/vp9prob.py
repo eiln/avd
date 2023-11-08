@@ -43,8 +43,8 @@ def main(slices, paths, count):
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(prog='macOS frame_params parser')
-	parser.add_argument('-i', '--input', type=str, help="path to bitstream")
-	parser.add_argument('-d','--dir', type=str, help="frame_params dir name")
+	parser.add_argument('-i', '--input', type=str, required=True, help="path to bitstream")
+	parser.add_argument('-d','--dir', type=str, required=True, help="frame_params dir name")
 	parser.add_argument('-p','--prefix', type=str, default="", help="dir prefix")
 	parser.add_argument('-n','--count', type=int, default=1, help="count")
 	parser.add_argument('-a', '--all', action='store_true', help="run all")
