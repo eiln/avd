@@ -446,10 +446,10 @@ int vp9_decode_uncompressed_header(VP9Context *s, const uint8_t *data, size_t si
         }
     }
 
-    int min_log2_tile_cols = 0;
+    uint8_t min_log2_tile_cols = 0;
     while ((VP9_MAX_TILE_WIDTH_B64 << min_log2_tile_cols) < s->sb_cols)
         ++min_log2_tile_cols;
-    int max_log2_tile_cols = 0;
+    uint8_t max_log2_tile_cols = 0;
     while ((s->sb_cols >> (max_log2_tile_cols + 1)) >= VP9_MIN_TILE_WIDTH_B64)
         ++max_log2_tile_cols;
     s->s.h.tiling.log2_tile_cols = vp9_read_increment(s, min_log2_tile_cols, max_log2_tile_cols);
@@ -565,9 +565,10 @@ int vp9_decode_compressed_header(VP9Context *s, const uint8_t *data, size_t size
 
     c = s->s.h.framectxid;
     VP9ProbContext *p = &s->prob.p;
+    printf("sz: %d\n", size);
 
     data += s->s.h.uncompressed_header_size;
-    err = vpx_reader_init(&s->c, s->gb.p, size, NULL, NULL);
+    err = vpx_reader_init(&s->c, data, size, NULL, NULL);
     if (err) {
         fprintf(stderr, "Marker bit was set\n");
         return AVERROR_INVALIDDATA;
@@ -789,6 +790,7 @@ void vp9_print_header(VP9Context *s)
     printf("{\n");
     vp9_print_uncompressed_header(s);
     printf("}\n");
+    //printf("\tskip: [%d, %d, %d]\n", s->prob.p.skip[0], s->prob.p.skip[1], s->prob.p.skip[2]);
 }
 
 void vp9_save_probs(VP9Context *s, const char *path)

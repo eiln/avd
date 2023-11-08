@@ -320,10 +320,9 @@ typedef struct VP9Context {
     unsigned properties;
     int pass, active_tile_cols;
 
-    uint8_t w, h;
+    uint32_t w, h;
     uint8_t bd;
     uint8_t sx, sy;
-    //uint8_t ss_h, ss_v;
     uint8_t last_bpp, bpp_index, bytesperpixel;
     uint8_t last_keyframe;
     // sb_cols/rows, rows/cols and last_fmt are used for allocating all internal
@@ -333,7 +332,7 @@ typedef struct VP9Context {
     enum AVPixelFormat pix_fmt, last_fmt, gf_fmt;
     enum AVColorSpace colorspace;
     enum AVPixelFormat color_range;
-    unsigned sb_cols, sb_rows, rows, cols;
+    uint32_t sb_cols, sb_rows, rows, cols;
     ThreadFrame next_refs[8];
 
     struct {
