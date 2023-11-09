@@ -449,9 +449,8 @@ static int h264_parse_sps(struct bitstream *gb, struct h264_sps *sps)
 
 static int h264_svc_vui_parameters(struct bitstream *gb, struct h264_vui *vui)
 {
-	/* XXX */
-	abort();
-	return 0;
+	h264_err("patch welcome\n");
+	return -1;
 }
 
 static int h264_parse_sps_svc(struct bitstream *gb, struct h264_sps *sps)
@@ -505,14 +504,14 @@ static int h264_parse_sps_svc(struct bitstream *gb, struct h264_sps *sps)
 
 static int h264_mvc_vui_parameters(struct bitstream *gb, struct h264_vui *vui)
 {
-	/* XXX */
-	abort();
-	return 0;
+	h264_err("patch welcome\n");
+	return -1;
 }
 
 static int h264_parse_sps_mvc(struct bitstream *gb, struct h264_sps *sps)
 {
-	int i, j, k;
+	int i = 0, j = 0, k;
+	int err = 0;
 
 	sps->is_mvc = 1;
 	if (!get_bits1(gb)) {
@@ -520,27 +519,33 @@ static int h264_parse_sps_mvc(struct bitstream *gb, struct h264_sps *sps)
 		return -1;
 	}
 
-	/* This leaks memory lmao */
 	sps->num_views_minus1 = bs_read_ue(gb);
 	sps->views = calloc(sizeof *sps->views, sps->num_views_minus1 + 1);
+	if (!sps->views) {
+		err = -1;
+		goto exit;
+	}
+
 	for (i = 0; i <= sps->num_views_minus1; i++)
 		sps->views[i].view_id = bs_read_ue(gb);
 	for (i = 1; i <= sps->num_views_minus1; i++) {
 		sps->views[i].num_anchor_refs_l0 = bs_read_ue(gb);
 		if (sps->views[i].num_anchor_refs_l0 > 15) {
 			h264_err("num_anchor_refs_l0 over limit\n");
-			return -1;
+			err = -1;
+			goto free_views;
 		}
-	
+
 		for (j = 0; j < sps->views[i].num_anchor_refs_l0; j++)
 			sps->views[i].anchor_ref_l0[j] = bs_read_ue(gb);
 
 		sps->views[i].num_anchor_refs_l1 = bs_read_ue(gb);
 		if (sps->views[i].num_anchor_refs_l1 > 15) {
 			h264_err("num_anchor_refs_l1 over limit\n");
-			return -1;
+			err = -1;
+			goto free_views;
 		}
-	
+
 		for (j = 0; j < sps->views[i].num_anchor_refs_l1; j++)
 			sps->views[i].anchor_ref_l1[j] = bs_read_ue(gb);
 	}
@@ -549,7 +554,8 @@ static int h264_parse_sps_mvc(struct bitstream *gb, struct h264_sps *sps)
 		sps->views[i].num_non_anchor_refs_l0 = bs_read_ue(gb);
 		if (sps->views[i].num_non_anchor_refs_l0 > 15) {
 			h264_err("num_non_anchor_refs_l0 over limit\n");
-			return -1;
+			err = -1;
+			goto free_views;
 		}
 		for (j = 0; j < sps->views[i].num_non_anchor_refs_l0; j++)
 			sps->views[i].non_anchor_ref_l0[j] = bs_read_ue(gb);
@@ -557,7 +563,8 @@ static int h264_parse_sps_mvc(struct bitstream *gb, struct h264_sps *sps)
 		sps->views[i].num_non_anchor_refs_l1 = bs_read_ue(gb);
 		if (sps->views[i].num_non_anchor_refs_l1 > 15) {
 			h264_err("num_non_anchor_refs_l1 over limit\n");
-			return -1;
+			err = -1;
+			goto free_views;
 		}
 		for (j = 0; j < sps->views[i].num_non_anchor_refs_l1; j++)
 			sps->views[i].non_anchor_ref_l1[j] = bs_read_ue(gb);
@@ -566,18 +573,33 @@ static int h264_parse_sps_mvc(struct bitstream *gb, struct h264_sps *sps)
 	sps->num_level_values_signalled_minus1 = bs_read_ue(gb);
 	sps->levels = calloc(sizeof *sps->levels,
 				     sps->num_level_values_signalled_minus1 + 1);
+	if (!sps->levels) {
+		err = -1;
+		goto free_views;
+	}
+
 	for (i = 0; i <= sps->num_level_values_signalled_minus1; i++) {
 		sps->levels[i].level_idc = get_bits(gb, 8);
 		sps->levels[i].num_applicable_ops_minus1 = bs_read_ue(gb);
 		sps->levels[i].applicable_ops =
 				calloc(sizeof *sps->levels[i].applicable_ops,
 				       sps->levels[i].num_applicable_ops_minus1 + 1);
+		if (!sps->levels[i].applicable_ops) {
+			err = -1;
+			goto free_levels;
+		}
+
 		for (j = 0; j <= sps->levels[i].num_applicable_ops_minus1; j++) {
 			sps->levels[i].applicable_ops[j].temporal_id = get_bits(gb, 3);
 			sps->levels[i].applicable_ops[j].num_target_views_minus1 = bs_read_ue(gb);
 			sps->levels[i].applicable_ops[j].target_view_id =
 					calloc(sizeof *sps->levels[i].applicable_ops[j].target_view_id,
 					       sps->levels[i].applicable_ops[j].num_target_views_minus1 + 1);
+			if (!sps->levels[i].applicable_ops[j].target_view_id) {
+				err = -1;
+				goto free_levels;
+			}
+
 			for (k = 0; k <= sps->levels[i].applicable_ops[j].num_target_views_minus1; k++)
 				sps->levels[i].applicable_ops[j].target_view_id[k] = bs_read_ue(gb);
 			sps->levels[i].applicable_ops[j].num_views_minus1 = bs_read_ue(gb);
@@ -585,11 +607,23 @@ static int h264_parse_sps_mvc(struct bitstream *gb, struct h264_sps *sps)
 	}
 
 	sps->mvc_vui_parameters_present_flag = get_bits1(gb);
-	if (sps->mvc_vui_parameters_present_flag)
-		if (h264_mvc_vui_parameters(gb, &sps->mvc_vui))
-			return -1;
+	if (sps->mvc_vui_parameters_present_flag) {
+		err = h264_mvc_vui_parameters(gb, &sps->mvc_vui);
+		if (err < 0)
+			goto free_levels;
+	}
 
-	return 0;
+free_levels:
+	while (i--) {
+		free(sps->levels[i].applicable_ops);
+		while (j--)
+			free(sps->levels[i].applicable_ops[j].target_view_id);
+	}
+	free(sps->levels);
+free_views:
+	free(sps->views);
+exit:
+	return err;
 }
 
 static int h264_parse_sps_ext(struct h264_context *ctx, uint32_t *pseq_parameter_set_id)
