@@ -1,4 +1,4 @@
-CFLAGS := -fpic
+CFLAGS := -fpic -Wall -Wextra -pedantic -Wmissing-prototypes -Wstrict-prototypes
 H264_OBJECTS := h264.o h264_print.o
 H264_OBJECTS := $(patsubst %,build/%,$(H264_OBJECTS))
 
@@ -28,5 +28,5 @@ libvp9.so: $(VP9_OBJECTS)
 	$(CC) -shared -pthread -fPIC -fno-strict-aliasing libvp9.c -o $@ $^
 
 clean:
-	rm -rf build/* out/*
+	rm -rf build/*
 	rm -f *.so deh264 devp9

@@ -25,33 +25,38 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "h264.h"
 #include <stdio.h>
+#include "h264.h"
 
-void h264_print_hrd(struct h264_hrd_parameters *hrd)
+#define h264_field(a, ...)     printf("\t" a " = %d\n", ##__VA_ARGS__)
+#define h264_field2(a, b, ...) printf("\t" a " = %d [%s]\n", b, ##__VA_ARGS__)
+
+static void h264_print_hrd(struct h264_hrd_parameters *hrd)
 {
-	printf("\t\t\tcpb_cnt_minus1 = %d\n", hrd->cpb_cnt - 1);
-	printf("\t\t\tbit_rate_scale = %d\n", hrd->bit_rate_scale);
-	printf("\t\t\tcpb_size_scale = %d\n", hrd->cpb_size_scale);
-	int i;
+	uint32_t i;
+
+	h264_field("\t\tcpb_cnt_minus1", hrd->cpb_cnt - 1);
+	h264_field("\t\tbit_rate_scale", hrd->bit_rate_scale);
+	h264_field("\t\tcpb_size_scale", hrd->cpb_size_scale);
 	for (i = 0; i < hrd->cpb_cnt; i++) {
-		printf("\t\t\tbit_rate_value_minus1[%d] = %d\n", i,
+		h264_field("\t\tbit_rate_value_minus1[%d]", i,
 		       hrd->bit_rate_value[i] - 1);
-		printf("\t\t\tcpb_size_value_minus1[%d] = %d\n", i,
+		h264_field("\t\tcpb_size_value_minus1[%d]", i,
 		       hrd->cpb_size_value[i] - 1);
-		printf("\t\t\tcbr_flag[%d] = %d\n", i, hrd->cbr_flag[i]);
+		h264_field("\t\tcbr_flag[%d]", i, hrd->cbr_flag[i]);
 	}
-	printf("\t\t\tinitial_cpb_removal_delay_length_minus1 = %d\n",
+	h264_field("\t\tinitial_cpb_removal_delay_length_minus1",
 	       hrd->initial_cpb_removal_delay_length - 1);
-	printf("\t\t\tcpb_removal_delay_length_minus1 = %d\n",
+	h264_field("\t\tcpb_removal_delay_length_minus1",
 	       hrd->cpb_removal_delay_length - 1);
-	printf("\t\t\tdpb_output_delay_length_minus1 = %d\n",
+	h264_field("\t\tdpb_output_delay_length_minus1",
 	       hrd->dpb_output_delay_length - 1);
-	printf("\t\t\ttime_offset_length = %d\n", hrd->time_offset_length);
+	h264_field("\t\ttime_offset_length", hrd->time_offset_length);
 }
 
 void h264_print_sps(struct h264_sps *sps)
 {
+	uint32_t i, j, k;
 	const char *profile_name = "???";
 	switch (sps->profile_idc) {
 	case H264_PROFILE_BASELINE:
@@ -94,218 +99,218 @@ void h264_print_sps(struct h264_sps *sps)
 		profile_name = "Stereo High";
 		break;
 	}
-	printf("\tprofile_idc = %d [%s]\n", sps->profile_idc, profile_name);
-	printf("\tconstraint_set = %d\n", sps->constraint_set);
-	int i, j, k;
-	printf("\tlevel_idc = %d\n", sps->level_idc);
-	printf("\tseq_parameter_set_id = %d\n", sps->seq_parameter_set_id);
-	printf("\tchroma_format_idc = %d\n", sps->chroma_format_idc);
-	printf("\tseparate_colour_plane_flag = %d\n", sps->separate_colour_plane_flag);
-	printf("\tbit_depth_luma_minus8 = %d\n", sps->bit_depth_luma_minus8);
-	printf("\tbit_depth_chroma_minus8 = %d\n", sps->bit_depth_chroma_minus8);
-	printf("\tqpprime_y_zero_transform_bypass_flag = %d\n",
+	h264_field2("profile_idc", sps->profile_idc, profile_name);
+
+	h264_field("constraint_set", sps->constraint_set);
+	h264_field("level_idc", sps->level_idc);
+	h264_field("seq_parameter_set_id", sps->seq_parameter_set_id);
+	h264_field("chroma_format_idc", sps->chroma_format_idc);
+	h264_field("separate_colour_plane_flag", sps->separate_colour_plane_flag);
+	h264_field("bit_depth_luma_minus8", sps->bit_depth_luma_minus8);
+	h264_field("bit_depth_chroma_minus8", sps->bit_depth_chroma_minus8);
+	h264_field("qpprime_y_zero_transform_bypass_flag",
 	       sps->qpprime_y_zero_transform_bypass_flag);
-	printf("\tseq_scaling_matrix_present_flag = %d\n",
+	h264_field("seq_scaling_matrix_present_flag",
 	       sps->seq_scaling_matrix_present_flag);
 	if (sps->seq_scaling_matrix_present_flag) {
 		for (i = 0; i < (sps->chroma_format_idc == 3 ? 12 : 8); i++) {
-			printf("\tseq_scaling_list_present_flag[%d] = %d\n", i,
+			h264_field("seq_scaling_list_present_flag[%d]", i,
 			       sps->seq_scaling_list_present_flag[i]);
 			if (sps->seq_scaling_list_present_flag[i]) {
-				printf("\tuse_default_scaling_matrix_flag[%d] = %d\n", i,
+				h264_field("use_default_scaling_matrix_flag[%d]", i,
 				       sps->use_default_scaling_matrix_flag[i]);
 				if (!sps->use_default_scaling_matrix_flag[i]) {
 					for (j = 0; j < (i < 6 ? 16 : 64); j++) {
 						if (i < 6)
-							printf("\tseq_scaling_list[%d][%d] = %d\n",
+							h264_field("seq_scaling_list[%d][%d]",
 							       i, j,
-							       sps->seq_scaling_list_4x4
-								       [i][j]);
+							       sps->seq_scaling_list_4x4[i][j]);
 						else
-							printf("\tseq_scaling_list[%d][%d] = %d\n",
+							h264_field("seq_scaling_list[%d][%d]",
 							       i, j,
-							       sps->seq_scaling_list_8x8
-								       [i - 6][j]);
+							       sps->seq_scaling_list_8x8[i - 6][j]);
 					}
 				}
 			}
 		}
 	}
-	printf("\tlog2_max_frame_num_minus4 = %d\n", sps->log2_max_frame_num - 4);
-	printf("\tpic_order_cnt_type = %d\n", sps->pic_order_cnt_type);
+	h264_field("log2_max_frame_num_minus4", sps->log2_max_frame_num - 4);
+	h264_field("pic_order_cnt_type", sps->pic_order_cnt_type);
 	switch (sps->pic_order_cnt_type) {
 	case 0:
-		printf("\tlog2_max_pic_order_cnt_lsb_minus4 = %d\n",
+		h264_field("log2_max_pic_order_cnt_lsb_minus4",
 		       sps->log2_max_pic_order_cnt_lsb - 4);
 		break;
 	case 1:
-		printf("\tdelta_pic_order_always_zero_flag = %d\n",
+		h264_field("delta_pic_order_always_zero_flag",
 		       sps->delta_pic_order_always_zero_flag);
-		printf("\toffset_for_non_ref_pic = %d\n", sps->offset_for_non_ref_pic);
-		printf("\toffset_for_top_to_bottom_field = %d\n",
+		h264_field("offset_for_non_ref_pic", sps->offset_for_non_ref_pic);
+		h264_field("offset_for_top_to_bottom_field",
 		       sps->offset_for_top_to_bottom_field);
-		printf("\tnum_ref_frames_in_pic_order_cnt_cycle = %d\n",
+		h264_field("num_ref_frames_in_pic_order_cnt_cycle",
 		       sps->num_ref_frames_in_pic_order_cnt_cycle);
 		for (i = 0; i < sps->num_ref_frames_in_pic_order_cnt_cycle; i++) {
-			printf("\toffset_for_ref_frame[%d] = %d\n", i,
+			h264_field("offset_for_ref_frame[%d]", i,
 			       sps->offset_for_ref_frame[i]);
 		}
 		break;
 	}
-	printf("\tmax_num_ref_frames = %d\n", sps->max_num_ref_frames);
-	printf("\tgaps_in_frame_num_value_allowed_flag = %d\n",
+	h264_field("max_num_ref_frames", sps->max_num_ref_frames);
+	h264_field("gaps_in_frame_num_value_allowed_flag",
 	       sps->gaps_in_frame_num_value_allowed_flag);
-	printf("\tpic_width_in_mbs_minus1 = %d\n", sps->pic_width_in_mbs - 1);
-	printf("\tpic_height_in_map_units_minus1 = %d\n",
+
+	h264_field("pic_width_in_mbs_minus1", sps->pic_width_in_mbs - 1);
+	h264_field("pic_height_in_map_units_minus1",
 	       sps->pic_height_in_map_units - 1);
-	printf("\tframe_mbs_only_flag = %d\n", sps->frame_mbs_only_flag);
-	printf("\tmb_adaptive_frame_field_flag = %d\n",
+	h264_field("frame_mbs_only_flag", sps->frame_mbs_only_flag);
+	h264_field("mb_adaptive_frame_field_flag",
 	       sps->mb_adaptive_frame_field_flag);
-	printf("\tdirect_8x8_inference_flag = %d\n", sps->direct_8x8_inference_flag);
-	printf("\tframe_cropping_flag = %d\n", sps->frame_cropping_flag);
-	printf("\tframe_crop_left_offset = %d\n", sps->frame_crop_left_offset);
-	printf("\tframe_crop_right_offset = %d\n", sps->frame_crop_right_offset);
-	printf("\tframe_crop_top_offset = %d\n", sps->frame_crop_top_offset);
-	printf("\tframe_crop_bottom_offset = %d\n", sps->frame_crop_bottom_offset);
+	h264_field("direct_8x8_inference_flag", sps->direct_8x8_inference_flag);
+	h264_field("frame_cropping_flag", sps->frame_cropping_flag);
+	h264_field("frame_crop_left_offset", sps->frame_crop_left_offset);
+	h264_field("frame_crop_right_offset", sps->frame_crop_right_offset);
+	h264_field("frame_crop_top_offset", sps->frame_crop_top_offset);
+	h264_field("frame_crop_bottom_offset", sps->frame_crop_bottom_offset);
+
 	if (sps->vui_parameters_present_flag) {
 		struct h264_vui *vui = &sps->vui;
 		printf("\tVUI parameters:\n");
-		printf("\t\taspect_ratio_info_present_flag = %d\n",
+		h264_field("\taspect_ratio_info_present_flag",
 		       vui->aspect_ratio_info_present_flag);
-		printf("\t\taspect_ratio_idc = %d\n", vui->aspect_ratio_idc);
-		printf("\t\tsar_width = %d\n", vui->sar_width);
-		printf("\t\tsar_height = %d\n", vui->sar_height);
-		printf("\t\toverscan_info_present_flag = %d\n",
+		h264_field("\taspect_ratio_idc", vui->aspect_ratio_idc);
+		h264_field("\tsar_width", vui->sar_width);
+		h264_field("\tsar_height", vui->sar_height);
+		h264_field("\toverscan_info_present_flag",
 		       vui->overscan_info_present_flag);
 		if (vui->overscan_info_present_flag) {
-			printf("\t\toverscan_appropriate_flag = %d\n",
+			h264_field("\toverscan_appropriate_flag",
 			       vui->overscan_appropriate_flag);
 		}
-		printf("\t\tvideo_signal_type_present_flag = %d\n",
+		h264_field("\tvideo_signal_type_present_flag",
 		       vui->video_signal_type_present_flag);
-		printf("\t\tvideo_format = %d\n", vui->video_format);
-		printf("\t\tvideo_full_range_flag = %d\n", vui->video_full_range_flag);
-		printf("\t\tcolour_description_present_flag = %d\n",
+		h264_field("\tvideo_format", vui->video_format);
+		h264_field("\tvideo_full_range_flag", vui->video_full_range_flag);
+		h264_field("\tcolour_description_present_flag",
 		       vui->colour_description_present_flag);
-		printf("\t\tcolour_primaries = %d\n", vui->colour_primaries);
-		printf("\t\ttransfer_characteristics = %d\n",
+		h264_field("\tcolour_primaries", vui->colour_primaries);
+		h264_field("\ttransfer_characteristics",
 		       vui->transfer_characteristics);
-		printf("\t\tmatrix_coefficients = %d\n", vui->matrix_coefficients);
-		printf("\t\tchroma_loc_info_present_flag = %d\n",
+		h264_field("\tmatrix_coefficients", vui->matrix_coefficients);
+		h264_field("\tchroma_loc_info_present_flag",
 		       vui->chroma_loc_info_present_flag);
-		printf("\t\tchroma_sample_loc_type_top_field = %d\n",
+		h264_field("\tchroma_sample_loc_type_top_field",
 		       vui->chroma_sample_loc_type_top_field);
-		printf("\t\tchroma_sample_loc_type_bottom_field = %d\n",
+		h264_field("\tchroma_sample_loc_type_bottom_field",
 		       vui->chroma_sample_loc_type_bottom_field);
-		printf("\t\ttiming_info_present_flag = %d\n",
+		h264_field("\ttiming_info_present_flag",
 		       vui->timing_info_present_flag);
 		if (vui->timing_info_present_flag) {
-			printf("\t\tnum_units_in_tick = %d\n", vui->num_units_in_tick);
-			printf("\t\ttime_scale = %d\n", vui->time_scale);
+			h264_field("\tnum_units_in_tick", vui->num_units_in_tick);
+			h264_field("\ttime_scale", vui->time_scale);
 		}
-		printf("\t\tfixed_frame_rate_flag = %d\n", vui->fixed_frame_rate_flag);
+		h264_field("\tfixed_frame_rate_flag", vui->fixed_frame_rate_flag);
 		if (vui->nal_hrd_parameters_flag) {
-			printf("\t\tNAL HRD parameters:\n");
+			printf("\tNAL HRD parameters:\n");
 			h264_print_hrd(&vui->nal_hrd_parameters);
 		}
 		if (vui->vcl_hrd_parameters_flag) {
-			printf("\t\tVCL HRD parameters:\n");
+			printf("\tVCL HRD parameters:\n");
 			h264_print_hrd(&vui->vcl_hrd_parameters);
 		}
 		if (vui->nal_hrd_parameters_flag || vui->vcl_hrd_parameters_flag) {
-			printf("\t\tlow_delay_hrd_flag = %d\n", vui->low_delay_hrd_flag);
+			h264_field("\tlow_delay_hrd_flag", vui->low_delay_hrd_flag);
 		}
-		printf("\t\tpic_struct_present_flag = %d\n",
+		h264_field("\tpic_struct_present_flag",
 		       vui->pic_struct_present_flag);
-		printf("\t\tbitstream_restriction_present_flag = %d\n",
+		h264_field("\tbitstream_restriction_present_flag",
 		       vui->bitstream_restriction_present_flag);
-		printf("\t\tmotion_vectors_over_pic_bounduaries_flag = %d\n",
+		h264_field("\tmotion_vectors_over_pic_bounduaries_flag",
 		       vui->motion_vectors_over_pic_bounduaries_flag);
-		printf("\t\tmax_bytes_per_pic_denom = %d\n",
+		h264_field("\tmax_bytes_per_pic_denom",
 		       vui->max_bytes_per_pic_denom);
-		printf("\t\tmax_bits_per_mb_denom = %d\n", vui->max_bits_per_mb_denom);
-		printf("\t\tlog2_max_mv_length_horizontal = %d\n",
+		h264_field("\tmax_bits_per_mb_denom", vui->max_bits_per_mb_denom);
+		h264_field("\tlog2_max_mv_length_horizontal",
 		       vui->log2_max_mv_length_horizontal);
-		printf("\t\tlog2_max_mv_length_vertical = %d\n",
+		h264_field("\tlog2_max_mv_length_vertical",
 		       vui->log2_max_mv_length_vertical);
-		printf("\t\tnum_reorder_frames = %d\n", vui->num_reorder_frames);
-		printf("\t\tmax_dec_frame_buffering = %d\n",
+		h264_field("\tnum_reorder_frames", vui->num_reorder_frames);
+		h264_field("\tmax_dec_frame_buffering",
 		       vui->max_dec_frame_buffering);
 	}
+
 	if (sps->is_svc) {
-		printf("\tinter_layer_deblocking_filter_control_present_flag = %d\n",
+		h264_field("inter_layer_deblocking_filter_control_present_flag",
 		       sps->inter_layer_deblocking_filter_control_present_flag);
-		printf("\textended_spatial_scalability_idc = %d\n",
+		h264_field("extended_spatial_scalability_idc",
 		       sps->extended_spatial_scalability_idc);
-		printf("\tchroma_phase_x_plus1_flag = %d\n",
+		h264_field("chroma_phase_x_plus1_flag",
 		       sps->chroma_phase_x_plus1_flag);
-		printf("\tchroma_phase_y_plus1 = %d\n", sps->chroma_phase_y_plus1);
-		printf("\tseq_ref_layer_chroma_phase_x_plus1_flag = %d\n",
+		h264_field("chroma_phase_y_plus1", sps->chroma_phase_y_plus1);
+		h264_field("seq_ref_layer_chroma_phase_x_plus1_flag",
 		       sps->seq_ref_layer_chroma_phase_x_plus1_flag);
-		printf("\tseq_ref_layer_chroma_phase_y_plus1 = %d\n",
+		h264_field("seq_ref_layer_chroma_phase_y_plus1",
 		       sps->seq_ref_layer_chroma_phase_y_plus1);
-		printf("\tseq_ref_layer_left_offset = %d\n",
+		h264_field("seq_ref_layer_left_offset",
 		       sps->seq_ref_layer_left_offset);
-		printf("\tseq_ref_layer_top_offset = %d\n",
+		h264_field("seq_ref_layer_top_offset",
 		       sps->seq_ref_layer_top_offset);
-		printf("\tseq_ref_layer_right_offset = %d\n",
+		h264_field("seq_ref_layer_right_offset",
 		       sps->seq_ref_layer_right_offset);
-		printf("\tseq_ref_layer_bottom_offset = %d\n",
+		h264_field("seq_ref_layer_bottom_offset",
 		       sps->seq_ref_layer_bottom_offset);
-		printf("\tseq_tcoeff_level_prediction_flag = %d\n",
+		h264_field("seq_tcoeff_level_prediction_flag",
 		       sps->seq_tcoeff_level_prediction_flag);
-		printf("\tadaptive_tcoeff_level_prediction_flag = %d\n",
+		h264_field("adaptive_tcoeff_level_prediction_flag",
 		       sps->adaptive_tcoeff_level_prediction_flag);
-		printf("\tslice_header_restriction_flag = %d\n",
+		h264_field("slice_header_restriction_flag",
 		       sps->slice_header_restriction_flag);
 		if (sps->vui_parameters_present_flag) {
 			/* XXX */
 		}
 	}
+
 	if (sps->is_mvc) {
-		printf("\tnum_views_minus1 = %d\n", sps->num_views - 1);
+		h264_field("num_views_minus1", sps->num_views - 1);
 		for (i = 0; i < sps->num_views; i++) {
-			printf("\tview_id[%d] = %d\n", i, sps->views[i].view_id);
-			printf("\tnum_anchor_refs_l0[%d] = %d\n", i,
+			h264_field("view_id[%d]", i, sps->views[i].view_id);
+			h264_field("num_anchor_refs_l0[%d]", i,
 			       sps->views[i].num_anchor_refs_l0);
 			for (j = 1; j < sps->views[i].num_anchor_refs_l0; j++)
-				printf("\tanchor_ref_l0[%d][%d] = %d\n", i, j,
+				h264_field("anchor_ref_l0[%d][%d]", i, j,
 				       sps->views[i].anchor_ref_l0[j]);
-			printf("\tnum_anchor_refs_l1[%d] = %d\n", i,
+			h264_field("num_anchor_refs_l1[%d]", i,
 			       sps->views[i].num_anchor_refs_l1);
 			for (j = 1; j < sps->views[i].num_anchor_refs_l1; j++)
-				printf("\tanchor_ref_l1[%d][%d] = %d\n", i, j,
+				h264_field("anchor_ref_l1[%d][%d]", i, j,
 				       sps->views[i].anchor_ref_l1[j]);
-			printf("\tnum_non_anchor_refs_l0[%d] = %d\n", i,
+			h264_field("num_non_anchor_refs_l0[%d]", i,
 			       sps->views[i].num_non_anchor_refs_l0);
 			for (j = 1; j < sps->views[i].num_non_anchor_refs_l0; j++)
-				printf("\tnon_anchor_ref_l0[%d][%d] = %d\n", i, j,
+				h264_field("non_anchor_ref_l0[%d][%d]", i, j,
 				       sps->views[i].non_anchor_ref_l0[j]);
-			printf("\tnum_non_anchor_refs_l1[%d] = %d\n", i,
+			h264_field("num_non_anchor_refs_l1[%d]", i,
 			       sps->views[i].num_non_anchor_refs_l1);
 			for (j = 1; j < sps->views[i].num_non_anchor_refs_l1; j++)
-				printf("\tnon_anchor_ref_l1[%d][%d] = %d\n", i, j,
+				h264_field("non_anchor_ref_l1[%d][%d]", i, j,
 				       sps->views[i].non_anchor_ref_l1[j]);
 		}
-		printf("\tnum_level_values_signalled_minus1 = %d\n",
+		h264_field("num_level_values_signalled_minus1",
 		       sps->num_level_values_signalled - 1);
 		for (i = 0; i < sps->num_level_values_signalled; i++) {
-			printf("\tlevel_idc[%d] = %d.%d\n", i,
-			       sps->levels[i].level_idc / 10,
-			       sps->levels[i].level_idc % 10);
-			printf("\tnum_applicable_ops_minus1[%d] = %d\n", i,
+			h264_field("level_idc[%d]", i, sps->levels[i].level_idc);
+			h264_field("num_applicable_ops_minus1[%d]", i,
 			       sps->levels[i].num_applicable_ops - 1);
 			for (j = 0; j < sps->levels[i].num_applicable_ops; j++) {
 				struct h264_sps_mvc_applicable_op *op =
 					&sps->levels[i].applicable_ops[j];
-				printf("\tapplicable_op_temporal_id[%d][%d] = %d\n", i, j,
+				h264_field("applicable_op_temporal_id[%d][%d]", i, j,
 				       op->temporal_id);
-				printf("\tapplicable_op_num_target_views_minus1[%d][%d] = %d\n",
+				h264_field("applicable_op_num_target_views_minus1[%d][%d]",
 				       i, j, op->num_target_views - 1);
 				for (k = 0; k < op->num_target_views; k++)
-					printf("\tapplicable_op_target_view_id[%d][%d][%d] = %d\n",
+					h264_field("applicable_op_target_view_id[%d][%d][%d]",
 					       i, j, k, op->target_view_id[k]);
-				printf("\tapplicable_op_num_views_minus1[%d][%d] = %d\n",
+				h264_field("applicable_op_num_views_minus1[%d][%d]",
 				       i, j, op->num_views - 1);
 			}
 		}
@@ -318,294 +323,297 @@ void h264_print_sps(struct h264_sps *sps)
 void h264_print_sps_ext(struct h264_sps *sps)
 {
 	printf("Sequence parameter set extension:\n");
-	printf("\taux_format_idc = %d\n", sps->aux_format_idc);
+	h264_field("aux_format_idc", sps->aux_format_idc);
 	if (sps->aux_format_idc) {
-		printf("\tbit_depth_aux_minus8 = %d\n", sps->bit_depth_aux_minus8);
-		printf("\talpha_incr_flag = %d\n", sps->alpha_incr_flag);
-		printf("\talpha_opaque_value = %d\n", sps->alpha_opaque_value);
-		printf("\talpha_transparent_value = %d\n", sps->alpha_transparent_value);
+		h264_field("bit_depth_aux_minus8", sps->bit_depth_aux_minus8);
+		h264_field("alpha_incr_flag", sps->alpha_incr_flag);
+		h264_field("alpha_opaque_value", sps->alpha_opaque_value);
+		h264_field("alpha_transparent_value", sps->alpha_transparent_value);
 	}
 }
 
 void h264_print_pps(struct h264_pps *pps)
 {
-	printf("\tpic_parameter_set_id = %d\n", pps->pic_parameter_set_id);
-	printf("\tseq_parameter_set_id = %d\n", pps->seq_parameter_set_id);
-	printf("\tentropy_coding_mode_flag = %d\n", pps->entropy_coding_mode_flag);
-	printf("\tbottom_field_pic_order_in_frame_present_flag = %d\n",
+	uint32_t i;
+
+	h264_field("pic_parameter_set_id", pps->pic_parameter_set_id);
+	h264_field("seq_parameter_set_id", pps->seq_parameter_set_id);
+	h264_field("entropy_coding_mode_flag", pps->entropy_coding_mode_flag);
+	h264_field("bottom_field_pic_order_in_frame_present_flag",
 	       pps->bottom_field_pic_order_in_frame_present_flag);
-	printf("\tnum_slice_groups_minus1 = %d\n", pps->num_slice_groups - 1);
+
+	h264_field("num_slice_groups_minus1", pps->num_slice_groups - 1);
 	if (pps->num_slice_groups) {
-		int i;
-		printf("\tslice_group_map_type = %d\n", pps->slice_group_map_type);
+		h264_field("slice_group_map_type", pps->slice_group_map_type);
 		switch (pps->slice_group_map_type) {
 		case H264_SLICE_GROUP_MAP_INTERLEAVED:
 			for (i = 0; i < pps->num_slice_groups; i++) {
-				printf("\trun_length[%d] = %d\n", i,
+				h264_field("run_length[%d]", i,
 				       pps->run_length[i]);
 			}
 			break;
 		case H264_SLICE_GROUP_MAP_DISPERSED:
 			break;
 		case H264_SLICE_GROUP_MAP_FOREGROUND:
-			for (i = pps->num_slice_groups - 1 - 1; i >= 0; i--) {
-				printf("\ttop_left[%d] = %d\n", i, pps->top_left[i]);
-				printf("\tbottom_right[%d] = %d\n", i,
-				       pps->bottom_right[i]);
+			for (i = 0; i < pps->num_slice_groups; i++) {
+				h264_field("top_left[%d]", i, pps->top_left[i]);
+				h264_field("bottom_right[%d]", i, pps->bottom_right[i]);
 			}
 			break;
 		case H264_SLICE_GROUP_MAP_CHANGING_BOX:
 		case H264_SLICE_GROUP_MAP_CHANGING_VERTICAL:
 		case H264_SLICE_GROUP_MAP_CHANGING_HORIZONTAL:
-			printf("\tslice_group_change_direction_flag = %d\n",
+			h264_field("slice_group_change_direction_flag",
 			       pps->slice_group_change_direction_flag);
-			printf("\tslice_group_change_rate_minus1 = %d\n",
-			       pps->slice_group_change_rate) - 1;
+			h264_field("slice_group_change_rate_minus1",
+			       pps->slice_group_change_rate - 1);
 			break;
 		case H264_SLICE_GROUP_MAP_EXPLICIT:
-			printf("\tpic_size_in_map_units_minus1 = %d\n",
-			       pps->pic_size_in_map_units) - 1;
+			h264_field("pic_size_in_map_units_minus1",
+			       pps->pic_size_in_map_units - 1);
 			for (i = 0; i < pps->pic_size_in_map_units; i++)
-				printf("\tslice_group_id[%d] = %d\n", i,
+				h264_field("slice_group_id[%d]", i,
 				       pps->slice_group_id[i]);
 			break;
 		}
 	}
-	printf("\tnum_ref_idx_l0_default_active_minus1 = %d\n",
-	       pps->num_ref_idx_l0_default_active) - 1;
-	printf("\tnum_ref_idx_l1_default_active_minus1 = %d\n",
-	       pps->num_ref_idx_l1_default_active) - 1;
-	printf("\tweighted_pred_flag = %d\n", pps->weighted_pred_flag);
-	printf("\tweighted_bipred_idc = %d\n", pps->weighted_bipred_idc);
-	printf("\tpic_init_qp_minus26 = %d\n", pps->pic_init_qp_minus26);
-	printf("\tpic_init_qs_minus26 = %d\n", pps->pic_init_qs_minus26);
-	printf("\tchroma_qp_index_offset = %d\n", pps->chroma_qp_index_offset);
-	printf("\tdeblocking_filter_control_present_flag = %d\n",
+
+	h264_field("num_ref_idx_l0_default_active_minus1",
+	       pps->num_ref_idx_l0_default_active - 1);
+	h264_field("num_ref_idx_l1_default_active_minus1",
+	       pps->num_ref_idx_l1_default_active - 1);
+
+	h264_field("weighted_pred_flag", pps->weighted_pred_flag);
+	h264_field("weighted_bipred_idc", pps->weighted_bipred_idc);
+	h264_field("pic_init_qp_minus26", pps->pic_init_qp_minus26);
+	h264_field("pic_init_qs_minus26", pps->pic_init_qs_minus26);
+	h264_field("chroma_qp_index_offset", pps->chroma_qp_index_offset);
+
+	h264_field("deblocking_filter_control_present_flag",
 	       pps->deblocking_filter_control_present_flag);
-	printf("\tconstrained_intra_pred_flag = %d\n", pps->constrained_intra_pred_flag);
-	printf("\tredundant_pic_cnt_present_flag = %d\n",
+	h264_field("constrained_intra_pred_flag", pps->constrained_intra_pred_flag);
+	h264_field("redundant_pic_cnt_present_flag",
 	       pps->redundant_pic_cnt_present_flag);
-	printf("\ttransform_8x8_mode_flag = %d\n", pps->transform_8x8_mode_flag);
-	printf("\tpic_scaling_matrix_present_flag = %d\n",
+
+	h264_field("transform_8x8_mode_flag", pps->transform_8x8_mode_flag);
+	h264_field("pic_scaling_matrix_present_flag",
 	       pps->pic_scaling_matrix_present_flag);
 	if (pps->pic_scaling_matrix_present_flag) {
 		int i, j;
 		for (i = 0; i < (pps->chroma_format_idc == 3 ? 12 : 8); i++) {
-			printf("\tpic_scaling_list_present_flag[%d] = %d\n", i,
+			h264_field("pic_scaling_list_present_flag[%d]", i,
 			       pps->pic_scaling_list_present_flag[i]);
 			if (pps->pic_scaling_list_present_flag[i]) {
-				printf("\tuse_default_scaling_matrix_flag[%d] = %d\n", i,
+				h264_field("use_default_scaling_matrix_flag[%d]", i,
 				       pps->use_default_scaling_matrix_flag[i]);
 				if (!pps->use_default_scaling_matrix_flag[i]) {
 					for (j = 0; j < (i < 6 ? 16 : 64); j++) {
 						if (i < 6)
-							printf("\tpic_scaling_list[%d][%d] = %d\n",
+							h264_field("pic_scaling_list[%d][%d]",
 							       i, j,
-							       pps->pic_scaling_list_4x4
-								       [i][j]);
+							       pps->pic_scaling_list_4x4[i][j]);
 						else
-							printf("\tpic_scaling_list[%d][%d] = %d\n",
+							h264_field("pic_scaling_list[%d][%d]",
 							       i, j,
-							       pps->pic_scaling_list_8x8
-								       [i - 6][j]);
+							       pps->pic_scaling_list_8x8[i - 6][j]);
 					}
 				}
 			}
 		}
 	}
-	printf("\tsecond_chroma_qp_index_offset = %d\n",
+	h264_field("second_chroma_qp_index_offset",
 	       pps->second_chroma_qp_index_offset);
 }
 
-void h264_print_ref_pic_list_modification(struct h264_ref_pic_list_modification *list,
+static void h264_print_ref_pic_list_modification(struct h264_ref_pic_list_modification *list,
 					  char *which)
 {
-	int i = 0;
-	printf("\tref_pic_list_modification_flag_%s = %d\n", which, list->flag);
+	uint32_t i = 0;
+	h264_field("ref_pic_list_modification_flag_%s", which, list->flag);
 	for (i = 0; list->list[i].op != 3; i++) {
-		int op = list->list[i].op;
-		printf("\tmodification_of_pic_nums_idc_%s[%d] = %d\n", which, i, op);
-		printf("\tabs_diff_pic_num_minus1_%s[%d] = %d\n", which, i, list->list[i].param);
+		h264_field("modification_of_pic_nums_idc_%s[%d]", which, i, list->list[i].op);
+		h264_field("abs_diff_pic_num_minus1_%s[%d]", which, i, list->list[i].param);
 	}
-	printf("\tmodification_of_pic_nums_idc_%s[%d] = 3\n", which, i);
+	h264_field("modification_of_pic_nums_idc_%s[%d]", which, i, 3);
 }
 
-void h264_print_pred_weight_table(struct h264_slice *sl)
+static void h264_print_pred_weight_table(struct h264_slice *sl)
 {
-	printf("\tluma_log2_weight_denom = %d\n", sl->luma_log2_weight_denom);
-	printf("\tchroma_log2_weight_denom = %d\n", sl->chroma_log2_weight_denom);
-	int i;
+	uint32_t i;
+	h264_field("luma_log2_weight_denom", sl->luma_log2_weight_denom);
+	h264_field("chroma_log2_weight_denom", sl->chroma_log2_weight_denom);
 	for (i = 0; i < sl->num_ref_idx_l0_active; i++) {
-		printf("\tluma_weight_l0_flag[%d] = %d\n", i, sl->pwt_l0[i].luma_weight_flag);
-		printf("\tluma_weight_l0[%d] = %d\n", i, sl->pwt_l0[i].luma_weight);
-		printf("\tluma_offset_l0[%d] = %d\n", i, sl->pwt_l0[i].luma_offset);
-		printf("\tchroma_weight_l0_flag[%d] = %d\n", i, sl->pwt_l0[i].chroma_weight_flag);
-		printf("\tchroma_weight_l0[%d][0] = %d\n", i, sl->pwt_l0[i].chroma_weight[0]);
-		printf("\tchroma_weight_l0[%d][1] = %d\n", i, sl->pwt_l0[i].chroma_weight[1]);
-		printf("\tchroma_offset_l0[%d][0] = %d\n", i, sl->pwt_l0[i].chroma_offset[0]);
-		printf("\tchroma_offset_l0[%d][1] = %d\n", i, sl->pwt_l0[i].chroma_offset[1]);
+		h264_field("luma_weight_l0_flag[%d]", i, sl->pwt_l0[i].luma_weight_flag);
+		h264_field("luma_weight_l0[%d]", i, sl->pwt_l0[i].luma_weight);
+		h264_field("luma_offset_l0[%d]", i, sl->pwt_l0[i].luma_offset);
+		h264_field("chroma_weight_l0_flag[%d]", i, sl->pwt_l0[i].chroma_weight_flag);
+		h264_field("chroma_weight_l0[%d][0]", i, sl->pwt_l0[i].chroma_weight[0]);
+		h264_field("chroma_weight_l0[%d][1]", i, sl->pwt_l0[i].chroma_weight[1]);
+		h264_field("chroma_offset_l0[%d][0]", i, sl->pwt_l0[i].chroma_offset[0]);
+		h264_field("chroma_offset_l0[%d][1]", i, sl->pwt_l0[i].chroma_offset[1]);
 	}
 	if (sl->slice_type_nos == H264_SLICE_TYPE_B) {
 		for (i = 0; i < sl->num_ref_idx_l1_active; i++) {
-			printf("\tluma_weight_l1_flag[%d] = %d\n", i, sl->pwt_l1[i].luma_weight_flag);
-			printf("\tluma_weight_l1[%d] = %d\n", i, sl->pwt_l1[i].luma_weight);
-			printf("\tluma_offset_l1[%d] = %d\n", i, sl->pwt_l1[i].luma_offset);
-			printf("\tchroma_weight_l1_flag[%d] = %d\n", i, sl->pwt_l1[i].chroma_weight_flag);
-			printf("\tchroma_weight_l1[%d][0] = %d\n", i, sl->pwt_l1[i].chroma_weight[0]);
-			printf("\tchroma_weight_l1[%d][1] = %d\n", i, sl->pwt_l1[i].chroma_weight[1]);
-			printf("\tchroma_offset_l1[%d][0] = %d\n", i, sl->pwt_l1[i].chroma_offset[0]);
-			printf("\tchroma_offset_l1[%d][1] = %d\n", i, sl->pwt_l1[i].chroma_offset[1]);
+			h264_field("luma_weight_l1_flag[%d]", i, sl->pwt_l1[i].luma_weight_flag);
+			h264_field("luma_weight_l1[%d]", i, sl->pwt_l1[i].luma_weight);
+			h264_field("luma_offset_l1[%d]", i, sl->pwt_l1[i].luma_offset);
+			h264_field("chroma_weight_l1_flag[%d]", i, sl->pwt_l1[i].chroma_weight_flag);
+			h264_field("chroma_weight_l1[%d][0]", i, sl->pwt_l1[i].chroma_weight[0]);
+			h264_field("chroma_weight_l1[%d][1]", i, sl->pwt_l1[i].chroma_weight[1]);
+			h264_field("chroma_offset_l1[%d][0]", i, sl->pwt_l1[i].chroma_offset[0]);
+			h264_field("chroma_offset_l1[%d][1]", i, sl->pwt_l1[i].chroma_offset[1]);
 		}
 	}
 }
 
-void h264_print_dec_ref_pic_marking(struct h264_slice *sl)
+static void h264_print_dec_ref_pic_marking(struct h264_slice *sl)
 {
 	int i;
+
 	if (sl->nal_unit_type == H264_NAL_SLICE_IDR) {
-		printf("\tno_output_of_prior_pics_flag = %d\n",
+		h264_field("no_output_of_prior_pics_flag",
 		       sl->no_output_of_prior_pics_flag);
-		printf("\tlong_term_reference_flag = %d\n", sl->long_term_reference_flag);
+		h264_field("long_term_reference_flag", sl->long_term_reference_flag);
 	} else {
-		printf("\tadaptive_ref_pic_marking_mode_flag = %d\n",
+		h264_field("adaptive_ref_pic_marking_mode_flag",
 		       sl->adaptive_ref_pic_marking_mode_flag);
-		for (i = 0; i < sl->nb_mmco; i++) {
-			int opcode = sl->mmcos[i].opcode;
-			if (opcode == H264_MMCO_END)
-				break;
+		for (i = 0; i < sl->num_mmcos; i++) {
 			switch (sl->mmcos[i].opcode) {
 			case H264_MMCO_END:
 				break;
 			case H264_MMCO_FORGET_SHORT:
-				printf("\tmmco_forget_short[%d] = %d\n",
-				       i, sl->mmcos[i].short_pic_num);
+				h264_field("mmco_forget_short[%d]", i,
+					sl->mmcos[i].short_pic_num);
 				break;
-			case H264_MMCO_SHORT_TO_LONG:
-				printf("\tmmco_short_to_long = %d %d\n",
-				       sl->mmcos[i].short_pic_num, sl->mmcos[i].long_arg);
+			case H264_MMCO_SHORT_TO_LONG: // TODO long args
+				h264_field("mmco_short_to_long[%d]", i,
+				       sl->mmcos[i].short_pic_num);
 				break;
 			case H264_MMCO_FORGET_LONG:
-				printf("\tmmco_forget_long = %d\n",
+				h264_field("mmco_forget_long[%d]", i,
 				       sl->mmcos[i].long_arg);
 				break;
 			case H264_MMCO_THIS_TO_LONG:
-				printf("\tmmco_this_to_long = %d\n",
+				h264_field("mmco_this_to_long[%d]", i,
 				       sl->mmcos[i].long_arg);
 				break;
 			case H264_MMCO_FORGET_LONG_MAX:
-				printf("\tmmco_forget_long_max = %d\n",
+				h264_field("mmco_forget_long_max[%d]", i,
 				       sl->mmcos[i].long_arg);
 				break;
+			case H264_MMCO_FORGET_ALL:
+				break; /* XXX */
 			}
 		}
 	}
 }
 
-void h264_print_dec_ref_base_pic_marking(struct h264_nal_svc_header *svc)
+static void h264_print_dec_ref_base_pic_marking(struct h264_slice *sl,
+					        struct h264_nal_svc_header *svc)
 {
-#if 0
-	printf("\tstore_ref_base_pic_flag = %d\n", ref->store_ref_base_pic_flag);
-	if ((svc->use_ref_base_pic_flag || ref->store_ref_base_pic_flag) && !svc->idr_flag) {
-		printf("\tadaptive_ref_base_pic_marking_mode_flag = %d\n", ref->adaptive_ref_base_pic_marking_mode_flag);
-		if (ref->adaptive_ref_base_pic_marking_mode_flag) {
-			int i = 0;
-			do {
-				printf("\tmemory_management_control_operation = %d\n", ref->mmcos[i].memory_management_control_operation);
-				switch (ref->mmcos[i].memory_management_control_operation) {
-					case H264_MMCO_END:
-						break;
-					case H264_MMCO_FORGET_SHORT:
-						printf("\tdifference_of_pic_nums_minus1 = %d\n", ref->mmcos[i].difference_of_pic_nums_minus1);
-						break;
-					case H264_MMCO_FORGET_LONG:
-						printf("\tlong_term_pic_num = %d\n", ref->mmcos[i].long_term_pic_num);
-						break;
-				}
-			} while (ref->mmcos[i++].memory_management_control_operation != H264_MMCO_END);
+	int i;
+
+	h264_field("store_ref_base_pic_flag", sl->store_ref_base_pic_flag);
+	if ((svc->use_ref_base_pic_flag || sl->store_ref_base_pic_flag) && !svc->idr_flag) {
+		h264_field("adaptive_ref_base_pic_marking_mode_flag", sl->adaptive_ref_base_pic_marking_mode_flag);
+		for (i = 0; i < sl->num_base_mmcos; i++) {
+			switch (sl->base_mmcos[i].opcode) {
+				case H264_MMCO_END:
+					break;
+				case H264_MMCO_FORGET_SHORT:
+					h264_field("base_mmco_forget_short[%d]", i,
+						sl->base_mmcos[i].short_pic_num);
+					break;
+				case H264_MMCO_FORGET_LONG:
+					h264_field("base_mmco_forget_long[%d]", i,
+						sl->base_mmcos[i].long_arg);
+					break;
+				default:
+					break;
+			}
 		}
 	}
-#endif
 }
 
-void h264_print_slice_header(struct h264_context *ctx, struct h264_slice *slice)
+void h264_print_slice_header(struct h264_context *ctx, struct h264_slice *sl)
 {
-	struct h264_sps *sps = h264_get_sps(ctx, slice->pic_parameter_set_id);
-	struct h264_pps *pps = h264_get_pps(ctx, slice->pic_parameter_set_id);
+	struct h264_sps *sps = h264_get_sps(ctx, sl->pic_parameter_set_id);
+	struct h264_pps *pps = h264_get_pps(ctx, sl->pic_parameter_set_id);
 
-	printf("\tfirst_mb_in_slice = %d\n", slice->first_mb_in_slice);
-	printf("\tslice_type = %d\n", slice->slice_type);
-	printf("\tpic_parameter_set_id = %d\n", pps->pic_parameter_set_id);
-
+	h264_field("first_mb_in_slice", sl->first_mb_in_slice);
+	h264_field("slice_type", sl->slice_type);
+	h264_field("pic_parameter_set_id", pps->pic_parameter_set_id);
 	if (sps->separate_colour_plane_flag)
-		printf("\tcolour_plane_id = %d\n", slice->colour_plane_id);
-	printf("\tframe_num = %d\n", slice->frame_num);
-	printf("\tfield_pic_flag = %d\n", slice->field_pic_flag);
-	printf("\tbottom_field_flag = %d\n", slice->bottom_field_flag);
-	if (slice->nal_unit_type == H264_NAL_SLICE_IDR)
-		printf("\tidr_pic_id = %d\n", slice->idr_pic_id);
+		h264_field("colour_plane_id", sl->colour_plane_id);
+
+	h264_field("frame_num", sl->frame_num);
+	h264_field("field_pic_flag", sl->field_pic_flag);
+	h264_field("bottom_field_flag", sl->bottom_field_flag);
+	if (sl->nal_unit_type == H264_NAL_SLICE_IDR)
+		h264_field("idr_pic_id", sl->idr_pic_id);
 	switch (sps->pic_order_cnt_type) {
 	case 0:
-		printf("\tpic_order_cnt_lsb = %d\n", slice->pic_order_cnt_lsb);
-		printf("\tdelta_pic_order_cnt_bottom = %d\n",
-		       slice->delta_pic_order_cnt_bottom);
+		h264_field("pic_order_cnt_lsb", sl->pic_order_cnt_lsb);
+		h264_field("delta_pic_order_cnt_bottom",
+		       sl->delta_pic_order_cnt_bottom);
 		break;
 	case 1:
-		printf("\tdelta_pic_order_cnt[0] = %d\n", slice->delta_pic_order_cnt[0]);
-		printf("\tdelta_pic_order_cnt[1] = %d\n", slice->delta_pic_order_cnt[1]);
+		h264_field("delta_pic_order_cnt[0]", sl->delta_pic_order_cnt[0]);
+		h264_field("delta_pic_order_cnt[1]", sl->delta_pic_order_cnt[1]);
 		break;
 	}
-	printf("\tredundant_pic_cnt = %d\n", slice->redundant_pic_cnt);
-	if (slice->slice_type == H264_SLICE_TYPE_B)
-		printf("\tdirect_spatial_mb_pred_flag = %d\n",
-		       slice->direct_spatial_mb_pred_flag);
-	if (slice->slice_type != H264_SLICE_TYPE_I &&
-	    slice->slice_type != H264_SLICE_TYPE_SI) {
-		printf("\tnum_ref_idx_active_override_flag = %d\n",
-		       slice->num_ref_idx_active_override_flag);
-		printf("\tnum_ref_idx_l0_active_minus1 = %d\n",
-		       slice->num_ref_idx_l0_active - 1);
-		if (slice->slice_type == H264_SLICE_TYPE_B)
-			printf("\tnum_ref_idx_l1_active_minus1 = %d\n",
-			       slice->num_ref_idx_l1_active - 1);
-		h264_print_ref_pic_list_modification(&slice->ref_pic_list_modification_l0,
+	h264_field("redundant_pic_cnt", sl->redundant_pic_cnt);
+	if (sl->slice_type == H264_SLICE_TYPE_B)
+		h264_field("direct_spatial_mb_pred_flag",
+		       sl->direct_spatial_mb_pred_flag);
+
+	if (sl->slice_type != H264_SLICE_TYPE_I &&
+	    sl->slice_type != H264_SLICE_TYPE_SI) {
+		h264_field("num_ref_idx_active_override_flag",
+		       sl->num_ref_idx_active_override_flag);
+		h264_field("num_ref_idx_l0_active_minus1",
+		       sl->num_ref_idx_l0_active - 1);
+		if (sl->slice_type == H264_SLICE_TYPE_B)
+			h264_field("num_ref_idx_l1_active_minus1",
+			       sl->num_ref_idx_l1_active - 1);
+		h264_print_ref_pic_list_modification(&sl->ref_pic_list_modification_l0,
 						     "l0");
-		if (slice->slice_type == H264_SLICE_TYPE_B)
+		if (sl->slice_type == H264_SLICE_TYPE_B)
 			h264_print_ref_pic_list_modification(
-				&slice->ref_pic_list_modification_l1, "l1");
+				&sl->ref_pic_list_modification_l1, "l1");
 	}
-	if ((pps->weighted_pred_flag && (slice->slice_type == H264_SLICE_TYPE_P ||
-					 slice->slice_type == H264_SLICE_TYPE_SP)) ||
-	    (pps->weighted_bipred_idc == 1 && slice->slice_type == H264_SLICE_TYPE_B)) {
-		printf("\tbase_pred_weight_table_flag = %d\n",
-		       slice->base_pred_weight_table_flag);
-		if (!slice->base_pred_weight_table_flag) {
-			h264_print_pred_weight_table(slice);
+	if ((pps->weighted_pred_flag && (sl->slice_type == H264_SLICE_TYPE_P ||
+					 sl->slice_type == H264_SLICE_TYPE_SP)) ||
+	    (pps->weighted_bipred_idc == 1 && sl->slice_type == H264_SLICE_TYPE_B)) {
+		h264_field("base_pred_weight_table_flag",
+		       sl->base_pred_weight_table_flag);
+		if (!sl->base_pred_weight_table_flag) {
+			h264_print_pred_weight_table(sl);
 		}
 	}
 
-	if (slice->nal_ref_idc || (1)) {
-		h264_print_dec_ref_pic_marking(slice);
-		if (sps->is_svc && !sps->slice_header_restriction_flag)
-			h264_print_dec_ref_base_pic_marking(&slice->svc);
-	}
+	h264_print_dec_ref_pic_marking(sl);
+	if (sps->is_svc && !sps->slice_header_restriction_flag)
+		h264_print_dec_ref_base_pic_marking(sl, &sl->svc);
 
-	if (slice->slice_type != H264_SLICE_TYPE_I &&
-	    slice->slice_type != H264_SLICE_TYPE_SI)
-		printf("\tcabac_init_idc = %d\n", slice->cabac_init_idc);
-	printf("\tslice_qp_delta = %d\n", slice->slice_qp_delta);
-	if (slice->slice_type == H264_SLICE_TYPE_SP)
-		printf("\tsp_for_switch_flag = %d\n", slice->sp_for_switch_flag);
-	if (slice->slice_type == H264_SLICE_TYPE_SP ||
-	    slice->slice_type == H264_SLICE_TYPE_SI)
-		printf("\tslice_qs_delta = %d\n", slice->slice_qs_delta);
-	printf("\tdisable_deblocking_filter_idc = %d\n",
-	       slice->disable_deblocking_filter_idc);
-	printf("\tslice_alpha_c0_offset_div2 = %d\n", slice->slice_alpha_c0_offset_div2);
-	printf("\tslice_beta_offset_div2 = %d\n", slice->slice_beta_offset_div2);
+	if (sl->slice_type != H264_SLICE_TYPE_I &&
+	    sl->slice_type != H264_SLICE_TYPE_SI)
+		h264_field("cabac_init_idc", sl->cabac_init_idc);
+
+	h264_field("slice_qp_delta", sl->slice_qp_delta);
+	if (sl->slice_type == H264_SLICE_TYPE_SP)
+		h264_field("sp_for_switch_flag", sl->sp_for_switch_flag);
+	if (sl->slice_type == H264_SLICE_TYPE_SP ||
+	    sl->slice_type == H264_SLICE_TYPE_SI)
+		h264_field("slice_qs_delta", sl->slice_qs_delta);
+
+	h264_field("disable_deblocking_filter_idc",
+	       sl->disable_deblocking_filter_idc);
+	h264_field("slice_alpha_c0_offset_div2", sl->slice_alpha_c0_offset_div2);
+	h264_field("slice_beta_offset_div2", sl->slice_beta_offset_div2);
 	if (pps->num_slice_groups && pps->slice_group_map_type >= 3 &&
 		pps->slice_group_map_type <= 5) {
-		printf("\tslice_group_change_cycle = %d\n",
-		       slice->slice_group_change_cycle);
+		h264_field("slice_group_change_cycle", sl->slice_group_change_cycle);
 	}
 
 	if (sps->is_svc) {

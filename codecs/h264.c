@@ -189,6 +189,7 @@ static void h264_parse_scaling_list(struct bitstream *gb, uint32_t *scaling_list
 
 static int h264_parse_hrd_parameters(struct bitstream *gb, struct h264_hrd_parameters *hrd)
 {
+	uint32_t i;
 	hrd->cpb_cnt = get_ue_golomb_31(gb) + 1;
 	if (hrd->cpb_cnt >= 32) {
 		h264_err("cpb_cnt (%d) out of bounds\n", hrd->cpb_cnt);
@@ -198,7 +199,7 @@ static int h264_parse_hrd_parameters(struct bitstream *gb, struct h264_hrd_param
 	hrd->bit_rate_scale = get_bits(gb, 4);
 	hrd->cpb_size_scale = get_bits(gb, 4);
 
-	for (int i = 0; i < hrd->cpb_cnt; i++) {
+	for (i = 0; i < hrd->cpb_cnt; i++) {
 		hrd->bit_rate_value[i] = get_ue_golomb_long(gb) + 1;
 		hrd->cpb_size_value[i] = get_ue_golomb_long(gb) + 1;
 		hrd->cbr_flag[i]       = get_bits1(gb);
@@ -256,7 +257,7 @@ static int h264_parse_vui_parameters(struct bitstream *gb, struct h264_vui *vui)
 	vui->overscan_info_present_flag = get_bits1(gb);
 	if (vui->overscan_info_present_flag)
 		vui->overscan_appropriate_flag = get_bits1(gb);
-	
+
 	vui->video_format = 5;
 	vui->video_full_range_flag = 0;
 	vui->colour_description_present_flag = 0;
@@ -334,7 +335,7 @@ static int h264_parse_vui_parameters(struct bitstream *gb, struct h264_vui *vui)
 
 static int h264_parse_sps(struct bitstream *gb, struct h264_sps *sps)
 {
-	uint32_t constraint_set_flags = 0;
+	uint32_t i, constraint_set_flags = 0;
 
 	sps->is_svc = 0;
 	sps->is_mvc = 0;
@@ -390,7 +391,7 @@ static int h264_parse_sps(struct bitstream *gb, struct h264_sps *sps)
 				if (sps->seq_scaling_list_present_flag[i]) {
 					if (i < 6) {
 						h264_parse_scaling_list(
-							    gb, sps->seq_scaling_list_4x4[i], 16, 
+							    gb, sps->seq_scaling_list_4x4[i], 16,
 							    &sps->use_default_scaling_matrix_flag[i]);
 					} else {
 						h264_parse_scaling_list(
@@ -418,7 +419,7 @@ static int h264_parse_sps(struct bitstream *gb, struct h264_sps *sps)
 	        sps->offset_for_top_to_bottom_field   = get_se_golomb_long(gb);
 		sps->num_ref_frames_in_pic_order_cnt_cycle = get_ue_golomb(gb);
 
-		for (int i = 0; i < sps->num_ref_frames_in_pic_order_cnt_cycle; i++) {
+		for (i = 0; i < sps->num_ref_frames_in_pic_order_cnt_cycle; i++) {
 			sps->offset_for_ref_frame[i] = get_se_golomb_long(gb);
 		}
 		break;
@@ -460,6 +461,8 @@ static int h264_parse_sps(struct bitstream *gb, struct h264_sps *sps)
 
 static int h264_svc_vui_parameters(struct bitstream *gb, struct h264_vui *vui)
 {
+	(void)gb;
+	(void)vui;
 	h264_err("patch welcome\n");
 	return -1;
 }
@@ -474,7 +477,7 @@ static int h264_parse_sps_svc(struct bitstream *gb, struct h264_sps *sps)
 	sps->chroma_phase_x_plus1_flag = 1;
 	if (sps->chroma_format_idc == 1 || sps->chroma_format_idc == 2)
 		sps->chroma_phase_x_plus1_flag = get_bits1(gb);
-	
+
 	sps->chroma_phase_y_plus1 = 1;
 	if (sps->chroma_format_idc == 1)
 		sps->chroma_phase_y_plus1 = get_bits(gb, 2);
@@ -515,13 +518,15 @@ static int h264_parse_sps_svc(struct bitstream *gb, struct h264_sps *sps)
 
 static int h264_mvc_vui_parameters(struct bitstream *gb, struct h264_vui *vui)
 {
+	(void)gb;
+	(void)vui;
 	h264_err("patch welcome\n");
 	return -1;
 }
 
 static int h264_parse_sps_mvc(struct bitstream *gb, struct h264_sps *sps)
 {
-	int i = 0, j = 0, k;
+	uint32_t i = 0, j = 0, k;
 	int err = 0;
 
 	sps->is_mvc = 1;
@@ -670,7 +675,7 @@ static int h264_parse_sps_ext(struct h264_context *ctx, uint32_t *pseq_parameter
 static int h264_parse_pps(struct h264_context *ctx, struct h264_pps *pps)
 {
 	struct bitstream *gb = &ctx->gb;
-	int i;
+	uint32_t i;
 
 	pps->pic_parameter_set_id = get_ue_golomb(gb);
 	pps->seq_parameter_set_id = get_ue_golomb_31(gb);
@@ -710,10 +715,8 @@ static int h264_parse_pps(struct h264_context *ctx, struct h264_pps *pps)
 		case H264_SLICE_GROUP_MAP_EXPLICIT:
 			pps->pic_size_in_map_units = bs_read_ue(gb) + 1;
 			static const int id_sizes[8] = { 0, 1, 2, 2, 3, 3, 3, 3 };
-			for (i = 0; i < pps->pic_size_in_map_units; i++) {
-				uint32_t slice_group_id;
-				slice_group_id = get_bits(gb, id_sizes[pps->num_slice_groups]);
-			}
+			for (i = 0; i < pps->pic_size_in_map_units; i++)
+				get_bits(gb, id_sizes[pps->num_slice_groups]); /* slice_group_id */
 			break;
 		default:
 			h264_err("unknown slice_group_map_type %d!\n",
@@ -785,7 +788,7 @@ static int h264_parse_pps(struct h264_context *ctx, struct h264_pps *pps)
 	return 0;
 }
 
-static int h264_ref_pic_list_modification(struct bitstream *gb, struct h264_slice *slice,
+static int h264_parse_ref_pic_list_modification(struct bitstream *gb,
 					  struct h264_ref_pic_list_modification *list)
 {
 	list->flag = get_bits1(gb);
@@ -812,7 +815,7 @@ static int h264_parse_dec_ref_pic_marking(struct bitstream *gb, struct h264_slic
 {
 	int i = 0;
 
-	sl->nb_mmco = 0;
+	sl->num_mmcos = 0;
 	sl->no_output_of_prior_pics_flag = 0;
 	sl->long_term_reference_flag = 0;
 	sl->adaptive_ref_pic_marking_mode_flag = 0;
@@ -849,7 +852,7 @@ static int h264_parse_dec_ref_pic_marking(struct bitstream *gb, struct h264_slic
 		}
 	}
 
-	sl->nb_mmco = i;
+	sl->num_mmcos = i;
 
 	return 0;
 }
@@ -923,7 +926,7 @@ static void h264_pred_weight_table_entry(struct bitstream *gb, struct h264_slice
 
 static int h264_pred_weight_table(struct bitstream *gb, struct h264_slice *sl)
 {
-	int i;
+	uint32_t i;
 
 	sl->luma_log2_weight_denom = get_ue_golomb_31(gb);
 	sl->chroma_log2_weight_denom = get_ue_golomb_31(gb);
@@ -1099,10 +1102,12 @@ static int h264_parse_slice_header(struct h264_context *ctx, struct h264_slice *
 
 		if (sl->slice_type != H264_SLICE_TYPE_I &&
 		    sl->slice_type != H264_SLICE_TYPE_SI) {
-			if (h264_ref_pic_list_modification(gb, sl, &sl->ref_pic_list_modification_l0))
+			if (h264_parse_ref_pic_list_modification(gb,
+				&sl->ref_pic_list_modification_l0))
 				return -1;
 			if (sl->slice_type == H264_SLICE_TYPE_B) {
-				if (h264_ref_pic_list_modification(gb, sl, &sl->ref_pic_list_modification_l1))
+				if (h264_parse_ref_pic_list_modification(gb,
+					&sl->ref_pic_list_modification_l1))
 					return -1;
 			}
 		}
@@ -1120,7 +1125,7 @@ static int h264_parse_slice_header(struct h264_context *ctx, struct h264_slice *
 			}
 		}
 
-		sl->nb_mmco = 0;
+		sl->num_mmcos = 0;
 		sl->no_output_of_prior_pics_flag = 0;
 		sl->long_term_reference_flag = 0;
 		sl->adaptive_ref_pic_marking_mode_flag = 0;
@@ -1150,7 +1155,7 @@ static int h264_parse_slice_header(struct h264_context *ctx, struct h264_slice *
 		sl->sp_for_switch_flag = get_bits1(gb);
 	if (sl->slice_type == H264_SLICE_TYPE_SP || sl->slice_type == H264_SLICE_TYPE_SI)
 		sl->slice_qs_delta = get_se_golomb(gb);
-	
+
 	sl->disable_deblocking_filter_idc = 0;
 	sl->slice_alpha_c0_offset_div2 = 0;
 	sl->slice_beta_offset_div2     = 0;
@@ -1172,7 +1177,7 @@ static int h264_parse_slice_header(struct h264_context *ctx, struct h264_slice *
 
 	if (pps->num_slice_groups && pps->slice_group_map_type >= 3 &&
 	    pps->slice_group_map_type <= 5) {
-		size_t s = clog2((sps->pic_width_in_mbs * sps->pic_height_in_map_units)		
+		size_t s = clog2((sps->pic_width_in_mbs * sps->pic_height_in_map_units)
 				/ (pps->slice_group_change_rate + 1));
 		sl->slice_group_change_cycle = get_bits(gb, s);
 	}
@@ -1186,8 +1191,12 @@ int h264_decode_nal_unit(struct h264_context *ctx, uint8_t *buf, int size)
 	uint64_t start_pos, end_pos;
 	uint32_t nal_ref_idc;
 	uint32_t nal_unit_type;
-	struct h264_sps sps;
 	int err;
+
+	struct h264_slice *sl = &ctx->slice;
+	struct h264_sps sps;
+	struct h264_pps pps;
+	uint32_t pseq_parameter_set_id;
 
 	int nal_size = size;
 	int rbsp_size = size;
@@ -1219,7 +1228,6 @@ int h264_decode_nal_unit(struct h264_context *ctx, uint8_t *buf, int size)
 	case H264_NAL_SLICE_NONIDR:
 	case H264_NAL_SLICE_IDR:
 	case H264_NAL_SLICE_AUX:
-		struct h264_slice *sl = &ctx->slice;
 		sl->nal_ref_idc = nal_ref_idc;
 		sl->nal_unit_type = nal_unit_type;
 		if (h264_parse_slice_header(ctx, sl)) {
@@ -1227,7 +1235,7 @@ int h264_decode_nal_unit(struct h264_context *ctx, uint8_t *buf, int size)
 			goto exit;
 		}
 		end_pos = (((uint64_t)(void *)gb->p) * 8) + (8 - gb->bits_left);
-		printf("\tslice_header_size = %d\n", end_pos - start_pos);
+		printf("\tslice_header_size = %ld\n", end_pos - start_pos);
 		h264_print_slice_header(ctx, sl);
 		break;
 	case H264_NAL_SEI:
@@ -1249,7 +1257,6 @@ int h264_decode_nal_unit(struct h264_context *ctx, uint8_t *buf, int size)
 		memcpy(&ctx->sps_list[sps.seq_parameter_set_id], &sps, sizeof(sps));
 		break;
 	case H264_NAL_PICPARM:
-		struct h264_pps pps;
 		if (h264_parse_pps(ctx, &pps)) {
 			h264_err("failed to parse pps\n");
 			goto exit;
@@ -1263,7 +1270,7 @@ int h264_decode_nal_unit(struct h264_context *ctx, uint8_t *buf, int size)
 		memcpy(&ctx->pps_list[pps.pic_parameter_set_id], &pps, sizeof(pps));
 		break;
 	case H264_NAL_SEQPARM_EXT:
-		int pseq_parameter_set_id;
+
 		if (h264_parse_sps_ext(ctx, &pseq_parameter_set_id)) {
 			h264_err("failed to parse sps ext\n");
 			goto exit;

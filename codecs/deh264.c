@@ -28,7 +28,7 @@ int main(int argc, char *argv[])
 {
 	struct h264_context context;
 	struct h264_context *ctx = &context;
-	int err, size, nal_start, nal_end;
+	int size, nal_start, nal_end;
 
 	uint8_t *bytes = NULL;
 	char *data = NULL;

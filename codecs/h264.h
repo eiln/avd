@@ -423,7 +423,7 @@ struct h264_slice {
 	uint32_t long_term_reference_flag;
 	uint32_t adaptive_ref_pic_marking_mode_flag;
 	struct h264_mmco mmcos[H264_MAX_MMCO_COUNT];
-	int nb_mmco;
+	int num_mmcos;
 	/* SVC base ref pic marking */
 	uint32_t store_ref_base_pic_flag;
 	uint32_t adaptive_ref_base_pic_marking_mode_flag;
