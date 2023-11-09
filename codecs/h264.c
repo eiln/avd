@@ -1221,7 +1221,7 @@ int h264_decode_nal_unit(struct h264_context *ctx, uint8_t *buf, int size)
 			goto exit;
 		}
 		end_pos = (((uint64_t)(void *)gb->p) * 8) + (8 - gb->bits_left);
-		printf("\theader_size = %d\n", end_pos - start_pos);
+		printf("\tslice_header_size = %d\n", end_pos - start_pos);
 		h264_print_slice_header(ctx, sl);
 		break;
 	case H264_NAL_SEI:

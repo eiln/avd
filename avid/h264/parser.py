@@ -33,7 +33,7 @@ class AVDH264Slice(AVDSlice):
 		return payload[start:]
 
 	def get_payload_offset(self):
-		return ceil(self.header_size / 8) + 4
+		return ceil(self.slice_header_size / 8) + 4
 
 	def get_payload_size(self):
 		return len(self.get_payload()) - self.get_payload_offset()
