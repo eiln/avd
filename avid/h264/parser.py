@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright 2023 Eileen Yoon <eyn@gmx.com>
 
-from ..parser import AVDParser, AVDSlice
+from ..parser import *
 from .types import *
 
 import ctypes
@@ -40,7 +40,13 @@ class AVDH264Slice(AVDSlice):
 
 class AVDH264Parser(AVDParser):
 	def __init__(self):
-		super().__init__(bin_path="deh264", lib_path="libh264.so")
+		super().__init__(lib_path="libh264.so")
+		self.lib.libh264_init.restype = ctypes.c_void_p
+		self.lib.libh264_free.argtypes = [ctypes.c_void_p]
+		self.lib.libh264_decode.argtypes = [ctypes.c_void_p, ctypes.c_char_p,
+					ctypes.c_int, ctypes.POINTER(ctypes.c_int),
+					ctypes.POINTER(ctypes.c_int)]
+
 		self.arr_keys = [("modification_of_pic_nums_idc_l0", H264_MAX_REFS),
 				("modification_of_pic_nums_idc_l1", H264_MAX_REFS),
 				("abs_diff_pic_num_minus1_l0", H264_MAX_REFS),
@@ -59,21 +65,28 @@ class AVDH264Parser(AVDParser):
 		bytesnum = len(buf)
 		nal_start = ctypes.c_int()
 		nal_end = ctypes.c_int()
-		nalus = []
-		while (bytesnum > 0):
-			err = self.lib.libh264_find_nal_unit(buf[bufpos:], bytesnum, ctypes.byref(nal_start), ctypes.byref(nal_end))
-			payload = buf[bufpos:bufpos+nal_end.value]
-			nalus.append(payload)
-			bufpos += nal_start.value
-			# /* RBSP */
-			bufpos += (nal_end.value - nal_start.value)
-			bytesnum -= nal_end.value
-		return nalus
+
+		handle = self.lib.libh264_init()
+		if (handle == None):
+			raise RuntimeError("Failed to init libh264")
+
+		with pipes() as (out, err):
+			nalus = []
+			while (bytesnum > 0):
+				self.lib.libh264_decode(handle, buf[bufpos:], bytesnum, ctypes.byref(nal_start), ctypes.byref(nal_end))
+				#print(nal_end.value - nal_start.value, bufpos, bytesnum)
+				payload = buf[bufpos:bufpos+nal_end.value]
+				nalus.append(payload)
+				bufpos += nal_end.value
+				bytesnum -= nal_end.value
+		stdout = out.read()
+
+		self.lib.libh264_free(handle)
+		return nalus, stdout
 
 	def parse(self, path):
-		payloads = self.parse_payloads(path)
-		out = subprocess.check_output([f'{self.bin_path}', path], text=True)
-		units = self.parse_headers(out)
+		payloads, stdout = self.parse_payloads(path)
+		units = self.parse_headers(stdout)
 
 		slice_idx = 0
 		sps_list = [None] * H264_MAX_SPS_COUNT

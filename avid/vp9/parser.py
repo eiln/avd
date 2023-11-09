@@ -6,8 +6,8 @@ from ..parser import *
 from .probs import *
 from .types import *
 
-from construct import *
 import ctypes
+from construct import *
 
 IVFHeader = Struct(
 	"signature" / ExprValidator(PaddedString(4, encoding='u8'), obj_ == "DKIF"),
@@ -84,7 +84,7 @@ class AVDVP9Slice(AVDSlice):
 
 class AVDVP9Parser(AVDParser):
 	def __init__(self):
-		super().__init__("devp9", "libvp9.so")
+		super().__init__(lib_path="libvp9.so")
 		self.lib.libvp9_init.restype = ctypes.c_void_p
 		self.lib.libvp9_free.argtypes = [ctypes.c_void_p]
 		self.lib.libvp9_decode.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int]
@@ -103,16 +103,15 @@ class AVDVP9Parser(AVDParser):
 		handle = self.lib.libvp9_init()
 		if (handle == None):
 			raise RuntimeError("Failed to init libvp9")
-		out = OutputGrabber()
-		out.start()
-		probs_all = []
-		for frame in frames:
-			err = self.lib.libvp9_decode(handle, frame.payload, frame.size)
-			probs = ctypes.string_at(handle, LibVP9Probs.sizeof()) # this isnt great but it works
-			probs_all.append(probs)
-		out.stop()
+		with pipes() as (out, err):
+			probs_all = []
+			for frame in frames:
+				err = self.lib.libvp9_decode(handle, frame.payload, frame.size)
+				probs = ctypes.string_at(handle, LibVP9Probs.sizeof()) # this isnt great but it works
+				probs_all.append(probs)
+		stdout = out.read()
 		self.lib.libvp9_free(handle)
-		headers = self.parse_headers(out.capturedtext)
+		headers = self.parse_headers(stdout)
 		assert(len(headers) == len(frames) == len(probs_all))
 		for i,hdr in enumerate(headers):
 			hdr.frame = frames[i]
