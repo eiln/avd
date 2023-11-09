@@ -141,13 +141,13 @@ static unsigned int tree_merge_probs_impl(unsigned int i,
   return left_count + right_count;
 }
 
-void vpx_tree_merge_probs(const int8_t *tree, const uint8_t *pre_probs,
+static void vpx_tree_merge_probs(const int8_t *tree, const uint8_t *pre_probs,
                           const unsigned int *counts, uint8_t *probs)
 {
     tree_merge_probs_impl(0, tree, pre_probs, counts, probs);
 }
 
-void tx_counts_to_branch_counts_32x32(const unsigned int *tx_count_32x32p,
+static void tx_counts_to_branch_counts_32x32(const unsigned int *tx_count_32x32p,
                                       unsigned int (*ct_32x32p)[2]) {
   ct_32x32p[0][0] = tx_count_32x32p[TX_4X4];
   ct_32x32p[0][1] = tx_count_32x32p[TX_8X8] + tx_count_32x32p[TX_16X16] +
@@ -158,7 +158,7 @@ void tx_counts_to_branch_counts_32x32(const unsigned int *tx_count_32x32p,
   ct_32x32p[2][1] = tx_count_32x32p[TX_32X32];
 }
 
-void tx_counts_to_branch_counts_16x16(const unsigned int *tx_count_16x16p,
+static void tx_counts_to_branch_counts_16x16(const unsigned int *tx_count_16x16p,
                                       unsigned int (*ct_16x16p)[2]) {
   ct_16x16p[0][0] = tx_count_16x16p[TX_4X4];
   ct_16x16p[0][1] = tx_count_16x16p[TX_8X8] + tx_count_16x16p[TX_16X16];
@@ -166,7 +166,7 @@ void tx_counts_to_branch_counts_16x16(const unsigned int *tx_count_16x16p,
   ct_16x16p[1][1] = tx_count_16x16p[TX_16X16];
 }
 
-void tx_counts_to_branch_counts_8x8(const unsigned int *tx_count_8x8p,
+static void tx_counts_to_branch_counts_8x8(const unsigned int *tx_count_8x8p,
                                     unsigned int (*ct_8x8p)[2]) {
   ct_8x8p[0][0] = tx_count_8x8p[TX_4X4];
   ct_8x8p[0][1] = tx_count_8x8p[TX_8X8];
@@ -174,11 +174,10 @@ void tx_counts_to_branch_counts_8x8(const unsigned int *tx_count_8x8p,
 
 static void vp9_adapt_mode_probs(VP9Context *s)
 {
-    int c, i, j, k, l, m, n;
-    c = s->s.h.framectxid;
-    VP9ProbContext *pp = &s->prob_ctx[c].p;
+    VP9ProbContext *pp = &s->prob_ctx[s->s.h.framectxid].p;
     VP9ProbContext *p = &s->prob.p;
     VP9FrameCounts *counts = &s->counts;
+    int i, j;
 
     for (i = 0; i < 4; i++)
         p->intra_inter[i] = mode_mv_merge_probs(pp->intra_inter[i],
@@ -289,9 +288,8 @@ static inline uint8_t merge_probs(uint8_t pre_prob, const unsigned int ct[2],
 static void adapt_coef_probs(VP9Context *s, int tx_size,
                              unsigned int count_sat,
                              unsigned int update_factor) {
-    int c = s->s.h.framectxid;
-    VP9ProbContext *pp = &s->prob_ctx[c].p;
-    const vp9_coeff_probs_model *const pre_probs = pp->coef[tx_size];
+    VP9ProbContext *pp = &s->prob_ctx[s->s.h.framectxid].p;
+    vp9_coeff_probs_model *const pre_probs = pp->coef[tx_size];
     vp9_coeff_probs_model *const probs = s->prob.p.coef[tx_size];
     vp9_coeff_count_model *counts = s->counts.coef[tx_size];
     unsigned int(*eob_counts)[REF_TYPES][COEF_BANDS][COEFF_CONTEXTS] = s->counts.eob_branch[tx_size];
@@ -315,7 +313,7 @@ static void adapt_coef_probs(VP9Context *s, int tx_size,
         }
 }
 
-void vp9_adapt_coef_probs(VP9Context *s) {
+static void vp9_adapt_coef_probs(VP9Context *s) {
   unsigned int count_sat, update_factor;
 
   if (s->s.h.keyframe || s->s.h.intraonly) {
@@ -382,90 +380,7 @@ static const int8_t vp9_mv_class0_tree[TREE_SIZE(CLASS0_SIZE)] = { -0, -1 };
 static const int8_t vp9_mv_fp_tree[TREE_SIZE(MV_FP_SIZE)] = { -0, 2,  -1,
                                                                4,  -2, -3 };
 
-static const uint8_t log_in_base_2[] = {
-  0, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-  4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-  5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
-  6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
-  6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7,
-  7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-  7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-  7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-  7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-  7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 8, 8, 8,
-  8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-  8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-  8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-  8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-  8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-  8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-  8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-  8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-  8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-  8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 9, 9, 9,
-  9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-  9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-  9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-  9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-  9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-  9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-  9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-  9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-  9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-  9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-  9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-  9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-  9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-  9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-  9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-  9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-  9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-  9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-  9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-  9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 10
-};
-
-static inline int mv_class_base(MV_CLASS_TYPE c) {
-  return c ? CLASS0_SIZE << (c + 2) : 0;
-}
-
-static MV_CLASS_TYPE vp9_get_mv_class(int z, int *offset) {
-  const MV_CLASS_TYPE c = (z >= CLASS0_SIZE * 4096)
-                              ? MV_CLASS_10
-                              : (MV_CLASS_TYPE)log_in_base_2[z >> 3];
-  if (offset) *offset = z - mv_class_base(c);
-  return c;
-}
-
-static void inc_mv_component(int v, nmv_component_counts *comp_counts, int incr,
-                             int usehp) {
-  int s, z, c, o, d, e, f;
-  assert(v != 0); /* should not be zero */
-  s = v < 0;
-  comp_counts->sign[s] += incr;
-  z = (s ? -v : v) - 1; /* magnitude - 1 */
-
-  c = vp9_get_mv_class(z, &o);
-  comp_counts->classes[c] += incr;
-
-  d = (o >> 3);     /* int mv data */
-  f = (o >> 1) & 3; /* fractional pel mv data */
-  e = (o & 1);      /* high precision mv data */
-
-  if (c == MV_CLASS_0) {
-    comp_counts->class0[d] += incr;
-    comp_counts->class0_fp[d][f] += incr;
-    comp_counts->class0_hp[e] += usehp * incr;
-  } else {
-    int i;
-    int b = c + CLASS0_BITS - 1;  // number of bits
-    for (i = 0; i < b; ++i) comp_counts->bits[i][((d >> i) & 1)] += incr;
-    comp_counts->fp[f] += incr;
-    comp_counts->hp[e] += usehp * incr;
-  }
-}
-
-void vp9_adapt_mv_probs(VP9Context *s, int allow_hp) {
+static void vp9_adapt_mv_probs(VP9Context *s, int allow_hp) {
   int i, j;
 
   nmv_context *fc = &s->prob.p.nmvc;
@@ -504,7 +419,6 @@ void vp9_adapt_mv_probs(VP9Context *s, int allow_hp) {
 
 void vp9_adapt_probs(VP9Context *s)
 {
-    int i, j, k, l, m;
     vp9_adapt_coef_probs(s);
     if (!s->s.h.keyframe && !s->s.h.intraonly) {
         vp9_adapt_mode_probs(s);

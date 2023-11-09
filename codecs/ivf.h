@@ -29,7 +29,7 @@
 #include <assert.h>
 #include <stdint.h>
 
-struct __attribute__((packed, scalar_storage_order("little-endian"))) ivf_header {
+typedef struct __attribute__((packed, scalar_storage_order("little-endian"))) IVFHeader {
 	uint32_t signature; /* DKIF */
 	uint16_t version;
 	uint16_t length;
@@ -40,25 +40,25 @@ struct __attribute__((packed, scalar_storage_order("little-endian"))) ivf_header
 	uint32_t frame_rate_scale;
 	uint32_t frame_count;
 	uint8_t reserved[4];
-};
-static_assert(sizeof(struct ivf_header) == 32);
+} IVFHeader;
+static_assert(sizeof(IVFHeader) == 32);
 
-struct ivf_frame {
+typedef struct IVFFrame {
 	uint32_t size;
 	uint64_t timestamp;
 	const uint8_t *buf;
-};
+} IVFFrame;
 
-struct ivf_context {
+typedef struct IVFContext {
 	unsigned char *start;
 	unsigned char *p;
 	uint32_t fnum;
-	struct ivf_header h;
-	struct ivf_frame f;
-};
+	IVFHeader h;
+	IVFFrame f;
+} IVFContext;
 
-struct ivf_context *ivf_init(unsigned char *data);
-void ivf_free(struct ivf_context *ivctx);
-int ivf_read_frame(struct ivf_context *ivctx);
+IVFContext *ivf_init(unsigned char *data);
+void ivf_free(IVFContext *ivctx);
+int ivf_read_frame(IVFContext *ivctx);
 
 #endif /* __IVF_H__ */

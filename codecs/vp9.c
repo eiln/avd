@@ -25,11 +25,11 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
 #include <assert.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "bs.h"
 #include "vp9_dec.h"
@@ -38,7 +38,6 @@
 #include "vp9.h"
 #include "vpx_rac.h"
 #include "vpx_dsp_common.h"
-#include "util.h"
 
 #define vp9_log(a, ...)   printf("[VP9] " a, ##__VA_ARGS__)
 #define vp9_field(a, ...) printf("\t" a " = %d\n", ##__VA_ARGS__)
@@ -54,7 +53,7 @@ static inline int get_sbits_inv(struct bitstream *gb, int n)
 
 static int vp9_read_colorspace_details(VP9Context *s)
 {
-    static const enum AVColorSpace colorspaces[8] = {
+    static const enum AVColorSpace color_spaces[8] = {
         AVCOL_SPC_UNSPECIFIED, AVCOL_SPC_BT470BG, AVCOL_SPC_BT709, AVCOL_SPC_SMPTE170M,
         AVCOL_SPC_SMPTE240M, AVCOL_SPC_BT2020_NCL, AVCOL_SPC_RESERVED, AVCOL_SPC_RGB,
     };
@@ -63,8 +62,8 @@ static int vp9_read_colorspace_details(VP9Context *s)
     s->bpp_index = bits;
     s->s.h.bpp = 8 + bits * 2;
     s->bytesperpixel = (7 + s->s.h.bpp) >> 3;
-    s->colorspace = colorspaces[get_bits(&s->gb, 3)];
-    if (s->colorspace == AVCOL_SPC_RGB) { // RGB = profile 1
+    s->color_space = color_spaces[get_bits(&s->gb, 3)];
+    if (s->color_space == AVCOL_SPC_RGB) { // RGB = profile 1
         static const enum AVPixelFormat pix_fmt_rgb[3] = {
             AV_PIX_FMT_GBRP, AV_PIX_FMT_GBRP10, AV_PIX_FMT_GBRP12
         };
@@ -255,7 +254,7 @@ int vp9_decode_uncompressed_header(VP9Context *s, const uint8_t *data, size_t si
                 s->bpp_index = 0;
                 s->bytesperpixel = 1;
                 s->pix_fmt = AV_PIX_FMT_YUV420P;
-                s->colorspace = AVCOL_SPC_BT470BG;
+                s->color_space = AVCOL_SPC_BT470BG;
                 s->color_range = AVCOL_RANGE_MPEG;
             }
             s->s.h.refreshrefmask = get_bits(&s->gb, 8);
@@ -518,7 +517,6 @@ static int inv_remap_prob(int v, int m)
         237, 238, 239, 240, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251,
         252, 253, 253,
     };
-    int d;
 
     /* This code is trying to do a differential probability update. For a
      * current probability A in the range [1, 255], the difference to a new
@@ -565,7 +563,6 @@ int vp9_decode_compressed_header(VP9Context *s, const uint8_t *data, size_t size
 
     c = s->s.h.framectxid;
     VP9ProbContext *p = &s->prob.p;
-    printf("sz: %d\n", size);
 
     data += s->s.h.uncompressed_header_size;
     err = vpx_reader_init(&s->c, data, size, NULL, NULL);
@@ -833,10 +830,4 @@ void vp9_print_header(VP9Context *s)
     printf("{\n");
     vp9_print_uncompressed_header(s);
     printf("}\n");
-    //printf("\tskip: [%d, %d, %d]\n", s->prob.p.skip[0], s->prob.p.skip[1], s->prob.p.skip[2]);
-}
-
-void vp9_save_probs(VP9Context *s, const char *path)
-{
-    write_to_file(path, (char *)&s->prob.p, sizeof(s->prob.p));
 }

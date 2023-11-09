@@ -35,7 +35,6 @@ typedef struct __attribute__((packed)) LibVP9Context {
 
 LibVP9Context *libvp9_init(void)
 {
-	printf("[LIBVP9] hello\n");
 	LibVP9Context *ctx = malloc(sizeof(*ctx));
 	if (!ctx)
 		return NULL;
@@ -49,7 +48,6 @@ LibVP9Context *libvp9_init(void)
 
 void libvp9_free(LibVP9Context *ctx)
 {
-	printf("[LIBVP9] bye\n");
 	free(ctx->s);
 	free(ctx);
 }
@@ -61,13 +59,13 @@ int libvp9_decode(LibVP9Context *ctx, const uint8_t *buf, int size)
 
 	err = vp9_decode_uncompressed_header(s, buf, size);
 	if (err){
-		fprintf(stderr, "failed to decode uncompressed header\n");
+		fprintf(stderr, "[LIBVP9] failed to decode uncompressed header\n");
 		return err;
 	}
 
 	err = vp9_decode_compressed_header(s, buf, s->s.h.compressed_header_size);
 	if (err){
-		fprintf(stderr, "failed to decode compressed header\n");
+		fprintf(stderr, "[LIBVP9] failed to decode compressed header\n");
 		return err;
 	}
 

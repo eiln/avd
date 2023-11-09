@@ -60,10 +60,10 @@ static inline uint64_t avio_rl64(unsigned char **b)
 	return val;
 }
 
-struct ivf_context *ivf_init(unsigned char *data)
+IVFContext *ivf_init(unsigned char *data)
 {
-	struct ivf_context *ivctx;
-	struct ivf_header *h;
+	IVFContext *ivctx;
+	IVFHeader *h;
 
 	ivctx = malloc(sizeof(*ivctx));
 	if (!ivctx)
@@ -90,14 +90,14 @@ err:
 	return NULL;
 }
 
-void ivf_free(struct ivf_context *ivctx)
+void ivf_free(IVFContext *ivctx)
 {
 	free(ivctx);
 }
 
-int ivf_read_frame(struct ivf_context *ivctx)
+int ivf_read_frame(IVFContext *ivctx)
 {
-	struct ivf_frame *f = &ivctx->f;
+	IVFFrame *f = &ivctx->f;
 	if (ivctx->fnum >= ivctx->h.frame_count) {
 		printf("[IVF] reached end of stream\n");
 		return -1;
@@ -106,7 +106,7 @@ int ivf_read_frame(struct ivf_context *ivctx)
 	f->size = avio_rl32(&ivctx->p);
 	f->timestamp = avio_rl64(&ivctx->p);
 	f->buf = ivctx->p;
-	printf("[IVF] frame %d: size: %d timestamp: %d\n", ivctx->fnum, f->size,
+	printf("[IVF] frame %d: size: %d timestamp: %ld\n", ivctx->fnum, f->size,
 	       f->timestamp);
 
 	ivctx->fnum++;

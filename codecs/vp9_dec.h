@@ -35,8 +35,8 @@
 #define VP9_REFS_PER_FRAME     3
 #define VP9_MAX_REF_FRAMES     4
 #define VP9_NUM_REF_FRAMES     8
-#define VP9_MIN_TILE_WIDTH_B64 4
-#define VP9_MAX_TILE_WIDTH_B64 64
+#define VP9_MIN_TILE_WIDTH_B64 4UL
+#define VP9_MAX_TILE_WIDTH_B64 64UL
 
 // Only need this for fixed-size arrays, for structs just assign.
 #define vp9_copy(dest, src)              \
@@ -330,8 +330,8 @@ typedef struct VP9Context {
     // and are therefore per-stream. pix_fmt represents the value in the header
     // of the currently processed frame.
     enum AVPixelFormat pix_fmt, last_fmt, gf_fmt;
-    enum AVColorSpace colorspace;
-    enum AVPixelFormat color_range;
+    enum AVColorSpace color_space;
+    enum AVColorRange color_range;
     uint32_t sb_cols, sb_rows, rows, cols;
     ThreadFrame next_refs[8];
 

@@ -27,17 +27,22 @@
 
 int main(int argc, char *argv[])
 {
-	int i, num, err;
+	int i, err, num, size;
+	char *data;
+
+	IVFContext *ivctx = NULL;
+	VP9Context context;
+	VP9Context *s = &context;
+
 	if (argc <= 1) {
 		fprintf(stderr, "usage: ./devp9 [path to .ivf] [optional count]\n");
 		return -1;
 	}
-	int size;
-	char *data = read_file(argv[1], &size);
+	data = read_file(argv[1], &size);
 	if (!data)
 		return -1;
 
-	struct ivf_context *ivctx = ivf_init(data);
+	ivctx = ivf_init((uint8_t *)data);
 	if (!ivctx || (*(uint32_t *)ivctx->h.fourcc != FOURCC_VP90) || !ivctx->h.frame_count)
 		goto free_data;
 
@@ -46,10 +51,6 @@ int main(int argc, char *argv[])
 	else
 		num = ivctx->h.frame_count;
 
-	VP9Context context;
-	VP9Context *s = &context;
-	memset(s, 0, sizeof(*s));
-	char* path;
 	for (i = 0; i < num; i++) {
 		err = ivf_read_frame(ivctx);
 		if (err)
@@ -59,8 +60,6 @@ int main(int argc, char *argv[])
 		err = vp9_decode_compressed_header(s, ivctx->f.buf, s->s.h.compressed_header_size);
 
 		vp9_print_header(s);
-		asprintf(&path, "out/p%d.bin", i);
-		vp9_save_probs(s, path);
 		vp9_adapt_probs(s);
 	}
 
