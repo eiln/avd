@@ -30,23 +30,23 @@
 
 void h264_print_hrd(struct h264_hrd_parameters *hrd)
 {
-	printf("\t\t\tcpb_cnt_minus1 = %d\n", hrd->cpb_cnt_minus1);
+	printf("\t\t\tcpb_cnt_minus1 = %d\n", hrd->cpb_cnt - 1);
 	printf("\t\t\tbit_rate_scale = %d\n", hrd->bit_rate_scale);
 	printf("\t\t\tcpb_size_scale = %d\n", hrd->cpb_size_scale);
 	int i;
-	for (i = 0; i <= hrd->cpb_cnt_minus1; i++) {
+	for (i = 0; i < hrd->cpb_cnt; i++) {
 		printf("\t\t\tbit_rate_value_minus1[%d] = %d\n", i,
-		       hrd->bit_rate_value_minus1[i]);
+		       hrd->bit_rate_value[i] - 1);
 		printf("\t\t\tcpb_size_value_minus1[%d] = %d\n", i,
-		       hrd->cpb_size_value_minus1[i]);
+		       hrd->cpb_size_value[i] - 1);
 		printf("\t\t\tcbr_flag[%d] = %d\n", i, hrd->cbr_flag[i]);
 	}
 	printf("\t\t\tinitial_cpb_removal_delay_length_minus1 = %d\n",
-	       hrd->initial_cpb_removal_delay_length_minus1);
+	       hrd->initial_cpb_removal_delay_length - 1);
 	printf("\t\t\tcpb_removal_delay_length_minus1 = %d\n",
-	       hrd->cpb_removal_delay_length_minus1);
+	       hrd->cpb_removal_delay_length - 1);
 	printf("\t\t\tdpb_output_delay_length_minus1 = %d\n",
-	       hrd->dpb_output_delay_length_minus1);
+	       hrd->dpb_output_delay_length - 1);
 	printf("\t\t\ttime_offset_length = %d\n", hrd->time_offset_length);
 }
 
@@ -131,12 +131,12 @@ void h264_print_sps(struct h264_sps *sps)
 			}
 		}
 	}
-	printf("\tlog2_max_frame_num_minus4 = %d\n", sps->log2_max_frame_num_minus4);
+	printf("\tlog2_max_frame_num_minus4 = %d\n", sps->log2_max_frame_num - 4);
 	printf("\tpic_order_cnt_type = %d\n", sps->pic_order_cnt_type);
 	switch (sps->pic_order_cnt_type) {
 	case 0:
 		printf("\tlog2_max_pic_order_cnt_lsb_minus4 = %d\n",
-		       sps->log2_max_pic_order_cnt_lsb_minus4);
+		       sps->log2_max_pic_order_cnt_lsb - 4);
 		break;
 	case 1:
 		printf("\tdelta_pic_order_always_zero_flag = %d\n",
@@ -155,9 +155,9 @@ void h264_print_sps(struct h264_sps *sps)
 	printf("\tmax_num_ref_frames = %d\n", sps->max_num_ref_frames);
 	printf("\tgaps_in_frame_num_value_allowed_flag = %d\n",
 	       sps->gaps_in_frame_num_value_allowed_flag);
-	printf("\tpic_width_in_mbs_minus1 = %d\n", sps->pic_width_in_mbs_minus1);
+	printf("\tpic_width_in_mbs_minus1 = %d\n", sps->pic_width_in_mbs - 1);
 	printf("\tpic_height_in_map_units_minus1 = %d\n",
-	       sps->pic_height_in_map_units_minus1);
+	       sps->pic_height_in_map_units - 1);
 	printf("\tframe_mbs_only_flag = %d\n", sps->frame_mbs_only_flag);
 	printf("\tmb_adaptive_frame_field_flag = %d\n",
 	       sps->mb_adaptive_frame_field_flag);
@@ -263,8 +263,8 @@ void h264_print_sps(struct h264_sps *sps)
 		}
 	}
 	if (sps->is_mvc) {
-		printf("\tnum_views_minus1 = %d\n", sps->num_views_minus1);
-		for (i = 0; i <= sps->num_views_minus1; i++) {
+		printf("\tnum_views_minus1 = %d\n", sps->num_views - 1);
+		for (i = 0; i < sps->num_views; i++) {
 			printf("\tview_id[%d] = %d\n", i, sps->views[i].view_id);
 			printf("\tnum_anchor_refs_l0[%d] = %d\n", i,
 			       sps->views[i].num_anchor_refs_l0);
@@ -288,25 +288,25 @@ void h264_print_sps(struct h264_sps *sps)
 				       sps->views[i].non_anchor_ref_l1[j]);
 		}
 		printf("\tnum_level_values_signalled_minus1 = %d\n",
-		       sps->num_level_values_signalled_minus1);
-		for (i = 0; i <= sps->num_level_values_signalled_minus1; i++) {
+		       sps->num_level_values_signalled - 1);
+		for (i = 0; i < sps->num_level_values_signalled; i++) {
 			printf("\tlevel_idc[%d] = %d.%d\n", i,
 			       sps->levels[i].level_idc / 10,
 			       sps->levels[i].level_idc % 10);
 			printf("\tnum_applicable_ops_minus1[%d] = %d\n", i,
-			       sps->levels[i].num_applicable_ops_minus1);
-			for (j = 0; j <= sps->levels[i].num_applicable_ops_minus1; j++) {
+			       sps->levels[i].num_applicable_ops - 1);
+			for (j = 0; j < sps->levels[i].num_applicable_ops; j++) {
 				struct h264_sps_mvc_applicable_op *op =
 					&sps->levels[i].applicable_ops[j];
 				printf("\tapplicable_op_temporal_id[%d][%d] = %d\n", i, j,
 				       op->temporal_id);
 				printf("\tapplicable_op_num_target_views_minus1[%d][%d] = %d\n",
-				       i, j, op->num_target_views_minus1);
-				for (k = 0; k <= op->num_target_views_minus1; k++)
+				       i, j, op->num_target_views - 1);
+				for (k = 0; k < op->num_target_views; k++)
 					printf("\tapplicable_op_target_view_id[%d][%d][%d] = %d\n",
 					       i, j, k, op->target_view_id[k]);
 				printf("\tapplicable_op_num_views_minus1[%d][%d] = %d\n",
-				       i, j, op->num_views_minus1);
+				       i, j, op->num_views - 1);
 			}
 		}
 		if (sps->mvc_vui_parameters_present_flag) {
@@ -334,21 +334,21 @@ void h264_print_pps(struct h264_pps *pps)
 	printf("\tentropy_coding_mode_flag = %d\n", pps->entropy_coding_mode_flag);
 	printf("\tbottom_field_pic_order_in_frame_present_flag = %d\n",
 	       pps->bottom_field_pic_order_in_frame_present_flag);
-	printf("\tnum_slice_groups_minus1 = %d\n", pps->num_slice_groups_minus1);
-	if (pps->num_slice_groups_minus1) {
+	printf("\tnum_slice_groups_minus1 = %d\n", pps->num_slice_groups - 1);
+	if (pps->num_slice_groups) {
 		int i;
 		printf("\tslice_group_map_type = %d\n", pps->slice_group_map_type);
 		switch (pps->slice_group_map_type) {
 		case H264_SLICE_GROUP_MAP_INTERLEAVED:
-			for (i = 0; i <= pps->num_slice_groups_minus1; i++) {
-				printf("\trun_length_minus1[%d] = %d\n", i,
-				       pps->run_length_minus1[i]);
+			for (i = 0; i < pps->num_slice_groups; i++) {
+				printf("\trun_length[%d] = %d\n", i,
+				       pps->run_length[i]);
 			}
 			break;
 		case H264_SLICE_GROUP_MAP_DISPERSED:
 			break;
 		case H264_SLICE_GROUP_MAP_FOREGROUND:
-			for (i = 0; i < pps->num_slice_groups_minus1; i++) {
+			for (i = pps->num_slice_groups - 1 - 1; i >= 0; i--) {
 				printf("\ttop_left[%d] = %d\n", i, pps->top_left[i]);
 				printf("\tbottom_right[%d] = %d\n", i,
 				       pps->bottom_right[i]);
@@ -360,21 +360,21 @@ void h264_print_pps(struct h264_pps *pps)
 			printf("\tslice_group_change_direction_flag = %d\n",
 			       pps->slice_group_change_direction_flag);
 			printf("\tslice_group_change_rate_minus1 = %d\n",
-			       pps->slice_group_change_rate_minus1);
+			       pps->slice_group_change_rate) - 1;
 			break;
 		case H264_SLICE_GROUP_MAP_EXPLICIT:
 			printf("\tpic_size_in_map_units_minus1 = %d\n",
-			       pps->pic_size_in_map_units_minus1);
-			for (i = 0; i <= pps->pic_size_in_map_units_minus1; i++)
+			       pps->pic_size_in_map_units) - 1;
+			for (i = 0; i < pps->pic_size_in_map_units; i++)
 				printf("\tslice_group_id[%d] = %d\n", i,
 				       pps->slice_group_id[i]);
 			break;
 		}
 	}
 	printf("\tnum_ref_idx_l0_default_active_minus1 = %d\n",
-	       pps->num_ref_idx_l0_default_active_minus1);
+	       pps->num_ref_idx_l0_default_active) - 1;
 	printf("\tnum_ref_idx_l1_default_active_minus1 = %d\n",
-	       pps->num_ref_idx_l1_default_active_minus1);
+	       pps->num_ref_idx_l1_default_active) - 1;
 	printf("\tweighted_pred_flag = %d\n", pps->weighted_pred_flag);
 	printf("\tweighted_bipred_idc = %d\n", pps->weighted_bipred_idc);
 	printf("\tpic_init_qp_minus26 = %d\n", pps->pic_init_qp_minus26);
@@ -435,7 +435,7 @@ void h264_print_pred_weight_table(struct h264_slice *sl)
 	printf("\tluma_log2_weight_denom = %d\n", sl->luma_log2_weight_denom);
 	printf("\tchroma_log2_weight_denom = %d\n", sl->chroma_log2_weight_denom);
 	int i;
-	for (i = 0; i <= sl->num_ref_idx_l0_active_minus1; i++) {
+	for (i = 0; i < sl->num_ref_idx_l0_active; i++) {
 		printf("\tluma_weight_l0_flag[%d] = %d\n", i, sl->pwt_l0[i].luma_weight_flag);
 		printf("\tluma_weight_l0[%d] = %d\n", i, sl->pwt_l0[i].luma_weight);
 		printf("\tluma_offset_l0[%d] = %d\n", i, sl->pwt_l0[i].luma_offset);
@@ -446,7 +446,7 @@ void h264_print_pred_weight_table(struct h264_slice *sl)
 		printf("\tchroma_offset_l0[%d][1] = %d\n", i, sl->pwt_l0[i].chroma_offset[1]);
 	}
 	if (sl->slice_type_nos == H264_SLICE_TYPE_B) {
-		for (i = 0; i <= sl->num_ref_idx_l1_active_minus1; i++) {
+		for (i = 0; i < sl->num_ref_idx_l1_active; i++) {
 			printf("\tluma_weight_l1_flag[%d] = %d\n", i, sl->pwt_l1[i].luma_weight_flag);
 			printf("\tluma_weight_l1[%d] = %d\n", i, sl->pwt_l1[i].luma_weight);
 			printf("\tluma_offset_l1[%d] = %d\n", i, sl->pwt_l1[i].luma_offset);
@@ -563,10 +563,10 @@ void h264_print_slice_header(struct h264_context *ctx, struct h264_slice *slice)
 		printf("\tnum_ref_idx_active_override_flag = %d\n",
 		       slice->num_ref_idx_active_override_flag);
 		printf("\tnum_ref_idx_l0_active_minus1 = %d\n",
-		       slice->num_ref_idx_l0_active_minus1);
+		       slice->num_ref_idx_l0_active - 1);
 		if (slice->slice_type == H264_SLICE_TYPE_B)
 			printf("\tnum_ref_idx_l1_active_minus1 = %d\n",
-			       slice->num_ref_idx_l1_active_minus1);
+			       slice->num_ref_idx_l1_active - 1);
 		h264_print_ref_pic_list_modification(&slice->ref_pic_list_modification_l0,
 						     "l0");
 		if (slice->slice_type == H264_SLICE_TYPE_B)
@@ -602,8 +602,8 @@ void h264_print_slice_header(struct h264_context *ctx, struct h264_slice *slice)
 	       slice->disable_deblocking_filter_idc);
 	printf("\tslice_alpha_c0_offset_div2 = %d\n", slice->slice_alpha_c0_offset_div2);
 	printf("\tslice_beta_offset_div2 = %d\n", slice->slice_beta_offset_div2);
-	if (pps->num_slice_groups_minus1 && pps->slice_group_map_type >= 3 &&
-	    pps->slice_group_map_type <= 5) {
+	if (pps->num_slice_groups && pps->slice_group_map_type >= 3 &&
+		pps->slice_group_map_type <= 5) {
 		printf("\tslice_group_change_cycle = %d\n",
 		       slice->slice_group_change_cycle);
 	}

@@ -29,16 +29,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-/* ceil log2 */
-static inline int clog2(uint64_t x) {
-	if (!x)
-		return x;
-	int r = 0;
-	while (x - 1 > (1ull << r) - 1)
-		r++;
-	return r;
-}
-
 #define ARRAY_SIZE(a) (sizeof (a) / sizeof *(a))
 
 #ifndef __cplusplus

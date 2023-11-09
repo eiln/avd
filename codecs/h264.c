@@ -36,6 +36,17 @@
 #define h264_log(a, ...)  printf("[H264] " a, ##__VA_ARGS__)
 #define h264_err(a, ...)  fprintf(stderr, "[H264] " a, ##__VA_ARGS__)
 
+/* ceil log2 */
+static inline int clog2(uint64_t x)
+{
+	if (!x)
+		return x;
+	int r = 0;
+	while (x - 1 > (1ull << r) - 1)
+		r++;
+	return r;
+}
+
 int h264_find_nal_unit(uint8_t *buf, int size, int *nal_start, int *nal_end)
 {
 	int i;
@@ -178,25 +189,25 @@ static void h264_parse_scaling_list(struct bitstream *gb, uint32_t *scaling_list
 
 static int h264_parse_hrd_parameters(struct bitstream *gb, struct h264_hrd_parameters *hrd)
 {
-	hrd->cpb_cnt_minus1 = get_ue_golomb_31(gb);
-	if (hrd->cpb_cnt_minus1 > 31) {
-		h264_err("cpb_cnt_minus1 (%d) out of bounds\n", hrd->cpb_cnt_minus1);
+	hrd->cpb_cnt = get_ue_golomb_31(gb) + 1;
+	if (hrd->cpb_cnt >= 32) {
+		h264_err("cpb_cnt (%d) out of bounds\n", hrd->cpb_cnt);
 		return -1;
 	}
 
 	hrd->bit_rate_scale = get_bits(gb, 4);
 	hrd->cpb_size_scale = get_bits(gb, 4);
 
-	for (int i = 0; i < hrd->cpb_cnt_minus1 + 1; i++) {
-		hrd->bit_rate_value_minus1[i] = get_ue_golomb_long(gb) + 1;
-		hrd->cpb_size_value_minus1[i] = get_ue_golomb_long(gb) + 1;
-		hrd->cbr_flag[i]              = get_bits1(gb);
+	for (int i = 0; i < hrd->cpb_cnt; i++) {
+		hrd->bit_rate_value[i] = get_ue_golomb_long(gb) + 1;
+		hrd->cpb_size_value[i] = get_ue_golomb_long(gb) + 1;
+		hrd->cbr_flag[i]       = get_bits1(gb);
 	}
 
-	hrd->initial_cpb_removal_delay_length_minus1 = get_bits(gb, 5);
-	hrd->cpb_removal_delay_length_minus1         = get_bits(gb, 5);
-	hrd->dpb_output_delay_length_minus1          = get_bits(gb, 5);
-	hrd->time_offset_length                      = get_bits(gb, 5);
+	hrd->initial_cpb_removal_delay_length = get_bits(gb, 5) + 1;
+	hrd->cpb_removal_delay_length         = get_bits(gb, 5) + 1;
+	hrd->dpb_output_delay_length          = get_bits(gb, 5) + 1;
+	hrd->time_offset_length               = get_bits(gb, 5);
 
 	return 0;
 }
@@ -395,11 +406,11 @@ static int h264_parse_sps(struct bitstream *gb, struct h264_sps *sps)
 		return -1;
 	}
 
-	sps->log2_max_frame_num_minus4 = get_ue_golomb_31(gb);
+	sps->log2_max_frame_num = get_ue_golomb_31(gb) + 4;
 	sps->pic_order_cnt_type = get_ue_golomb_31(gb);
 	switch (sps->pic_order_cnt_type) {
 	case 0:
-		sps->log2_max_pic_order_cnt_lsb_minus4 = get_ue_golomb_31(gb);
+		sps->log2_max_pic_order_cnt_lsb       = get_ue_golomb_31(gb) + 4;
 		break;
 	case 1:
 		sps->delta_pic_order_always_zero_flag = get_bits1(gb);
@@ -415,8 +426,8 @@ static int h264_parse_sps(struct bitstream *gb, struct h264_sps *sps)
 
 	sps->max_num_ref_frames                   = get_ue_golomb_31(gb);
 	sps->gaps_in_frame_num_value_allowed_flag = get_bits1(gb);
-	sps->pic_width_in_mbs_minus1              = get_ue_golomb(gb);
-	sps->pic_height_in_map_units_minus1       = get_ue_golomb(gb);
+	sps->pic_width_in_mbs                     = get_ue_golomb(gb) + 1;
+	sps->pic_height_in_map_units              = get_ue_golomb(gb) + 1;
 
 	sps->frame_mbs_only_flag = get_bits1(gb);
 	if (!sps->frame_mbs_only_flag) {
@@ -519,16 +530,16 @@ static int h264_parse_sps_mvc(struct bitstream *gb, struct h264_sps *sps)
 		return -1;
 	}
 
-	sps->num_views_minus1 = bs_read_ue(gb);
-	sps->views = calloc(sizeof *sps->views, sps->num_views_minus1 + 1);
+	sps->num_views = bs_read_ue(gb) + 1;
+	sps->views = calloc(sizeof *sps->views, sps->num_views);
 	if (!sps->views) {
 		err = -1;
 		goto exit;
 	}
 
-	for (i = 0; i <= sps->num_views_minus1; i++)
+	for (i = 0; i < sps->num_views; i++)
 		sps->views[i].view_id = bs_read_ue(gb);
-	for (i = 1; i <= sps->num_views_minus1; i++) {
+	for (i = 1; i < sps->num_views; i++) {
 		sps->views[i].num_anchor_refs_l0 = bs_read_ue(gb);
 		if (sps->views[i].num_anchor_refs_l0 > 15) {
 			h264_err("num_anchor_refs_l0 over limit\n");
@@ -550,7 +561,7 @@ static int h264_parse_sps_mvc(struct bitstream *gb, struct h264_sps *sps)
 			sps->views[i].anchor_ref_l1[j] = bs_read_ue(gb);
 	}
 
-	for (i = 1; i <= sps->num_views_minus1; i++) {
+	for (i = 1; i < sps->num_views; i++) {
 		sps->views[i].num_non_anchor_refs_l0 = bs_read_ue(gb);
 		if (sps->views[i].num_non_anchor_refs_l0 > 15) {
 			h264_err("num_non_anchor_refs_l0 over limit\n");
@@ -570,39 +581,38 @@ static int h264_parse_sps_mvc(struct bitstream *gb, struct h264_sps *sps)
 			sps->views[i].non_anchor_ref_l1[j] = bs_read_ue(gb);
 	}
 
-	sps->num_level_values_signalled_minus1 = bs_read_ue(gb);
-	sps->levels = calloc(sizeof *sps->levels,
-				     sps->num_level_values_signalled_minus1 + 1);
+	sps->num_level_values_signalled = bs_read_ue(gb);
+	sps->levels = calloc(sizeof *sps->levels, sps->num_level_values_signalled);
 	if (!sps->levels) {
 		err = -1;
 		goto free_views;
 	}
 
-	for (i = 0; i <= sps->num_level_values_signalled_minus1; i++) {
+	for (i = 0; i < sps->num_level_values_signalled; i++) {
 		sps->levels[i].level_idc = get_bits(gb, 8);
-		sps->levels[i].num_applicable_ops_minus1 = bs_read_ue(gb);
+		sps->levels[i].num_applicable_ops = bs_read_ue(gb) + 1;
 		sps->levels[i].applicable_ops =
 				calloc(sizeof *sps->levels[i].applicable_ops,
-				       sps->levels[i].num_applicable_ops_minus1 + 1);
+				       sps->levels[i].num_applicable_ops);
 		if (!sps->levels[i].applicable_ops) {
 			err = -1;
 			goto free_levels;
 		}
 
-		for (j = 0; j <= sps->levels[i].num_applicable_ops_minus1; j++) {
+		for (j = 0; j < sps->levels[i].num_applicable_ops; j++) {
 			sps->levels[i].applicable_ops[j].temporal_id = get_bits(gb, 3);
-			sps->levels[i].applicable_ops[j].num_target_views_minus1 = bs_read_ue(gb);
+			sps->levels[i].applicable_ops[j].num_target_views = bs_read_ue(gb) + 1;
 			sps->levels[i].applicable_ops[j].target_view_id =
 					calloc(sizeof *sps->levels[i].applicable_ops[j].target_view_id,
-					       sps->levels[i].applicable_ops[j].num_target_views_minus1 + 1);
+					       sps->levels[i].applicable_ops[j].num_target_views);
 			if (!sps->levels[i].applicable_ops[j].target_view_id) {
 				err = -1;
 				goto free_levels;
 			}
 
-			for (k = 0; k <= sps->levels[i].applicable_ops[j].num_target_views_minus1; k++)
+			for (k = 0; k <= sps->levels[i].applicable_ops[j].num_target_views; k++)
 				sps->levels[i].applicable_ops[j].target_view_id[k] = bs_read_ue(gb);
-			sps->levels[i].applicable_ops[j].num_views_minus1 = bs_read_ue(gb);
+			sps->levels[i].applicable_ops[j].num_views = bs_read_ue(gb) + 1;
 		}
 	}
 
@@ -671,22 +681,22 @@ static int h264_parse_pps(struct h264_context *ctx, struct h264_pps *pps)
 
 	pps->entropy_coding_mode_flag = get_bits1(gb);
 	pps->bottom_field_pic_order_in_frame_present_flag = get_bits1(gb);
-	pps->num_slice_groups_minus1 = get_ue_golomb(gb);
-	if (pps->num_slice_groups_minus1) {
-		if (pps->num_slice_groups_minus1 > 7) {
-			h264_err("num_slice_groups_minus1 over limit\n");
+	pps->num_slice_groups = get_ue_golomb(gb);
+	if (pps->num_slice_groups) {
+		if (pps->num_slice_groups > 7) {
+			h264_err("num_slice_groups over limit\n");
 			return -1;
 		}
 		pps->slice_group_map_type = get_ue_golomb(gb);
 		switch (pps->slice_group_map_type) {
 		case H264_SLICE_GROUP_MAP_INTERLEAVED:
-			for (i = 0; i <= pps->num_slice_groups_minus1; i++)
-				pps->run_length_minus1[i] = get_ue_golomb(gb);
+			for (i = 0; i < pps->num_slice_groups; i++)
+				pps->run_length[i]   = get_ue_golomb(gb) + 1;
 			break;
 		case H264_SLICE_GROUP_MAP_DISPERSED:
 			break;
 		case H264_SLICE_GROUP_MAP_FOREGROUND:
-			for (i = 0; i < pps->num_slice_groups_minus1; i++) {
+			for (i = 0; i < pps->num_slice_groups; i++) {
 				pps->top_left[i]     = bs_read_ue(gb);
 				pps->bottom_right[i] = bs_read_ue(gb);
 			}
@@ -695,14 +705,14 @@ static int h264_parse_pps(struct h264_context *ctx, struct h264_pps *pps)
 		case H264_SLICE_GROUP_MAP_CHANGING_VERTICAL:
 		case H264_SLICE_GROUP_MAP_CHANGING_HORIZONTAL:
 			pps->slice_group_change_direction_flag = get_bits1(gb);
-			pps->slice_group_change_rate_minus1    = bs_read_ue(gb);
+			pps->slice_group_change_rate           = bs_read_ue(gb) + 1;
 			break;
 		case H264_SLICE_GROUP_MAP_EXPLICIT:
-			pps->pic_size_in_map_units_minus1 = bs_read_ue(gb);
+			pps->pic_size_in_map_units = bs_read_ue(gb) + 1;
 			static const int id_sizes[8] = { 0, 1, 2, 2, 3, 3, 3, 3 };
-			for (i = 0; i <= pps->pic_size_in_map_units_minus1; i++) {
+			for (i = 0; i < pps->pic_size_in_map_units; i++) {
 				uint32_t slice_group_id;
-				slice_group_id = get_bits(gb, id_sizes[pps->num_slice_groups_minus1]);
+				slice_group_id = get_bits(gb, id_sizes[pps->num_slice_groups]);
 			}
 			break;
 		default:
@@ -712,8 +722,8 @@ static int h264_parse_pps(struct h264_context *ctx, struct h264_pps *pps)
 		}
 	}
 
-	pps->num_ref_idx_l0_default_active_minus1 = get_ue_golomb(gb);
-	pps->num_ref_idx_l1_default_active_minus1 = get_ue_golomb(gb);
+	pps->num_ref_idx_l0_default_active = get_ue_golomb(gb) + 1;
+	pps->num_ref_idx_l1_default_active = get_ue_golomb(gb) + 1;
 
 	pps->weighted_pred_flag  = get_bits1(gb);
 	pps->weighted_bipred_idc = get_bits(gb, 2);
@@ -918,11 +928,11 @@ static int h264_pred_weight_table(struct bitstream *gb, struct h264_slice *sl)
 	sl->luma_log2_weight_denom = get_ue_golomb_31(gb);
 	sl->chroma_log2_weight_denom = get_ue_golomb_31(gb);
 
-	for (i = 0; i <= sl->num_ref_idx_l0_active_minus1; i++)
+	for (i = 0; i < sl->num_ref_idx_l0_active; i++)
 		h264_pred_weight_table_entry(gb, sl, &sl->pwt_l0[i]);
 
 	if (sl->slice_type_nos == H264_SLICE_TYPE_B) {
-		for (i = 0; i <= sl->num_ref_idx_l1_active_minus1; i++)
+		for (i = 0; i < sl->num_ref_idx_l1_active; i++)
 			h264_pred_weight_table_entry(gb, sl, &sl->pwt_l1[i]);
 	}
 
@@ -995,7 +1005,7 @@ static int h264_parse_slice_header(struct h264_context *ctx, struct h264_slice *
 	if (sps->separate_colour_plane_flag)
 		sl->colour_plane_id = get_bits(gb, 2);
 
-	sl->frame_num = get_bits(gb, sps->log2_max_frame_num_minus4 + 4);
+	sl->frame_num = get_bits(gb, sps->log2_max_frame_num);
 
 	sl->field_pic_flag = 0;
 	sl->bottom_field_flag = 0;
@@ -1021,10 +1031,10 @@ static int h264_parse_slice_header(struct h264_context *ctx, struct h264_slice *
 		}
 	}
 
-	sl->width = ((sps->pic_width_in_mbs_minus1 + 1) * 16) - (sps->frame_crop_right_offset * 2) - (sps->frame_crop_left_offset * 2);
-	sl->height = ((2 - sps->frame_mbs_only_flag) * (sps->pic_height_in_map_units_minus1 + 1) * 16) - (sps->frame_crop_bottom_offset * 2) - (sps->frame_crop_top_offset * 2);
-	sl->width_mbs = sps->pic_width_in_mbs_minus1 + 1;
-	sl->height_mbs = (sps->pic_height_in_map_units_minus1 + 1);
+	sl->width = (sps->pic_width_in_mbs * 16) - (sps->frame_crop_right_offset * 2) - (sps->frame_crop_left_offset * 2);
+	sl->height = ((2 - sps->frame_mbs_only_flag) * sps->pic_height_in_map_units * 16) - (sps->frame_crop_bottom_offset * 2) - (sps->frame_crop_top_offset * 2);
+	sl->width_mbs = sps->pic_width_in_mbs;
+	sl->height_mbs = sps->pic_height_in_map_units;
 	if (!sps->frame_mbs_only_flag)
 		sl->height_mbs *= 2;
 	if (sl->field_pic_flag)
@@ -1034,7 +1044,7 @@ static int h264_parse_slice_header(struct h264_context *ctx, struct h264_slice *
 
 	switch (sps->pic_order_cnt_type) {
 	case 0:
-		sl->pic_order_cnt_lsb = get_bits(gb, sps->log2_max_pic_order_cnt_lsb_minus4 + 4);
+		sl->pic_order_cnt_lsb = get_bits(gb, sps->log2_max_pic_order_cnt_lsb);
 		sl->delta_pic_order_cnt_bottom = 0;
 		if (pps->bottom_field_pic_order_in_frame_present_flag &&
 		    !sl->field_pic_flag) {
@@ -1064,27 +1074,25 @@ static int h264_parse_slice_header(struct h264_context *ctx, struct h264_slice *
 		if (sl->slice_type_nos != H264_SLICE_TYPE_I) {
 			sl->num_ref_idx_active_override_flag = get_bits1(gb);
 			if (sl->num_ref_idx_active_override_flag) {
-				sl->num_ref_idx_l0_active_minus1 = get_ue_golomb(gb);
+				sl->num_ref_idx_l0_active = get_ue_golomb(gb) + 1;
 				if (sl->slice_type_nos == H264_SLICE_TYPE_B)
-					sl->num_ref_idx_l1_active_minus1 = get_ue_golomb(gb);
+					sl->num_ref_idx_l1_active = get_ue_golomb(gb) + 1;
 			} else {
-				sl->num_ref_idx_l0_active_minus1 = pps->num_ref_idx_l0_default_active_minus1;
+				sl->num_ref_idx_l0_active = pps->num_ref_idx_l0_default_active;
 				if (sl->slice_type_nos == H264_SLICE_TYPE_B) {
-					sl->num_ref_idx_l1_active_minus1 = pps->num_ref_idx_l1_default_active_minus1;
+					sl->num_ref_idx_l1_active = pps->num_ref_idx_l1_default_active;
 				}
 			}
 
-			if (sl->num_ref_idx_l0_active_minus1 >= H264_MAX_REFS) {
-				fprintf(stderr,
-					"num_ref_idx_l0_active_minus1 (%d) out of range\n",
-					sl->num_ref_idx_l0_active_minus1);
+			if (sl->num_ref_idx_l0_active >= H264_MAX_REFS) {
+				h264_err("num_ref_idx_l0_active (%d) out of bounds\n",
+					sl->num_ref_idx_l0_active);
 				return -1;
 			}
 			if (sl->slice_type_nos == H264_SLICE_TYPE_B &&
-				sl->num_ref_idx_l1_active_minus1 >= H264_MAX_REFS) {
-				fprintf(stderr,
-					"num_ref_idx_l1_active_minus1 (%d) out of range\n",
-					sl->num_ref_idx_l1_active_minus1);
+				sl->num_ref_idx_l1_active >= H264_MAX_REFS) {
+				h264_err("num_ref_idx_l1_active (%d) out of bounds\n",
+					sl->num_ref_idx_l1_active);
 				return -1;
 			}
 		}
@@ -1162,12 +1170,10 @@ static int h264_parse_slice_header(struct h264_context *ctx, struct h264_slice *
 		}
 	}
 
-	if (pps->num_slice_groups_minus1 && pps->slice_group_map_type >= 3 &&
+	if (pps->num_slice_groups && pps->slice_group_map_type >= 3 &&
 	    pps->slice_group_map_type <= 5) {
-		size_t s = clog2(((sps->pic_width_in_mbs_minus1 + 1) *
-					(sps->pic_height_in_map_units_minus1 + 1) +
-				pps->slice_group_change_rate_minus1) /
-				       (pps->slice_group_change_rate_minus1 + 1) + 1);
+		size_t s = clog2((sps->pic_width_in_mbs * sps->pic_height_in_map_units)		
+				/ (pps->slice_group_change_rate + 1));
 		sl->slice_group_change_cycle = get_bits(gb, s);
 	}
 

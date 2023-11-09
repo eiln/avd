@@ -128,7 +128,7 @@ enum {
 	H264_MAX_REFS = 2 * H264_MAX_DPB_FRAMES,
 
 	// 7.4.3.1: modification_of_pic_nums_idc is not equal to 3 at most
-	// num_ref_idx_lN_active_minus1 + 1 times (that is, once for each
+	// num_ref_idx_lN_active + 1 times (that is, once for each
 	// possible reference), then equal to 3 once.
 	H264_MAX_RPLM_COUNT = H264_MAX_REFS + 1,
 
@@ -141,10 +141,10 @@ enum {
 	H264_MAX_MMCO_COUNT = H264_MAX_REFS * 2 + 3,
 
 	// A.2.1, A.2.3: profiles supporting FMO constrain
-	// num_slice_groups_minus1 to be in [0, 7].
+	// num_slice_groups to be in [0, 7].
 	H264_MAX_SLICE_GROUPS = 8,
 
-	// E.2.2: cpb_cnt_minus1 is in [0, 31].
+	// E.2.2: cpb_cnt is in [0, 31].
 	H264_MAX_CPB_CNT = 32,
 
 	// A.3: in table A-1 the highest level allows a MaxFS of 139264.
@@ -164,15 +164,15 @@ enum {
 #define FIELD_PICTURE(sl) ((sl)->picture_structure != PICT_FRAME)
 
 struct h264_hrd_parameters {
-	uint32_t cpb_cnt_minus1;
+	uint32_t cpb_cnt;
 	uint32_t bit_rate_scale;
 	uint32_t cpb_size_scale;
-	uint32_t bit_rate_value_minus1[32];
-	uint32_t cpb_size_value_minus1[32];
+	uint32_t bit_rate_value[32];
+	uint32_t cpb_size_value[32];
 	uint32_t cbr_flag[32];
-	uint32_t initial_cpb_removal_delay_length_minus1;
-	uint32_t cpb_removal_delay_length_minus1;
-	uint32_t dpb_output_delay_length_minus1;
+	uint32_t initial_cpb_removal_delay_length;
+	uint32_t cpb_removal_delay_length;
+	uint32_t dpb_output_delay_length;
 	uint32_t time_offset_length;
 };
 
@@ -233,9 +233,9 @@ struct h264_sps {
 	uint32_t seq_scaling_list_4x4[6][16];
 	uint32_t seq_scaling_list_8x8[6][64];
 
-	uint32_t log2_max_frame_num_minus4;
+	uint32_t log2_max_frame_num;
 	uint32_t pic_order_cnt_type;
-	uint32_t log2_max_pic_order_cnt_lsb_minus4;
+	uint32_t log2_max_pic_order_cnt_lsb;
 	uint32_t delta_pic_order_always_zero_flag;
 	int32_t offset_for_non_ref_pic;
 	int32_t offset_for_top_to_bottom_field;
@@ -243,8 +243,8 @@ struct h264_sps {
 	int32_t offset_for_ref_frame[255];
 	uint32_t max_num_ref_frames;
 	uint32_t gaps_in_frame_num_value_allowed_flag;
-	uint32_t pic_width_in_mbs_minus1;
-	uint32_t pic_height_in_map_units_minus1;
+	uint32_t pic_width_in_mbs;
+	uint32_t pic_height_in_map_units;
 	uint32_t frame_mbs_only_flag;
 	uint32_t mb_adaptive_frame_field_flag;
 	uint32_t direct_8x8_inference_flag;
@@ -277,7 +277,7 @@ struct h264_sps {
 
 	/* MVC */
 	int is_mvc;
-	uint32_t num_views_minus1;
+	uint32_t num_views;
 	struct h264_sps_mvc_view {
 		uint32_t view_id;
 		uint32_t num_anchor_refs_l0;
@@ -289,15 +289,15 @@ struct h264_sps {
 		uint32_t num_non_anchor_refs_l1;
 		uint32_t non_anchor_ref_l1[15];
 	} *views;
-	uint32_t num_level_values_signalled_minus1;
+	uint32_t num_level_values_signalled;
 	struct h264_sps_mvc_level {
 		uint32_t level_idc;
-		uint32_t num_applicable_ops_minus1;
+		uint32_t num_applicable_ops;
 		struct h264_sps_mvc_applicable_op {
 			uint32_t temporal_id;
-			uint32_t num_target_views_minus1;
+			uint32_t num_target_views;
 			uint32_t *target_view_id;
-			uint32_t num_views_minus1;
+			uint32_t num_views;
 		} *applicable_ops;
 	} *levels;
 	int mvc_vui_parameters_present_flag;
@@ -317,17 +317,17 @@ struct h264_pps {
 	uint32_t seq_parameter_set_id;
 	uint32_t entropy_coding_mode_flag;
 	uint32_t bottom_field_pic_order_in_frame_present_flag;
-	uint32_t num_slice_groups_minus1;
+	uint32_t num_slice_groups;
 	uint32_t slice_group_map_type;
-	uint32_t run_length_minus1[8];
+	uint32_t run_length[8];
 	uint32_t top_left[8];
 	uint32_t bottom_right[8];
 	uint32_t slice_group_change_direction_flag;
-	uint32_t slice_group_change_rate_minus1;
-	uint32_t pic_size_in_map_units_minus1;
+	uint32_t slice_group_change_rate;
+	uint32_t pic_size_in_map_units;
 	uint32_t *slice_group_id;
-	uint32_t num_ref_idx_l0_default_active_minus1;
-	uint32_t num_ref_idx_l1_default_active_minus1;
+	uint32_t num_ref_idx_l0_default_active;
+	uint32_t num_ref_idx_l1_default_active;
 	uint32_t weighted_pred_flag;
 	uint32_t weighted_bipred_idc;
 	int32_t pic_init_qp_minus26;
@@ -408,8 +408,8 @@ struct h264_slice {
 	uint32_t redundant_pic_cnt;
 	uint32_t direct_spatial_mb_pred_flag;
 	uint32_t num_ref_idx_active_override_flag;
-	uint32_t num_ref_idx_l0_active_minus1;
-	uint32_t num_ref_idx_l1_active_minus1;
+	uint32_t num_ref_idx_l0_active;
+	uint32_t num_ref_idx_l1_active;
 	struct h264_ref_pic_list_modification ref_pic_list_modification_l0;
 	struct h264_ref_pic_list_modification ref_pic_list_modification_l1;
 
