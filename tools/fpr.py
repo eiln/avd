@@ -9,7 +9,6 @@ import os
 import numpy as np
 np.set_printoptions(formatter={'int':lambda x: "0x%06x" % (x)})
 
-from avid.types import *
 import struct
 
 if __name__ == "__main__":
@@ -32,10 +31,10 @@ if __name__ == "__main__":
 
 	# determine mode
 	_, mode = struct.unpack("<II", open(paths[0], "rb").read()[:8])
-	if  (mode == AVD_MODE_H264):
+	if  (mode == 1):
 		from avid.h264.fp import AvdH264V3FrameParams
 		fpcls = AvdH264V3FrameParams
-	elif (mode == AVD_MODE_VP9):
+	elif (mode == 2):
 		from avid.vp9.fp import AvdVP9V3FrameParams
 		fpcls = AvdVP9V3FrameParams
 	else:
@@ -48,6 +47,6 @@ if __name__ == "__main__":
 		print(fp)
 		#print("="*80)
 		#print()
-		out.append((fp.hdr.hdr_48_incr_addr, fp.hdr.hdr_4c_incr_size))
+		#out.append((fp.hdr.hdr_48_incr_addr, fp.hdr.hdr_4c_incr_size))
 	#out = np.array(out) # useful for finding regressions
 	#print(out)
