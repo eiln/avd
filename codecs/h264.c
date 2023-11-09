@@ -27,10 +27,59 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "bs.h"
 #include "h264.h"
 #include "util.h"
+
+#define h264_log(a, ...)  printf("[H264] " a, ##__VA_ARGS__)
+#define h264_err(a, ...)  fprintf(stderr, "[H264] " a, ##__VA_ARGS__)
+
+int h264_find_nal_unit(uint8_t *buf, int size, int *nal_start, int *nal_end)
+{
+	int i;
+	*nal_start = 0;
+	*nal_end = 0;
+
+	i = 0;
+	while ( // ( next_bits( 24 ) != 0x000001 && next_bits( 32 ) != 0x00000001 )
+		(buf[i] != 0 || buf[i + 1] != 0 || buf[i + 2] != 0x01) &&
+		(buf[i] != 0 || buf[i + 1] != 0 || buf[i + 2] != 0 ||
+		 buf[i + 3] != 0x01)) {
+		i++; // skip leading zero
+		if (i + 4 >= size) {
+			return 0;
+		} // did not find nal start
+	}
+
+	if (buf[i] != 0 || buf[i + 1] != 0 ||
+	    buf[i + 2] != 0x01) // ( next_bits( 24 ) != 0x000001 )
+	{
+		i++;
+	}
+
+	if (buf[i] != 0 || buf[i + 1] != 0 ||
+	    buf[i + 2] != 0x01) { /* error, should never happen */
+		return 0;
+	}
+	i += 3;
+	*nal_start = i;
+
+	while ( //( next_bits( 24 ) != 0x000000 && next_bits( 24 ) != 0x000001 )
+		(buf[i] != 0 || buf[i + 1] != 0 || buf[i + 2] != 0) &&
+		(buf[i] != 0 || buf[i + 1] != 0 || buf[i + 2] != 0x01)) {
+		i++;
+		// FIXME the next line fails when reading a nal that ends exactly at the end of the data
+		if (i + 3 >= size) {
+			*nal_end = size;
+			return -1;
+		} // did not find nal end, stream ended first
+	}
+
+	*nal_end = i;
+	return (*nal_end - *nal_start);
+}
 
 static int h264_nal_to_rbsp(const uint8_t *nal_buf, int *nal_size, uint8_t *rbsp_buf, int *rbsp_size)
 {
@@ -76,51 +125,6 @@ static int h264_nal_to_rbsp(const uint8_t *nal_buf, int *nal_size, uint8_t *rbsp
 	*nal_size = i;
 	*rbsp_size = j;
 	return j;
-}
-
-int h264_find_nal_unit(uint8_t *buf, int buf_size, int *nal_start, int *nal_end)
-{
-	int i;
-	*nal_start = 0;
-	*nal_end = 0;
-
-	i = 0;
-	while ( // ( next_bits( 24 ) != 0x000001 && next_bits( 32 ) != 0x00000001 )
-		(buf[i] != 0 || buf[i + 1] != 0 || buf[i + 2] != 0x01) &&
-		(buf[i] != 0 || buf[i + 1] != 0 || buf[i + 2] != 0 ||
-		 buf[i + 3] != 0x01)) {
-		i++; // skip leading zero
-		if (i + 4 >= buf_size) {
-			return 0;
-		} // did not find nal start
-	}
-
-	if (buf[i] != 0 || buf[i + 1] != 0 ||
-	    buf[i + 2] != 0x01) // ( next_bits( 24 ) != 0x000001 )
-	{
-		i++;
-	}
-
-	if (buf[i] != 0 || buf[i + 1] != 0 ||
-	    buf[i + 2] != 0x01) { /* error, should never happen */
-		return 0;
-	}
-	i += 3;
-	*nal_start = i;
-
-	while ( //( next_bits( 24 ) != 0x000000 && next_bits( 24 ) != 0x000001 )
-		(buf[i] != 0 || buf[i + 1] != 0 || buf[i + 2] != 0) &&
-		(buf[i] != 0 || buf[i + 1] != 0 || buf[i + 2] != 0x01)) {
-		i++;
-		// FIXME the next line fails when reading a nal that ends exactly at the end of the data
-		if (i + 3 >= buf_size) {
-			*nal_end = buf_size;
-			return -1;
-		} // did not find nal end, stream ended first
-	}
-
-	*nal_end = i;
-	return (*nal_end - *nal_start);
 }
 
 static int h264_more_rbsp_data(struct bitstream *gb)
@@ -176,7 +180,7 @@ static int h264_parse_hrd_parameters(struct bitstream *gb, struct h264_hrd_param
 {
 	hrd->cpb_cnt_minus1 = get_ue_golomb_31(gb);
 	if (hrd->cpb_cnt_minus1 > 31) {
-		fprintf(stderr, "cpb_cnt_minus1 (%d) out of range\n", hrd->cpb_cnt_minus1);
+		h264_err("cpb_cnt_minus1 (%d) out of bounds\n", hrd->cpb_cnt_minus1);
 		return -1;
 	}
 
@@ -232,7 +236,7 @@ static int h264_parse_vui_parameters(struct bitstream *gb, struct h264_vui *vui)
 			if (vui->aspect_ratio_idc < ARRAY_SIZE(h2645_pixel_aspect_ratios)) {
 				vui->sar_width = h2645_pixel_aspect_ratios[vui->aspect_ratio_idc][1];
 			} else {
-				fprintf(stderr, "WARNING: unknown aspect_ratio_idc %d\n",
+				h264_err("WARNING: unknown aspect_ratio_idc %d\n",
 					vui->aspect_ratio_idc);
 			}
 		}
@@ -317,10 +321,8 @@ static int h264_parse_vui_parameters(struct bitstream *gb, struct h264_vui *vui)
 	return 0;
 }
 
-int h264_parse_sps(struct h264_decoder *dec, struct h264_sps *sps)
+static int h264_parse_sps(struct bitstream *gb, struct h264_sps *sps)
 {
-	struct bitstream *gb = dec->gb;
-
 	uint32_t constraint_set_flags = 0;
 
 	sps->is_svc = 0;
@@ -338,7 +340,7 @@ int h264_parse_sps(struct h264_decoder *dec, struct h264_sps *sps)
 	sps->level_idc            = get_bits(gb, 8);
 	sps->seq_parameter_set_id = get_ue_golomb_31(gb);
 	if (sps->seq_parameter_set_id >= H264_MAX_SPS_COUNT) {
-		fprintf(stderr, "sps_id %u out of range\n", sps->seq_parameter_set_id);
+		h264_err("SPS id %u out of range\n", sps->seq_parameter_set_id);
 		return -1;
 	}
 
@@ -389,7 +391,7 @@ int h264_parse_sps(struct h264_decoder *dec, struct h264_sps *sps)
 		}
 		break;
 	default:
-		fprintf(stderr, "Unknown profile (%d)\n", sps->profile_idc);
+		h264_err("unknown profile (%d)\n", sps->profile_idc);
 		return -1;
 	}
 
@@ -452,9 +454,8 @@ static int h264_svc_vui_parameters(struct bitstream *gb, struct h264_vui *vui)
 	return 0;
 }
 
-int h264_parse_sps_svc(struct h264_decoder *dec, struct h264_sps *sps)
+static int h264_parse_sps_svc(struct bitstream *gb, struct h264_sps *sps)
 {
-	struct bitstream *gb = dec->gb;
 	sps->is_svc = 1;
 
 	sps->inter_layer_deblocking_filter_control_present_flag = get_bits1(gb);
@@ -509,14 +510,13 @@ static int h264_mvc_vui_parameters(struct bitstream *gb, struct h264_vui *vui)
 	return 0;
 }
 
-int h264_parse_sps_mvc(struct h264_decoder *dec, struct h264_sps *sps)
+static int h264_parse_sps_mvc(struct bitstream *gb, struct h264_sps *sps)
 {
-	struct bitstream *gb = dec->gb;
 	int i, j, k;
 
 	sps->is_mvc = 1;
 	if (!get_bits1(gb)) {
-		fprintf(stderr, "bit_equal_to_one invalid\n");
+		h264_err("SPS MVC marker bit not set\n");
 		return -1;
 	}
 
@@ -528,7 +528,7 @@ int h264_parse_sps_mvc(struct h264_decoder *dec, struct h264_sps *sps)
 	for (i = 1; i <= sps->num_views_minus1; i++) {
 		sps->views[i].num_anchor_refs_l0 = bs_read_ue(gb);
 		if (sps->views[i].num_anchor_refs_l0 > 15) {
-			fprintf(stderr, "num_anchor_refs_l0 over limit\n");
+			h264_err("num_anchor_refs_l0 over limit\n");
 			return -1;
 		}
 	
@@ -537,7 +537,7 @@ int h264_parse_sps_mvc(struct h264_decoder *dec, struct h264_sps *sps)
 
 		sps->views[i].num_anchor_refs_l1 = bs_read_ue(gb);
 		if (sps->views[i].num_anchor_refs_l1 > 15) {
-			fprintf(stderr, "num_anchor_refs_l1 over limit\n");
+			h264_err("num_anchor_refs_l1 over limit\n");
 			return -1;
 		}
 	
@@ -548,7 +548,7 @@ int h264_parse_sps_mvc(struct h264_decoder *dec, struct h264_sps *sps)
 	for (i = 1; i <= sps->num_views_minus1; i++) {
 		sps->views[i].num_non_anchor_refs_l0 = bs_read_ue(gb);
 		if (sps->views[i].num_non_anchor_refs_l0 > 15) {
-			fprintf(stderr, "num_non_anchor_refs_l0 over limit\n");
+			h264_err("num_non_anchor_refs_l0 over limit\n");
 			return -1;
 		}
 		for (j = 0; j < sps->views[i].num_non_anchor_refs_l0; j++)
@@ -556,7 +556,7 @@ int h264_parse_sps_mvc(struct h264_decoder *dec, struct h264_sps *sps)
 
 		sps->views[i].num_non_anchor_refs_l1 = bs_read_ue(gb);
 		if (sps->views[i].num_non_anchor_refs_l1 > 15) {
-			fprintf(stderr, "num_non_anchor_refs_l1 over limit\n");
+			h264_err("num_non_anchor_refs_l1 over limit\n");
 			return -1;
 		}
 		for (j = 0; j < sps->views[i].num_non_anchor_refs_l1; j++)
@@ -592,18 +592,18 @@ int h264_parse_sps_mvc(struct h264_decoder *dec, struct h264_sps *sps)
 	return 0;
 }
 
-int h264_parse_sps_ext(struct h264_decoder *dec, uint32_t *pseq_parameter_set_id)
+static int h264_parse_sps_ext(struct h264_context *ctx, uint32_t *pseq_parameter_set_id)
 {
-	struct bitstream *gb = dec->gb;
+	struct bitstream *gb = &ctx->gb;
 
 	uint32_t ps_id = bs_read_ue(gb);
 	if (ps_id > 31) {
-		fprintf(stderr, "pseq_parameter_set_id (%d) out of bounds\n", ps_id);
+		h264_err("PSEQ id (%d) out of bounds\n", ps_id);
 		return -1;
 	}
 	*pseq_parameter_set_id = ps_id;
 
-	struct h264_sps *sps = &dec->sps_list[ps_id];
+	struct h264_sps *sps = &ctx->sps_list[ps_id];
 	sps->has_ext = 1;
 	sps->aux_format_idc = bs_read_ue(gb);
 	if (sps->aux_format_idc) {
@@ -614,7 +614,7 @@ int h264_parse_sps_ext(struct h264_decoder *dec, uint32_t *pseq_parameter_set_id
 	}
 
 	if (get_bits1(gb)) {
-		fprintf(stderr, "WARNING: additional data in sps extension\n");
+		h264_err("WARNING: additional data in SPS extension\n");
 		while (h264_more_rbsp_data(gb)) {
 			get_bits1(gb);
 		}
@@ -623,15 +623,15 @@ int h264_parse_sps_ext(struct h264_decoder *dec, uint32_t *pseq_parameter_set_id
 	return 0;
 }
 
-int h264_parse_pps(struct h264_decoder *dec, struct h264_pps *pps)
+static int h264_parse_pps(struct h264_context *ctx, struct h264_pps *pps)
 {
-	struct bitstream *gb = dec->gb;
+	struct bitstream *gb = &ctx->gb;
 	int i;
 
 	pps->pic_parameter_set_id = get_ue_golomb(gb);
 	pps->seq_parameter_set_id = get_ue_golomb_31(gb);
 	if (pps->seq_parameter_set_id >= H264_MAX_SPS_COUNT) {
-		fprintf(stderr, "sps_id (%d) out of bounds\n", pps->seq_parameter_set_id);
+		h264_err("SPS id (%d) out of bounds\n", pps->seq_parameter_set_id);
 		return -1;
 	}
 
@@ -640,7 +640,7 @@ int h264_parse_pps(struct h264_decoder *dec, struct h264_pps *pps)
 	pps->num_slice_groups_minus1 = get_ue_golomb(gb);
 	if (pps->num_slice_groups_minus1) {
 		if (pps->num_slice_groups_minus1 > 7) {
-			fprintf(stderr, "num_slice_groups_minus1 over limit\n");
+			h264_err("num_slice_groups_minus1 over limit\n");
 			return -1;
 		}
 		pps->slice_group_map_type = get_ue_golomb(gb);
@@ -672,7 +672,7 @@ int h264_parse_pps(struct h264_decoder *dec, struct h264_pps *pps)
 			}
 			break;
 		default:
-			fprintf(stderr, "Unknown slice_group_map_type %d!\n",
+			h264_err("unknown slice_group_map_type %d!\n",
 				pps->slice_group_map_type);
 			return -1;
 		}
@@ -696,8 +696,8 @@ int h264_parse_pps(struct h264_decoder *dec, struct h264_pps *pps)
 		pps->pic_scaling_matrix_present_flag = get_bits1(gb);
 		if (pps->pic_scaling_matrix_present_flag) {
 			/* brain damage workaround start */
-			struct h264_sps *sps = h264_get_sps(dec, pps->pic_parameter_set_id);
-			struct h264_sps *subsps = h264_get_sub_sps(dec, pps->pic_parameter_set_id);
+			struct h264_sps *sps = h264_get_sps(ctx, pps->pic_parameter_set_id);
+			struct h264_sps *subsps = h264_get_sub_sps(ctx, pps->pic_parameter_set_id);
 			if (sps) {
 				pps->chroma_format_idc = sps->chroma_format_idc;
 				if (subsps) {
@@ -711,7 +711,7 @@ int h264_parse_pps(struct h264_decoder *dec, struct h264_pps *pps)
 			} else if (subsps) {
 				pps->chroma_format_idc = subsps->chroma_format_idc;
 			} else {
-				fprintf(stderr, "pps for nonexistent sps/subsps!\n");
+				h264_err("pps for nonexistent sps/subsps!\n");
 				return -1;
 			}
 			/* brain damage workaround end */
@@ -752,8 +752,7 @@ static int h264_ref_pic_list_modification(struct bitstream *gb, struct h264_slic
 			if (list->list[i].op != 3) {
 				list->list[i].param = get_ue_golomb_long(gb);
 				if (i == 32) {
-					fprintf(stderr,
-						"Too many ref_pic_list_modification entries\n");
+					h264_err("too many ref_pic_list_modification entries\n");
 					return 1;
 				}
 			}
@@ -765,11 +764,9 @@ static int h264_ref_pic_list_modification(struct bitstream *gb, struct h264_slic
 	return 0;
 }
 
-static int h264_parse_dec_ref_pic_marking(struct h264_decoder *dec, struct h264_slice *sl)
+static int h264_parse_dec_ref_pic_marking(struct bitstream *gb, struct h264_slice *sl)
 {
-	struct bitstream *gb = dec->gb;
-	int i;
-	int nb_mmco = 0;
+	int i = 0;
 
 	sl->nb_mmco = 0;
 	sl->no_output_of_prior_pics_flag = 0;
@@ -799,19 +796,16 @@ static int h264_parse_dec_ref_pic_marking(struct h264_decoder *dec, struct h264_
 				}
 
 				if (mmco->opcode > (unsigned)H264_MMCO_THIS_TO_LONG) {
-					printf("illegal memory management control operation %d\n",
-					       mmco->opcode);
-					sl->nb_mmco = i;
+					h264_err("illegal mmco opcode %d\n", mmco->opcode);
 					return -1;
 				}
 				if (mmco->opcode == H264_MMCO_END)
 					break;
 			}
-			nb_mmco = i;
 		}
 	}
 
-	sl->nb_mmco = nb_mmco;
+	sl->nb_mmco = i;
 
 	return 0;
 }
@@ -840,7 +834,7 @@ static int h264_parse_dec_ref_base_pic_marking(struct bitstream *gb, struct h264
 						mmco->long_arg = get_ue_golomb_31(gb); /* long_term_pic_num */
 						break;
 					default:
-						fprintf(stderr, "Unknown MMCO %d\n", mmco->opcode);
+						h264_err("unknown mmco opcode %d\n", mmco->opcode);
 						return -1;
 				}
 				if (mmco->opcode == H264_MMCO_END) {
@@ -906,19 +900,18 @@ static const uint8_t h264_golomb_to_pict_type[5] = { H264_SLICE_TYPE_P, H264_SLI
 						     H264_SLICE_TYPE_SP,
 						     H264_SLICE_TYPE_SI };
 
-int h264_parse_slice_header(struct h264_decoder *dec, struct h264_slice *sl)
+static int h264_parse_slice_header(struct h264_context *ctx, struct h264_slice *sl)
 {
-	struct bitstream *gb = dec->gb;
+	struct bitstream *gb = &ctx->gb;
 	struct h264_sps *sps = NULL;
 	struct h264_pps *pps = NULL;
 	uint32_t slice_type;
-	uint64_t start_bytepos = (uint64_t)(void *)gb->p;
 
 	sl->first_mb_in_slice = get_ue_golomb_long(gb);
 
 	slice_type = get_ue_golomb_31(gb);
 	if (slice_type > 9) {
-		fprintf(stderr, "slice type %d too large at %d\n", slice_type,
+		h264_err("slice type %d too large at %d\n", slice_type,
 		       sl->first_mb_in_slice);
 		return -1;
 	}
@@ -936,20 +929,20 @@ int h264_parse_slice_header(struct h264_decoder *dec, struct h264_slice *sl)
 
 	sl->pic_parameter_set_id = get_ue_golomb(gb);
 	if (sl->pic_parameter_set_id >= H264_MAX_PPS_COUNT) {
-		fprintf(stderr, "pic_parameter_set_id out of range\n");
+		h264_err("pic_parameter_set_id out of range\n");
 		return -1;
 	}
 
-	pps = h264_get_pps(dec, sl->pic_parameter_set_id);
+	pps = h264_get_pps(ctx, sl->pic_parameter_set_id);
 	if (!pps) {
-		fprintf(stderr, "pps id (%d) doesn't specify a pps\n",
+		h264_err("PPS id (%d) points to NULL PPS\n",
 			sl->pic_parameter_set_id);
 		return -1;
 	}
 
-	sps = h264_get_sps(dec, sl->pic_parameter_set_id);
+	sps = h264_get_sps(ctx, sl->pic_parameter_set_id);
 	if (!sps) {
-		fprintf(stderr, "sps id (%d) doesn't specify a sps\n",
+		h264_err("SPS id (%d) points to NULL SPS\n",
 			pps->seq_parameter_set_id);
 		return -1;
 	}
@@ -989,7 +982,7 @@ int h264_parse_slice_header(struct h264_decoder *dec, struct h264_slice *sl)
 	if (sl->nal_unit_type == H264_NAL_SLICE_IDR) {
 		sl->idr_pic_id = get_ue_golomb_long(gb);
 		if (sl->idr_pic_id >= 65536) {
-			fprintf(stderr, "idr_pic_id (%d) is out of bounds\n", sl->idr_pic_id);
+			h264_err("idr_pic_id (%d) out of bounds\n", sl->idr_pic_id);
 			return -1;
 		}
 	}
@@ -1090,7 +1083,7 @@ int h264_parse_slice_header(struct h264_decoder *dec, struct h264_slice *sl)
 		sl->long_term_reference_flag = 0;
 		sl->adaptive_ref_pic_marking_mode_flag = 0;
 		if (sl->nal_ref_idc) {
-			if (h264_parse_dec_ref_pic_marking(dec, sl))
+			if (h264_parse_dec_ref_pic_marking(gb, sl))
 				return -1;
 			if (sps->is_svc && !sps->slice_header_restriction_flag) {
 				if (h264_parse_dec_ref_base_pic_marking(gb, sl, &sl->svc))
@@ -1105,7 +1098,7 @@ int h264_parse_slice_header(struct h264_decoder *dec, struct h264_slice *sl)
 	    sl->slice_type != H264_SLICE_TYPE_SI) {
 		sl->cabac_init_idc = get_ue_golomb_31(gb);
 		if (sl->cabac_init_idc > 2) {
-			fprintf(stderr, "cabac_init_idc %u out of range!\n", sl->cabac_init_idc);
+			h264_err("cabac_init_idc %u out of range!\n", sl->cabac_init_idc);
 			return -1;
 		}
 	}
@@ -1128,8 +1121,7 @@ int h264_parse_slice_header(struct h264_decoder *dec, struct h264_slice *sl)
 		                sl->slice_alpha_c0_offset_div2 < -6 ||
 		                sl->slice_beta_offset_div2 >  6     ||
 		                sl->slice_beta_offset_div2 < -6) {
-		                	fprintf(stderr,
-			                       "deblocking filter parameters %d %d out of range\n",
+		                	h264_err("deblocking filter parameters %d %d out of range\n",
 			                       sl->slice_alpha_c0_offset_div2, sl->slice_beta_offset_div2);
 		                return -1;
 			}
@@ -1141,100 +1133,103 @@ int h264_parse_slice_header(struct h264_decoder *dec, struct h264_slice *sl)
 		size_t s = clog2(((sps->pic_width_in_mbs_minus1 + 1) *
 					(sps->pic_height_in_map_units_minus1 + 1) +
 				pps->slice_group_change_rate_minus1) /
-				       (pps->slice_group_change_rate_minus1 + 1) +
-			       1);
+				       (pps->slice_group_change_rate_minus1 + 1) + 1);
 		sl->slice_group_change_cycle = get_bits(gb, s);
 	}
-
-	sl->header_size = (uint64_t)(void *)gb->p - start_bytepos + gb->bits_left;
 
 	return 0;
 }
 
-int h264_decode_nal_unit(struct h264_decoder *dec, uint8_t *buf, size_t buf_size)
+int h264_decode_nal_unit(struct h264_context *ctx, uint8_t *buf, int size)
 {
+	struct bitstream *gb = NULL;
+	uint64_t start_pos, end_pos;
+	uint32_t nal_ref_idc;
+	uint32_t nal_unit_type;
+	struct h264_sps sps;
 	int err;
 
-	int nal_size = buf_size;
-	int rbsp_size = buf_size;
-	uint8_t *rbsp_buf = (uint8_t *)calloc(1, buf_size);
+	int nal_size = size;
+	int rbsp_size = size;
+	uint8_t *rbsp_buf = (uint8_t *)calloc(1, size);
+	if (!rbsp_buf)
+		return -1;
 
 	err = h264_nal_to_rbsp(buf, &nal_size, rbsp_buf, &rbsp_size);
 	if (err < 0) {
-		fprintf(stderr, "failed to convert to rbsp\n");
+		h264_err("failed to convert NAL to RBSP\n");
 		goto free_rbsp;
 	}
 
-	struct bitstream *gb = bs_new(rbsp_buf, rbsp_size);
-	dec->gb = gb;
-	uint64_t start_pos = (((uint64_t)(void *)gb->p) * 8) + (8 - gb->bits_left);
-
+	bs_init(&ctx->gb, rbsp_buf, rbsp_size);
+	gb = &ctx->gb;
+	start_pos = (((uint64_t)(void *)gb->p) * 8) + (8 - gb->bits_left);
 	if (get_bits1(gb) != 0) {
-		fprintf(stderr, "forbidden bit != 0\n");
-		goto free_bs;
+		h264_err("forbidden bit != 0\n");
+		goto exit;
 	}
 
-	uint32_t nal_ref_idc = get_bits(gb, 2);
-	uint32_t nal_unit_type = get_bits(gb, 5);
+	nal_ref_idc = get_bits(gb, 2);
+	nal_unit_type = get_bits(gb, 5);
 	printf("NAL unit: {\n");
 	printf("\tnal_ref_idc = %d\n", nal_ref_idc);
 	printf("\tnal_unit_type = %d\n", nal_unit_type);
 
-	struct h264_sps sps;
 	switch (nal_unit_type) {
 	case H264_NAL_SLICE_NONIDR:
 	case H264_NAL_SLICE_IDR:
 	case H264_NAL_SLICE_AUX:
-		struct h264_slice *sl = &dec->slice;
+		struct h264_slice *sl = &ctx->slice;
 		sl->nal_ref_idc = nal_ref_idc;
 		sl->nal_unit_type = nal_unit_type;
-		if (h264_parse_slice_header(dec, sl)) {
-			fprintf(stderr, "failed to parse slice header\n");
-			goto err;
+		if (h264_parse_slice_header(ctx, sl)) {
+			h264_err("failed to parse slice header\n");
+			goto exit;
 		}
-		h264_print_slice_header(dec, sl);
+		end_pos = (((uint64_t)(void *)gb->p) * 8) + (8 - gb->bits_left);
+		printf("\theader_size = %d\n", end_pos - start_pos);
+		h264_print_slice_header(ctx, sl);
 		break;
 	case H264_NAL_SEI:
-		while (h264_more_rbsp_data(gb)) {
-			skip_bits1(gb);
-		}
+		while (h264_more_rbsp_data(gb))
+			skip_bits1(gb); /* XXX */
 		h264_read_rbsp_trailing_bits(gb);
 		break;
 	case H264_NAL_SEQPARM:
-		if (h264_parse_sps(dec, &sps)) {
-			fprintf(stderr, "failed to parse sps\n");
-			goto err;
+		if (h264_parse_sps(gb, &sps)) {
+			h264_err("failed to parse sps\n");
+			goto exit;
 		}
 		h264_read_rbsp_trailing_bits(gb);
 		h264_print_sps(&sps);
 		if (sps.seq_parameter_set_id >= H264_MAX_SPS_COUNT) {
-			fprintf(stderr, "sps id out of bounds\n");
-			goto err;
+			h264_err("SPS id out of bounds\n");
+			goto exit;
 		}
-		memcpy(&dec->sps_list[sps.seq_parameter_set_id], &sps, sizeof(sps));
+		memcpy(&ctx->sps_list[sps.seq_parameter_set_id], &sps, sizeof(sps));
 		break;
 	case H264_NAL_PICPARM:
 		struct h264_pps pps;
-		if (h264_parse_pps(dec, &pps)) {
-			fprintf(stderr, "failed to parse pps\n");
-			goto err;
+		if (h264_parse_pps(ctx, &pps)) {
+			h264_err("failed to parse pps\n");
+			goto exit;
 		}
 		h264_read_rbsp_trailing_bits(gb);
 		h264_print_pps(&pps);
 		if (pps.pic_parameter_set_id >= H264_MAX_PPS_COUNT) {
-			fprintf(stderr, "pps id out of bounds\n");
-			goto err;
+			h264_err("PPS id out of bounds\n");
+			goto exit;
 		}
-		memcpy(&dec->pps_list[pps.pic_parameter_set_id], &pps, sizeof(pps));
+		memcpy(&ctx->pps_list[pps.pic_parameter_set_id], &pps, sizeof(pps));
 		break;
 	case H264_NAL_SEQPARM_EXT:
 		int pseq_parameter_set_id;
-		if (h264_parse_sps_ext(dec, &pseq_parameter_set_id)) {
-			fprintf(stderr, "failed to parse sps ext\n");
-			goto err;
+		if (h264_parse_sps_ext(ctx, &pseq_parameter_set_id)) {
+			h264_err("failed to parse sps ext\n");
+			goto exit;
 		}
 		h264_read_rbsp_trailing_bits(gb);
-		h264_print_sps_ext(h264_get_sps(dec, pseq_parameter_set_id));
+		h264_print_sps_ext(h264_get_sps(ctx, pseq_parameter_set_id));
 		break;
 	case H264_NAL_ACC_UNIT_DELIM: {
 		int primary_pic_type = get_bits(gb, 3);
@@ -1249,63 +1244,57 @@ int h264_decode_nal_unit(struct h264_decoder *dec, uint8_t *buf, size_t buf_size
 		break;
 	}
 	case H264_NAL_END_SEQ:
-		/* noop*/
+		/* noop */
 		h264_read_rbsp_trailing_bits(gb);
 		break;
 	case H264_NAL_END_STREAM:
-		/* noop*/
+		/* noop */
 		h264_read_rbsp_trailing_bits(gb);
 		break;
 	case H264_NAL_SUBSET_SEQPARM:
-		if (h264_parse_sps(dec, &sps)) {
-			fprintf(stderr, "failed to parse sps\n");
-			goto err;
+		if (h264_parse_sps(gb, &sps)) {
+			h264_err("failed to parse SPS\n");
+			goto exit;
 		}
 		switch (sps.profile_idc) {
 		case H264_PROFILE_SCALABLE_BASELINE:
 		case H264_PROFILE_SCALABLE_HIGH:
-			if (h264_parse_sps_svc(dec, &sps)) {
-				fprintf(stderr, "failed to parse sps svc\n");
-				goto err;
+			if (h264_parse_sps_svc(gb, &sps)) {
+				h264_err("failed to parse SPS SVC\n");
+				goto exit;
 			}
 			break;
 		case H264_PROFILE_MULTIVIEW_HIGH:
 		case H264_PROFILE_STEREO_HIGH:
-			if (h264_parse_sps_mvc(dec, &sps)) {
-				fprintf(stderr, "failed to parse sps mvc\n");
-				goto err;
+			if (h264_parse_sps_mvc(gb, &sps)) {
+				h264_err("failed to parse SPS MVC\n");
+				goto exit;
 			}
 			break;
 		default:
 			break;
 		}
-		if (get_bits1(gb)) { /* additional_extension_flag*/
-			fprintf(stderr,
-				"WARNING: additional data in subset sps extension\n");
-			while (h264_more_rbsp_data(gb)) {
+		if (get_bits1(gb)) { /* additional_extension_flag */
+			h264_err("WARNING: additional data in subset SPS extension\n");
+			while (h264_more_rbsp_data(gb))
 				get_bits1(gb);
-			}
 		}
 		h264_read_rbsp_trailing_bits(gb);
 		h264_print_sps(&sps);
 		if (sps.seq_parameter_set_id >= H264_MAX_SPS_COUNT) {
-			fprintf(stderr, "sps id (%d) out of bounds\n", sps.seq_parameter_set_id);
-			goto err;
+			h264_err("SPS id (%d) out of bounds\n", sps.seq_parameter_set_id);
+			goto exit;
 		}
-		memcpy(&dec->sub_sps_list[sps.seq_parameter_set_id], &sps, sizeof(sps));
+		memcpy(&ctx->sub_sps_list[sps.seq_parameter_set_id], &sps, sizeof(sps));
 		break;
 	default:
-		fprintf(stderr, "Unknown NAL type\n");
-		goto err;
+		h264_err("Unknown NAL unit type %d\n", nal_unit_type);
+		goto exit;
 	}
 
-	uint64_t end_pos = (((uint64_t)(void *)gb->p) * 8) + (8 - gb->bits_left);
-	printf("\theader_size = %d\n", end_pos - start_pos);
-	printf("}\n");
+	printf("}\n\n");
 
-err:
-free_bs:
-	bs_free(gb);
+exit:
 free_rbsp:
 	free(rbsp_buf);
 	return 0;

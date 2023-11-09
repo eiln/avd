@@ -26,25 +26,28 @@
 
 int main(int argc, char *argv[])
 {
-	int bytesnum, err;
+	struct h264_context context;
+	struct h264_context *ctx = &context;
+	int err, size, nal_start, nal_end;
+
+	uint8_t *bytes = NULL;
+	char *data = NULL;
 	if (argc <= 1) {
 		fprintf(stderr, "usage: ./deh264 [path to .h264]\n");
 		return -1;
 	}
-	char *data = read_file(argv[1], &bytesnum);
-	uint8_t *bytes = (uint8_t *)data;
-	if (!data || !bytesnum)
+
+	data = read_file(argv[1], &size);
+	if (!data || size <= 0)
 		return -1;
 
-	struct h264_decoder decoder;
-	struct h264_decoder *dec = &decoder;
-	int nal_start, nal_end;
-	while (bytesnum > 0) {
-		h264_find_nal_unit(bytes, bytesnum, &nal_start, &nal_end);
-		bytes += nal_start;
-		h264_decode_nal_unit(dec, bytes, nal_end - nal_start);
+	bytes = (uint8_t *)data;
+	while (size > 0) {
+		h264_find_nal_unit(bytes, size, &nal_start, &nal_end);
+		bytes += nal_start; /* move up to RBSP */
+		h264_decode_nal_unit(ctx, bytes, nal_end - nal_start);
 		bytes += (nal_end - nal_start);
-		bytesnum -= nal_end;
+		size -= nal_end;
 	}
 
 	free(data);

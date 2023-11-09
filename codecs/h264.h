@@ -452,34 +452,27 @@ struct h264_slice {
 	uint32_t bit_depth_chroma_minus8;
 };
 
-struct h264_decoder {
-	struct bitstream *gb;
+struct h264_context {
+	struct bitstream gb;
 	struct h264_sps sps_list[H264_MAX_SPS_COUNT];
 	struct h264_pps pps_list[H264_MAX_PPS_COUNT];
 	struct h264_sps sub_sps_list[H264_MAX_SPS_COUNT];
 	struct h264_slice slice;
 };
 
-#define h264_get_pps(dec, id) (&((dec)->pps_list[(id)]))
-#define h264_get_sps(dec, id) \
-	(&((dec)->sps_list[(h264_get_pps(dec, id)->seq_parameter_set_id)]))
-#define h264_get_sub_sps(dec, id) \
-	(&((dec)->sub_sps_list[(h264_get_pps(dec, id)->seq_parameter_set_id)]))
+#define h264_get_pps(ctx, id) (&((ctx)->pps_list[(id)]))
+#define h264_get_sps(ctx, id) \
+	(&((ctx)->sps_list[(h264_get_pps(ctx, id)->seq_parameter_set_id)]))
+#define h264_get_sub_sps(ctx, id) \
+	(&((ctx)->sub_sps_list[(h264_get_pps(ctx, id)->seq_parameter_set_id)]))
 
-int h264_parse_sps_svc(struct h264_decoder *dec, struct h264_sps *sps);
-int h264_parse_sps_mvc(struct h264_decoder *dec, struct h264_sps *sps);
-int h264_parse_sps_ext(struct h264_decoder *dec, uint32_t *pseq_parameter_set_id);
-int h264_parse_sps(struct h264_decoder *dec, struct h264_sps *sps);
-int h264_parse_pps(struct h264_decoder *dec, struct h264_pps *pps);
-int h264_parse_slice_header(struct h264_decoder *dec, struct h264_slice *slice);
-
-int h264_find_nal_unit(uint8_t *buf, int buf_size, int *nal_start, int *nal_end);
-int h264_decode_nal_unit(struct h264_decoder *dec, uint8_t *buf, size_t buf_size);
+int h264_find_nal_unit(uint8_t *buf, int size, int *nal_start, int *nal_end);
+int h264_decode_nal_unit(struct h264_context *ctx, uint8_t *buf, int size);
 
 void h264_print_sps(struct h264_sps *sps);
 void h264_print_sps_ext(struct h264_sps *sps);
 void h264_print_pps(struct h264_pps *pps);
-void h264_print_slice_header(struct h264_decoder *dec, struct h264_slice *slice);
+void h264_print_slice_header(struct h264_context *ctx, struct h264_slice *slice);
 void h264_print_slice_data(struct h264_slice *slice);
 
 #endif /* __H264_H__ */

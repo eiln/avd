@@ -527,10 +527,10 @@ void h264_print_dec_ref_base_pic_marking(struct h264_nal_svc_header *svc)
 #endif
 }
 
-void h264_print_slice_header(struct h264_decoder *dec, struct h264_slice *slice)
+void h264_print_slice_header(struct h264_context *ctx, struct h264_slice *slice)
 {
-	struct h264_sps *sps = h264_get_sps(dec, slice->pic_parameter_set_id);
-	struct h264_pps *pps = h264_get_pps(dec, slice->pic_parameter_set_id);
+	struct h264_sps *sps = h264_get_sps(ctx, slice->pic_parameter_set_id);
+	struct h264_pps *pps = h264_get_pps(ctx, slice->pic_parameter_set_id);
 
 	//printf("\theader_size = %d\n", slice->header_size);
 	printf("\tfirst_mb_in_slice = %d\n", slice->first_mb_in_slice);
