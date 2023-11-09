@@ -27,6 +27,16 @@ def ulog2(u):
     s = (u > 0x3   ) << 1; u >>= s; t |= s
     return (t | (u >> 1))
 
+def clog2(x):
+	if (x <= 0):
+		raise ValueError("domain error")
+	return (x - 1).bit_length() # python is incredible
+
+def flog2(x):
+	if x <= 0:
+		raise ValueError("domain error")
+	return x.bit_length() - 1
+
 ANSI_RED    = 31
 ANSI_GREEN  = 32
 ANSI_YELLOW = 33

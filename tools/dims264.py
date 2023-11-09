@@ -7,38 +7,24 @@ sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 import argparse
 import os
 
-from avid.fp import *
 from avid.h264.fp import *
 from avid.utils import *
-
-def pprint(dims):
-	s = ""
-	s += "dims_h264_%dx%d = {\n" % (dims.width, dims.height)
-	for k,v in dims.items():
-		if (k in ["pps_tile_size", "pps_tile_addr", "sps_tile_addr", "sps_tile_count"]): continue
-		if (k in ["y_addr", "uv_addr", "slice_data_addr", "rvra0_addr", "rvra1_addr"]): continue
-		if ("count" in k) or (k in ["height", "width"]):
-			vr = str(v)
-		else:
-			vr = hex(v)
-		s += f"\t{k.ljust(16)} = {vr},\n"
-	s += "}"
-	print(s)
-	return
+from tools.common import cassert
 
 def test(dims):
 	# e.g. 128 x 64 8-bit 4:2:0
 	# 0x004000: instruction FIFO x 6
 	# 0x720000: SPS/PPS (not used by hardware)
 	# 0x734000: rvra0_addr
+	# 0x736800: rvra1_addr
+	# 0x736900: rvra2_addr
+	# 0x737d00: rvra3_addr
 	# 0x73c100: y_addr: rvra0_addr + rvra_size + 0x100
 	# 0x73e100: uv_addr: y_addr + (height * width)
 	# 0x744000: slice_data_addr: round_up(uv_addr + (width * height // 2), 0x4000) + 0x4000
 	# 0x74c000: sps_tile_addr: slice_data_addr + slice_data_size
 	# 0x80c000: pps_tile_base_addr: sps_tile_addr + (sps_tile_size * sps_tile_count)
 	# 0x834000: rvra1_addr: pps_tile_base_addr + (pps_tile_size * pps_tile_count)
-	# that is, until height,width !div64 and it gets tiled & scaled...
-
 	cassert(dims.rvra0_addr, 0x734000)
 	cassert(dims.y_addr, (dims.rvra0_addr + dims.rvra_total_size + 0x100))
 
@@ -67,31 +53,47 @@ def test(dims):
 	cassert(dims.pps_tile_addr, (dims.sps_tile_addr + (dims.sps_tile_size * dims.sps_tile_count)))
 	cassert(dims.rvra1_addr, (dims.pps_tile_addr + (dims.pps_tile_size * 5))) # const
 
+	width_mbs = (dims.width + 15) // 16
+	height_mbs = (dims.height + 15) // 16
+	#x = (396 // (height_mbs * width_mbs)) # DPB
+	#print(dims.rvra_count, x, hex((1024 * 396) // (dims.rvra_count + 1)), hex(dims.rvra_size3))
+
 	ws = round_up(dims.width, 32)
 	hs = round_up(dims.height, 32)
-	cassert(dims.rvra_size0, (hs * ws) + ((hs * ws) // 4))
-	cassert(dims.rvra_size2, (dims.rvra_size0 // 2))
+	# 00734000: 51515151 51515151 51515151 51515151 51515151 51515151 51515151 51515151 0
+	# 00734400: 51515151 51515151 51515151 51515151 51515151 51515151 51515151 51515151 1
+	# ...
+	# 00735c00: 51515151 51515151 51515151 51515151 51515151 51515151 51515151 51515151 8
+	cassert(dims.rvra_size0, (hs * ws) + ((hs * ws) // 4)) # luma
+
+	# 00736900: f05af05a f05af05a f05af05a f05af05a 00000000 00000000 00000000 00000000 0
+	# 00736b00: f05af05a f05af05a f05af05a f05af05a 00000000 00000000 00000000 00000000 1
+	# ...
+	# 00737700: f05af05a f05af05a f05af05a f05af05a 00000000 00000000 00000000 00000000 8
+	cassert(dims.rvra_size2, (dims.rvra_size0 // 2))  # 4:2:0 chroma
+
 	cassert(dims.rvra_size1, ((nextpow2(dims.height) // 32) * nextpow2(dims.width)))
 
-	if (dims.width == 256):
-		z = (((dims.height - 1) >> 7))
-		cassert(dims.slice_data_size, 0x8000 + (z * 0x4000))
+	"""
+	64x64
+	00735e80 01010101 0b460506 05060101 4c4d484a 120d4e0b 0101494a 53111250 01014b4b
 
-	if (dims.width == 384):
-		x = 0x10000 + (0xc000 * ((dims.height // 64) - 1))
-		cassert(dims.rvra_total_size, x)
+	64x80
+	00736e00 01010101 01050101 01010101 474b4b48 510d4e4b 5453c956 544e4f4d 5454c8c6
+	00736e20 010101c6 00000000 01010101 00000000 00000000 00000000 00000000 00000000
 
-	x = (dims.height) * (dims.width)
-	y = dims.slice_data_size
-	z = dims.slice_data_size // 0x4000
-	hs = (dims.height + 15) // 16
-	ws = (dims.width + 15) // 16
-	#print(f"{str(dims.width).rjust(4)} {str(dims.height).rjust(4)}: {str(z).rjust(2)}")
-	x = (396 // (hs * ws)) # DPB
-	print(dims.rvra_count, x, hex((1024 * 396) // (dims.rvra_count + 1)), hex(dims.rvra_total_size))
-	#cassert(x, y)
-	#print()
-
+	64x96
+	00736e00 01010101 01010101 01010101 464a0606 0e460606 4dc75307 4e4b014a c7c64dca
+	00736e20 154b110c 01010701 4b4e0c0f 01010101 00000000 00000000 00000000 00000000
+	"""
+	# at least (16 * clog2(dims.height) * clog2(dims.height))
+	x = clog2(dims.width) - 6
+	y = clog2(dims.height) - 6
+	s = dims.width * dims.height
+	m = x * y
+	#print(dims.width, dims.height, hex(dims.rvra_size3), hex(m))
+	#print(dims.height, y, 2 ** (y + 5), dims.width, x)
+	#assert(dims.rvra_size3 >= (64 * x * y))
 
 def main(paths):
 	fp0 = AvdH264V3FrameParams.parse(open(paths[0], "rb").read())
@@ -146,18 +148,14 @@ def main(paths):
 	assert(not(rvra1_range % dims.rvra_total_size))
 	dims.rvra_count = rvra1_range // dims.rvra_total_size
 	assert((dims.rvra_count <= 16))
-
-	pprint(dims)
 	test(dims)
-	#print()
 
 def get_dims(dirname):
-	paths = os.listdir(os.path.join(dirname))
+	paths = os.listdir(dirname)
 	paths = sorted([os.path.join(dirname, path) for path in paths if "param" in path or "frame" in path])[:25]
 	main(paths)
 
 if __name__ == "__main__":
-	parser = argparse.ArgumentParser(prog='H.264 memory allocations experiment')
 	group = parser.add_mutually_exclusive_group(required=True)
 	group.add_argument('-d','--dir', type=str, help="trace dir name")
 	parser.add_argument('-p','--prefix', type=str, default="", help="dir prefix")

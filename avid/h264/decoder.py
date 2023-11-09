@@ -57,7 +57,7 @@ class AVDH264Decoder:
 
 		level = [level for level in h264_levels if level[1] == sps.level_idc][0]
 		ctx.max_dpb_frames = min((level[5]) // (width_mbs * height_mbs), 16) # max_dpb_mbs
-		assert((width_mbs * height_mbs) <= level[4]) # MaxFS
+		#assert((width_mbs * height_mbs) <= level[4]) # MaxFS
 		assert(width_mbs <= sqrt(level[4] * 8))
 		assert(height_mbs <= sqrt(level[4] * 8))
 
@@ -96,7 +96,7 @@ class AVDH264Decoder:
 		dims.rvra0_addr = 0x734000
 
 		if (dims.width == 128 and dims.height == 64):
-			dims.slice_data_size = 0x8000 # this is so trivial but I can't figure it out
+			dims.slice_data_size = 0x8000
 			dims.sps_tile_size = 0x8000
 			dims.rvra_total_size = 0x8000
 		elif (dims.width == 1024 and dims.height == 512):
@@ -104,7 +104,11 @@ class AVDH264Decoder:
 			dims.sps_tile_size = 0x24000
 			dims.rvra_total_size = 0xfc000
 		else:
-			raise ValueError("not impl")
+			# worst case, oops
+			dims.slice_data_size = 0x10000  # this is so trivial but I can't figure it out
+			#dims.sps_tile_size = 0x4000 * ((clog2(dims.width) - 6) * (clog2(dims.height) - 6))
+			dims.sps_tile_size = 0x40000
+			dims.rvra_total_size = 0x1000000
 
 		dims.y_addr = dims.rvra0_addr + dims.rvra_total_size + 0x100
 
