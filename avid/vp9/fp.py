@@ -12,18 +12,18 @@ class AVDV3VP9InstHeader(AVDFrameParams):
 		"hdr_34_const_20" / ExprValidator(u32, obj_ == 0x2000000),
 		"hdr_38_height_width_shift3" / u32,
 		"hdr_3c_zero" / ExprValidator(u32, obj_ == 0x0),
-		"hdr_40_flags_pt1" / u32,
-		"hdr_44_flags_pt2" / u32,
 
-		"hdr_48_incr_addr" / u32,
-		"hdr_4c_incr_size" / u32,
+		"hdr_40_flags1_pt1" / u32,
+		"hdr_44_flags1_pt2" / u32,
+		"hdr_48_flags2_pt1" / u32,
+		"hdr_4c_flags2_pt2" / u32,
 
 		"hdr_50_scaling_list" / Array(8, u32),
 		"hdr_70_ref_height_width" / Array(3, u32),
 		"hdr_7c_ref_size" / Array(3, u32),
-		"hdr_88" / u32,
-		"hdr_8c" / u32,
-		"hdr_90" / u32,
+		"hdr_88" / ExprValidator(u32, obj_ == 0x0),
+		"hdr_8c" / ExprValidator(u32, obj_ == 0x0),
+		"hdr_90" / ExprValidator(u32, obj_ == 0x0),
 		"hdr_94_height_width" / u32,
 		"hdr_98" / ExprValidator(u32, obj_ == 0x20000),
 		"hdr_9c" / u32,
@@ -32,7 +32,7 @@ class AVDV3VP9InstHeader(AVDFrameParams):
 		"hdr_a8_inst_fifo_addr_lsb8" / Array(7, u32),
 		"hdr_c4_inst_fifo_size" / Array(7, u32),
 
-		"hdr_e0_pps2_tile_const_addr_lsb8" / u32, # 0x240
+		"hdr_e0_const_240" / ExprValidator(u32, obj_ == 0x240),
 		"hdr_e4_zero" / ExprValidator(u32, obj_ == 0x0),
 
 		"hdr_e8_sps0_tile_addr_lsb8" / ExprValidator(Array(3, u32), obj_[2] == 0x0),

@@ -17,21 +17,26 @@ def test(fp0, fp1, args):
 	"hdr_30_cmd_start_hdr",
 	"hdr_34_const_20",
 	"hdr_38_height_width_shift3",
+	#"hdr_40_flags1_pt1",
 
+	"hdr_e0_const_240",
 	"hdr_104_probs_addr_lsb8",
-	"hdr_108_pps1_tile_addr_lsb8",
 	"hdr_118_pps0_tile_addr_lsb8",
+	"hdr_108_pps1_tile_addr_lsb8",
 
-	"hdr_e0_pps2_tile_const_addr_lsb8",
+	#"hdr_48_flags2_pt1",
+	#"hdr_44_flags1_pt2",
+	#"hdr_4c_flags2_pt2",
+
 	"hdr_e8_sps0_tile_addr_lsb8",
 	"hdr_f4_sps1_tile_addr_lsb8",
 
 	"hdr_11c_curr_rvra_addr_lsb7",
 
-	"hdr_168_y_addr_lsb8",
-	"hdr_16c_uv_addr_lsb8",
-	"hdr_170_width_align",
-	"hdr_174_width_align",
+	#"hdr_168_y_addr_lsb8",
+	#"hdr_16c_uv_addr_lsb8",
+	#"hdr_170_width_align",
+	#"hdr_174_width_align",
 	]
 	s = ""
 	for cand in cands:
