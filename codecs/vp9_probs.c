@@ -212,14 +212,14 @@ static void vp9_adapt_mode_probs(VP9Context *s)
     vpx_tree_merge_probs(vp9_partition_tree, pp->partition[i],
                          counts->partition[i], p->partition[i]);
 
-  if (s->s.h.txfmmode == TX_SWITCHABLE) {
+  if (s->s.h.filtermode == FILTER_SWITCHABLE) {
     for (i = 0; i < SWITCHABLE_FILTER_CONTEXTS; i++)
       vpx_tree_merge_probs(
           vp9_switchable_interp_tree, pp->switchable_interp[i],
           counts->switchable_interp[i], p->switchable_interp[i]);
   }
 
-  if (s->s.h.txfmmode == TX_SWITCHABLE) {
+  if (s->s.h.txfmmode == TX_MODE_SELECT) {
     unsigned int branch_ct_8x8p[TX_SIZES - 3][2];
     unsigned int branch_ct_16x16p[TX_SIZES - 2][2];
     unsigned int branch_ct_32x32p[TX_SIZES - 1][2];

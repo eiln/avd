@@ -557,9 +557,38 @@ static void vp9_update_mv_probs(VPXRangeCoder *c, uint8_t *p)
         *p = (vpx_read_literal(c, 7) << 1) | 1;
 }
 
+static const TX_SIZE tx_mode_to_biggest_tx_size[TX_MODES] = {
+  TX_4X4,    // ONLY_4X4
+  TX_8X8,    // ALLOW_8X8
+  TX_16X16,  // ALLOW_16X16
+  TX_32X32,  // ALLOW_32X32
+  TX_32X32,  // TX_MODE_SELECT
+};
+
+static void read_coef_probs_common(vp9_coeff_probs_model *coef_probs,
+                                   vpx_reader *r) {
+  int i, j, k, l, m;
+
+  if (vpx_read_bit(r))
+    for (i = 0; i < PLANE_TYPES; ++i)
+      for (j = 0; j < REF_TYPES; ++j)
+        for (k = 0; k < COEF_BANDS; ++k)
+          for (l = 0; l < BAND_COEFF_CONTEXTS(k); ++l)
+            for (m = 0; m < UNCONSTRAINED_NODES; ++m)
+                vp9_diff_update_prob(r, &coef_probs[i][j][k][l][m]);
+}
+
+static void vp9_read_coef_probs(VP9Context *s, TX_MODE tx_mode, vpx_reader *r) {
+  const TX_SIZE max_tx_size = tx_mode_to_biggest_tx_size[tx_mode];
+  TX_SIZE tx_size;
+  for (tx_size = TX_4X4; tx_size <= max_tx_size; ++tx_size) {
+      read_coef_probs_common(s->prob.p.coef[tx_size], r);
+  }
+}
+
 int vp9_decode_compressed_header(VP9Context *s, const uint8_t *data, size_t size)
 {
-    int c, i, j, k, l, m, n, err;
+    int c, i, j, k, err;
 
     c = s->s.h.framectxid;
     VP9ProbContext *p = &s->prob.p;
@@ -593,37 +622,10 @@ int vp9_decode_compressed_header(VP9Context *s, const uint8_t *data, size_t size
         }
     }
 
-    // coef updates
-    for (i = 0; i < 4; i++) {
-        uint8_t (*ref)[2][6][6][3] = p->coef[i];
-        if (vpx_read_bit(&s->c)) {
-            for (j = 0; j < 2; j++)
-                for (k = 0; k < 2; k++)
-                    for (l = 0; l < 6; l++)
-                        for (m = 0; m < 6; m++) {
-                            uint8_t *r = ref[j][k][l][m];
-                            if (m >= 3 && l == 0) // dc only has 3 pt
-                                break;
-                            for (n = 0; n < 3; n++) {
-                                vp9_diff_update_prob(&s->c, &r[n]);
-                            }
-                        }
-        } else {
-            for (j = 0; j < 2; j++)
-                for (k = 0; k < 2; k++)
-                    for (l = 0; l < 6; l++)
-                        for (m = 0; m < 6; m++) {
-                            uint8_t *q = p->coef[i][j][k][l][m];
-                            uint8_t *r = ref[j][k][l][m];
-                            if (m > 3 && l == 0) // dc only has 3 pt
-                                break;
-                            memcpy(q, r, 3);
-                        }
-        }
-    }
+    vp9_read_coef_probs(s, s->s.h.txfmmode, &s->c);
 
     // mode updates
-    for (i = 0; i < 3; ++i)
+    for (i = 0; i < 3; i++)
         vp9_diff_update_prob(&s->c, &p->skip[i]);
 
     if (!s->s.h.keyframe && !s->s.h.intraonly) {
@@ -700,19 +702,8 @@ int vp9_decode_compressed_header(VP9Context *s, const uint8_t *data, size_t size
         }
     }
 
-    if (s->s.h.refreshctx && s->s.h.parallelmode) {
-        for (i = 0; i < 4; i++) {
-            for (j = 0; j < 2; j++)
-                for (k = 0; k < 2; k++)
-                    for (l = 0; l < 6; l++)
-                        for (m = 0; m < 6; m++)
-                            memcpy(s->prob_ctx[s->s.h.framectxid].p.coef[i][j][k][l][m],
-                                   s->prob.p.coef[i][j][k][l][m], 3);
-            if (s->s.h.txfmmode == i)
-                break;
-        }
+    if (s->s.h.refreshctx && s->s.h.parallelmode)
         s->prob_ctx[s->s.h.framectxid].p = s->prob.p;
-    }
 
     /* Start of AVD-specific hacks, hopefully none more. Notice this comes _after_
      * updating the global context. Below is from libvpx/vp9/common/vp9_onyxc_int.h.
