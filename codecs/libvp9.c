@@ -33,7 +33,7 @@ typedef struct __attribute__((packed)) LibVP9Context {
 	VP9Context *s;
 } LibVP9Context;
 
-LibVP9Context *libvp9_init(void)
+void *libvp9_init(void)
 {
 	LibVP9Context *ctx = malloc(sizeof(*ctx));
 	if (!ctx)
@@ -43,17 +43,20 @@ LibVP9Context *libvp9_init(void)
 		free(ctx);
 		return NULL;
 	}
-	return ctx;
+	memset(ctx->s, 0, sizeof(*ctx->s));
+	return (void *)ctx;
 }
 
-void libvp9_free(LibVP9Context *ctx)
+void libvp9_free(void *handle)
 {
+	LibVP9Context *ctx = handle;
 	free(ctx->s);
 	free(ctx);
 }
 
-int libvp9_decode(LibVP9Context *ctx, const uint8_t *buf, int size, int do_probs)
+int libvp9_decode(void *handle, const uint8_t *buf, int size, int do_probs)
 {
+	LibVP9Context *ctx = handle;
 	VP9Context *s = ctx->s;
 	int err;
 

@@ -111,7 +111,8 @@ class AVDVP9Parser(AVDParser):
 				if (num and (i == num)):
 					break
 				frame = frames_all[i]
-				err = self.lib.libvp9_decode(handle, frame.payload, frame.size, int(do_probs))
+				err = self.lib.libvp9_decode(handle, frame.payload,
+						ctypes.c_int(frame.size), ctypes.c_int(do_probs))
 				if (do_probs):
 					probs_all.append(ctypes.string_at(handle, LibVP9Probs.sizeof()))
 		stdout = out.read()
