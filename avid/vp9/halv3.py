@@ -63,7 +63,7 @@ class AVDVP9HalV3(AVDHal):
 		avd_set(0x2020202, "fw_dma_config_3")
 		avd_set(0x240, "hdr_e0_pps2_tile_const_addr_lsb8")
 
-		avd_set((ctx.probs_addr + ((ctx.access_idx % 4) * 0x8000)) >> 8, "hdr_104_probs_addr_lsb8")
+		avd_set(ctx.probs_addr >> 8, "hdr_104_probs_addr_lsb8")
 
 		# set e8_addr_lsb8
 		# 0x8dc0 0x8dc0 0x8dc0 0x8dc0 0x8dc0 0x8dc0 0x8dc0

@@ -24,7 +24,7 @@ if __name__ == "__main__":
 	else:
 		raise ValueError("Not supported")
 
-	units = dec.parse(args.input)
+	units = dec.setup(args.input)
 	n = len(units) if args.all else args.num
 	for unit in units[:n]:
 		print(unit)

@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright 2023 Eileen Yoon <eyn@gmx.com>
 
+from ..decoder import AVDDecoder
 from ..utils import *
 from .halv3 import AVDH264HalV3
 from .parser import AVDH264Parser
@@ -15,35 +16,55 @@ class AVDH264Picture(dotdict):
 	def __repr__(self):
 		return f"[addr: {hex(self.addr >> 7).ljust(2+5)} pic_num: {str(self.pic_num).rjust(2)} poc: {str(self.poc).rjust(3)} fn: {str(self.frame_num_wrap).rjust(2)} idx: {str(self.idx).rjust(2)}]"
 
-class AVDH264Decoder:
+class AVDH264Decoder(AVDDecoder):
 	def __init__(self):
-		self.parser = AVDH264Parser()
-		self.hal = AVDH264HalV3()
-		self.ctx = None
-		self.stfu = False
-
-	def log(self, x):
-		if (not self.stfu):
-			if (self.ctx) and hasattr(self.ctx, "active_sl"):
-				print(f"[AVD] {self.ctx.active_sl.idx}: {x}")
-			else:
-				print(f"[AVD] {x}")
+		super().__init__(AVDH264Parser, AVDH264HalV3)
 
 	def get_pps(self, sl):
 		return self.ctx.pps_list[sl.pic_parameter_set_id]
 
-	def get_sps(self, sl):
-		return self.ctx.sps_list[self.get_pps(sl).seq_parameter_set_id]
+	def get_sps_id(self, sl):
+		return self.get_pps(sl).seq_parameter_set_id
 
-	def setup(self, sps_list, pps_list):
+	def get_sps(self, sl):
+		return self.ctx.sps_list[self.get_sps_id(sl)]
+
+	def new_context(self, sps_list, pps_list):
 		self.ctx = AVDH264Ctx()
 		ctx = self.ctx
 		ctx.sps_list = sps_list
 		ctx.pps_list = pps_list
 
-		sps = sps_list[0] # TODO refresh on sps change
+		ctx.access_idx = 0
+		ctx.width = -1
+		ctx.height = -1
+		ctx.active_sl = None
+		ctx.cur_sps_id = -1
+
+		ctx.last_p_sps_tile_idx = 0
+		ctx.prev_poc_lsb = 0
+		ctx.prev_poc_msb = 0
+		ctx.dpb_list = []
+		ctx.unused_refs = []
+		ctx.drain_list = []
+		ctx.rvra_pool_count = 0
+
+		ctx.inst_fifo_count = 6
+		ctx.inst_fifo_idx = 0
+
+	def refresh(self, sl):
+		ctx = self.ctx
+		sps_id = self.get_sps_id(sl)
+		if (sps_id == ctx.cur_sps_id):
+			return
+		sps = ctx.sps_list[sps_id]
+
 		width = ((sps.pic_width_in_mbs_minus1 + 1) * 16) - (sps.frame_crop_right_offset * 2) - (sps.frame_crop_left_offset * 2)
 		height = ((2 - sps.frame_mbs_only_flag) * (sps.pic_height_in_map_units_minus1 + 1) * 16) - (sps.frame_crop_bottom_offset * 2) - (sps.frame_crop_top_offset * 2)
+		if ((width == ctx.width) and (height == ctx.height)):
+			return
+
+		self.log("dimensions changed from %dx%d -> %dx%d" % (ctx.width, ctx.height, width, height))
 		ctx.width = width
 		ctx.height = height
 		assert((64 <= width and width <= 4096) and (64 <= height and height <= 4096)) # hardware caps
@@ -60,86 +81,73 @@ class AVDH264Decoder:
 		#assert((width_mbs * height_mbs) <= level[4]) # MaxFS
 		assert(width_mbs <= sqrt(level[4] * 8))
 		assert(height_mbs <= sqrt(level[4] * 8))
-
-		ctx.access_idx = 0
-		ctx.last_p_sps_tile_idx = 0
-		ctx.prev_poc_lsb = 0
-		ctx.prev_poc_msb = 0
-		ctx.dpb_list = []
-		ctx.unused_refs = []
-		ctx.drain_list = []
-		ctx.rvra_pool_count = 0
-
-		ctx.inst_fifo_iova = 0x4000
-		ctx.inst_fifo_size = 0x100000
-		ctx.inst_fifo_count = 6
-		ctx.inst_fifo_idx = 0
-
+		ctx.cur_sps_id = sps_id
 		self.allocate()
 
-	def parse(self, path):
-		sps_list, pps_list, slices = self.parser.parse(path)
-		self.log("num slices: %d" % (len(slices)))
-		self.setup(sps_list, pps_list)
-		return slices
-
 	def allocate(self):
-		dims = self.ctx
-
+		ctx = self.ctx
 		# matching macOS allocations makes for easy diffs
-		# see tools/dims.py experiment
+		# see tools/dims264.py experiment
 
 		# constants
-		dims.pps_tile_count = 5  # just random work buffers; they call it sps/pps for non-mpeg codecs too
-		dims.pps_tile_size = 0x8000
-		dims.sps_tile_count = 24  # again, nothing to do with sps; just a name for work buf group 2
-		dims.rvra0_addr = 0x734000
+		ctx.inst_fifo_iova = 0x4000
+		ctx.inst_fifo_size = 0x100000
+		ctx.pps_tile_count = 5  # just random work buffers; they call it sps/pps for non-mpeg codecs too
+		ctx.pps_tile_size = 0x8000
+		ctx.sps_tile_count = 24  # again, nothing to do with sps; just a name for work buf group 2
+		ctx.rvra0_addr = 0x734000
 
-		if (dims.width == 128 and dims.height == 64):
-			dims.slice_data_size = 0x8000
-			dims.sps_tile_size = 0x8000
-			dims.rvra_total_size = 0x8000
-		elif (dims.width == 1024 and dims.height == 512):
-			dims.slice_data_size = 0x44000
-			dims.sps_tile_size = 0x24000
-			dims.rvra_total_size = 0xfc000
+		if (ctx.width == 128 and ctx.height == 64):
+			ctx.slice_data_size = 0x8000
+			ctx.sps_tile_size = 0x8000
+			ctx.rvra_total_size = 0x8000
+		elif (ctx.width == 1024 and ctx.height == 512):
+			ctx.slice_data_size = 0x44000
+			ctx.sps_tile_size = 0x24000
+			ctx.rvra_total_size = 0xfc000
 		else:
 			# worst case, oops
-			dims.slice_data_size = 0x10000  # this is so trivial but I can't figure it out
+			ctx.slice_data_size = 0x10000  # this is so trivial but I can't figure it out
 			#dims.sps_tile_size = 0x4000 * ((clog2(dims.width) - 6) * (clog2(dims.height) - 6))
-			dims.sps_tile_size = 0x40000
-			dims.rvra_total_size = 0x1000000
+			ctx.sps_tile_size = 0x40000
+			ctx.rvra_total_size = 0x1000000
 
-		dims.y_addr = dims.rvra0_addr + dims.rvra_total_size + 0x100
+		ctx.y_addr = ctx.rvra0_addr + ctx.rvra_total_size + 0x100
 
 		# Pixel/disp buf != buf stored in DPB as reference.
 		# Refs are tiled/scaled smaller than the orig. They call it "rvra scaler buffer".
 		# Searching "rvra" "scaler" "apple" led to US10045089B2,
 		# "video resolution adaptation (VRA), reference VRA (RVRA)" which answers little
-		scale = min(pow2div(dims.height), pow2div(dims.width))
+		scale = min(pow2div(ctx.height), pow2div(ctx.width))
 		if (scale >= 32):
-			luma_size = dims.height * dims.width
+			luma_size = ctx.height * ctx.width
 		else:   # scale to 64 if it's <32, but leave it if it's >=32 (?)
-			luma_size = round_up(dims.width, 64) * round_up(dims.height, 64)
-		dims.uv_addr = dims.y_addr + luma_size
+			luma_size = round_up(ctx.width, 64) * round_up(ctx.height, 64)
+		ctx.uv_addr = ctx.y_addr + luma_size
 
-		scale = min(pow2div(dims.height), pow2div(dims.width))
+		scale = min(pow2div(ctx.height), pow2div(ctx.width))
 		if (scale >= 32):
-			chroma_size = dims.height * dims.width // 2
+			chroma_size = ctx.height * ctx.width // 2
 		else:
-			chroma_size = round_up(dims.height * dims.width // 2, 0x4000)
-		dims.slice_data_addr = round_up(dims.uv_addr + chroma_size, 0x4000) + 0x4000
+			chroma_size = round_up(ctx.height * ctx.width // 2, 0x4000)
+		ctx.slice_data_addr = round_up(ctx.uv_addr + chroma_size, 0x4000) + 0x4000
 
-		dims.sps_tile_addr = dims.slice_data_addr + dims.slice_data_size
-		dims.pps_tile_addr = dims.sps_tile_addr + (dims.sps_tile_size * dims.sps_tile_count)
-		dims.rvra1_addr = dims.pps_tile_addr + (dims.pps_tile_size * dims.pps_tile_count)
+		ctx.sps_tile_addr = ctx.slice_data_addr + ctx.slice_data_size
+		ctx.pps_tile_addr = ctx.sps_tile_addr + (ctx.sps_tile_size * ctx.sps_tile_count)
+		ctx.rvra1_addr = ctx.pps_tile_addr + (ctx.pps_tile_size * ctx.pps_tile_count)
 
-		dims.rvra_size0 = (round_up(dims.height, 32) * round_up(dims.width, 32)) + ((round_up(dims.height, 32) * round_up(dims.width, 32)) // 4)
-		dims.rvra_size2 = dims.rvra_size0 // 2
-		dims.rvra_size1 = ((nextpow2(dims.height) // 32) * nextpow2(dims.width))
-		dims.rvra_size3 = dims.rvra_total_size - dims.rvra_size2 - dims.rvra_size1 - dims.rvra_size0
+		ctx.rvra_size0 = (round_up(ctx.height, 32) * round_up(ctx.width, 32)) + ((round_up(ctx.height, 32) * round_up(ctx.width, 32)) // 4)
+		ctx.rvra_size2 = ctx.rvra_size0 // 2
+		ctx.rvra_size1 = ((nextpow2(ctx.height) // 32) * nextpow2(ctx.width))
+		ctx.rvra_size3 = ctx.rvra_total_size - ctx.rvra_size2 - ctx.rvra_size1 - ctx.rvra_size0
+		ctx.rvra_count = ctx.max_dpb_frames + 1 + 1
 
-		dims.rvra_count = dims.max_dpb_frames + 1 + 1
+	def setup(self, path):
+		sps_list, pps_list, slices = self.parser.parse(path)
+		self.new_context(sps_list, pps_list)
+		# realistically we'd have the height/width as metadata w/o relying on sps
+		self.refresh(slices[0])
+		return slices
 
 	def get_short_ref_by_num(self, lst, pic_num):
 		cands = [pic for pic in lst if pic and pic.pic_num == pic_num]
@@ -250,6 +258,8 @@ class AVDH264Decoder:
 
 	def init_slice(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
+		self.refresh(sl)
+
 		sl.pic = AVDH264Picture()
 		sl.pic.type = H264_REF_ST
 		sps = self.get_sps(sl)
@@ -327,10 +337,3 @@ class AVDH264Decoder:
 		if (sl.slice_type == H264_SLICE_TYPE_P):
 			ctx.last_p_sps_tile_idx = ctx.access_idx % ctx.sps_tile_count
 		self.ctx.access_idx += 1
-
-	def generate(self, sl):
-		self.ctx.active_sl = sl
-		self.init_slice()
-		inst = self.hal.generate(self.ctx, sl)
-		self.finish_slice()
-		return inst

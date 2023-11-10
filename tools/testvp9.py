@@ -78,7 +78,7 @@ if __name__ == "__main__":
 
 	dec = AVDVP9Decoder()
 	#dec.hal.stfu = True
-	slices = dec.parse(args.path)
+	slices = dec.setup(args.path)
 	paths = os.listdir(os.path.join(args.prefix, args.dir))
 	paths = sorted([os.path.join(args.prefix, args.dir, path) for path in paths if "param" in path or "frame" in path])
 	paths = paths if args.all else paths[:args.num]

@@ -57,7 +57,7 @@ class AVDVP9Probs(ProbsConstructClass):
 		"mv_hp" / Array(2, AVDVP9MvHpProbs), # v, h
 		"align" / ZPadding(3), # let's pad it to 4
 	)
-	assert(subcon.sizeof() == 1905 + 3)
+	assert(subcon.sizeof() == 1905 + 3) # 0x774
 
 	def __init__(self):
 		super().__init__()
