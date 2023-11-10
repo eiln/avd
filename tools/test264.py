@@ -102,7 +102,7 @@ if __name__ == "__main__":
 	paths = paths if args.all else paths[:args.num]
 	for i,path in enumerate(paths):
 		#print(path)
-		fp0 = AvdH264V3FrameParams.parse(open(path, "rb").read())
+		fp0 = AVDH264V3FrameParams.parse(open(path, "rb").read())
 		sl = slices[i]
 		print(sl)
 		inst = dec.generate(sl)

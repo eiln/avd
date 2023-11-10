@@ -4,7 +4,7 @@
 
 from ..fp import *
 
-class AvdH264V3PiodmaHeader(AvdFrameParams):
+class AVDH264V3PiodmaHeader(AVDFrameParams):
 	subcon = Struct(
 		"pio_piodma1_word" / u32,
 		"pio_4_codec" / ExprValidator(u32, obj_ >= 0 and obj_ <= 4), # 32 fucking bits for max 4 codes it doesn't need, this will be a recurring theme
@@ -20,7 +20,7 @@ class AvdH264V3PiodmaHeader(AvdFrameParams):
 	def __init__(self):
 		super().__init__()
 
-class AvdH264V3InstHeader(AvdFrameParams):
+class AVDH264V3InstHeader(AVDFrameParams):
 	subcon = "AvdH264V3InstHeader" / Struct(
 		"hdr_28_height_width_shift3" / u32,
 		"hdr_2c_sps_param" / u32,
@@ -58,7 +58,7 @@ class AvdH264V3InstHeader(AvdFrameParams):
 	def __init__(self):
 		super().__init__()
 
-class AvdH264V3DumbFuckingWasteOfMemory(AvdFrameParams):
+class AVDH264V3DumbFuckingWasteOfMemory(AVDFrameParams):
 	subcon = Struct(
 		"dfw_220_pad" / ZPadding(0x60),
 		"dfw_280_chunk0" / Bytes(0x1e4),
@@ -69,7 +69,7 @@ class AvdH264V3DumbFuckingWasteOfMemory(AvdFrameParams):
 	def __init__(self):
 		super().__init__()
 
-class AvdH264V3Slice(AvdFrameParams):
+class AVDH264V3Slice(AVDFrameParams):
 	subcon = Struct(
 		"slc_6e0_piodma2_word" / u32,
 		"slc_6e4_cmd_ref_type" / u32,
@@ -91,7 +91,7 @@ class AvdH264V3Slice(AvdFrameParams):
 	def __init__(self):
 		super().__init__()
 
-class AvdH264V3Input(AvdFrameParams):
+class AVDH264V3Input(AVDFrameParams):
 	subcon = Struct(
 		"inp_8b4c0_piodma1_word" / u32,
 		"inp_8b4c4_zero" / ExprValidator(u32, obj_ == 0),
@@ -105,12 +105,12 @@ class AvdH264V3Input(AvdFrameParams):
 	def __init__(self):
 		super().__init__()
 
-class AvdH264V3FrameParams(AvdFrameParams):
+class AVDH264V3FrameParams(AVDFrameParams):
 	subcon = Struct(
-		"pio" / AvdH264V3PiodmaHeader,
-		"hdr" / AvdH264V3InstHeader,
-		"dfw" / AvdH264V3DumbFuckingWasteOfMemory,
-		"slc" / AvdH264V3Slice,
+		"pio" / AVDH264V3PiodmaHeader,
+		"hdr" / AVDH264V3InstHeader,
+		"dfw" / AVDH264V3DumbFuckingWasteOfMemory,
+		"slc" / AVDH264V3Slice,
 		#"slc2" / Array(599, AvdH264V3Slice), # comment out for greatly faster construct parsing time
 		#"inp" / AvdH264V3Input,
 	)
@@ -120,7 +120,7 @@ class AvdH264V3FrameParams(AvdFrameParams):
 	def __str__(self):
 		return ''.join([str(getattr(self, x)) for x in ["pio", "hdr", "slc"]])
 
-class AvdH264V3FakeFrameParams(AVDFakeFrameParams):
+class AVDH264V3FakeFrameParams(AVDFakeFrameParams):
 	def __init__(self):
 		super().__init__()
 		self.keynames = ["hdr", "slc", "inp"]

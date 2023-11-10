@@ -161,7 +161,7 @@ class AVDVP9HalV3(AVDHal):
 
 	def generate(self, ctx, sl):
 		self.inst_stream = []
-		self.fp = AvdVP9V3FakeFrameParams.new()
+		self.fp = AVDVP9V3FakeFrameParams.new()
 		self.set_header(ctx, sl)
 		self.set_slice(ctx, sl)
 		return self.inst_stream

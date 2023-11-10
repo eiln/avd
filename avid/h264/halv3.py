@@ -187,7 +187,7 @@ class AVDH264HalV3(AVDHal):
 				lx = 1
 				for i,lst in enumerate(sl.pic.list1):
 					pos = list([x.pic_num for x in ctx.dpb_list]).index(lst.pic_num)
-					avd_set(0x2dc00000 | (lx << 8) | (i << 4) | pos, 
+					avd_set(0x2dc00000 | (lx << 8) | (i << 4) | pos,
 					"slc_6e8_cmd_ref_list_0", i + len(sl.pic.list0))
 
 			self.set_weights(ctx, sl)
@@ -220,7 +220,7 @@ class AVDH264HalV3(AVDHal):
 
 	def generate(self, ctx, sl):
 		self.inst_stream = []
-		self.fp = AvdH264V3FakeFrameParams.new()
+		self.fp = AVDH264V3FakeFrameParams.new()
 		self.set_header(ctx, sl)
 		self.set_slice(ctx, sl)
 		return self.inst_stream

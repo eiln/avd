@@ -12,7 +12,7 @@ u16 = Hex(Int16ul)
 u32 = Hex(Int32ul)
 u64 = Hex(Int64ul)
 
-class AvdFrameParams(ConstructClass):
+class AVDFrameParams(ConstructClass):
     def __init__(self):
         super().__init__()
 
@@ -55,7 +55,7 @@ class AvdFrameParams(ConstructClass):
             str += val_repr + "\n"
         return str + "\n"
 
-class AvdV3PiodmaHeader(AvdFrameParams):
+class AVDV3PiodmaHeader(AVDFrameParams):
 	subcon = Struct(
 		"pio_piodma1_word" / u32,
 		"pio_4_codec" / ExprValidator(u32, obj_ >= 0 and obj_ <= 4), # 32 fucking bits for max 4 codes it doesn't need, this will be a recurring theme

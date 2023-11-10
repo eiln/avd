@@ -32,11 +32,11 @@ if __name__ == "__main__":
 	# determine mode
 	_, mode = struct.unpack("<II", open(paths[0], "rb").read()[:8])
 	if  (mode == 1):
-		from avid.h264.fp import AvdH264V3FrameParams
-		fpcls = AvdH264V3FrameParams
+		from avid.h264.fp import AVDH264V3FrameParams
+		fpcls = AVDH264V3FrameParams
 	elif (mode == 2):
-		from avid.vp9.fp import AvdVP9V3FrameParams
-		fpcls = AvdVP9V3FrameParams
+		from avid.vp9.fp import AVDVP9V3FrameParams
+		fpcls = AVDVP9V3FrameParams
 	else:
 		raise ValueError("Not supported")
 

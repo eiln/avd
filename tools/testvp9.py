@@ -84,7 +84,7 @@ if __name__ == "__main__":
 	paths = paths if args.all else paths[:args.num]
 	for i,path in enumerate(paths):
 		#print(path)
-		fp0 = AvdVP9V3FrameParams.parse(open(path, "rb").read())
+		fp0 = AVDVP9V3FrameParams.parse(open(path, "rb").read())
 		sl = slices[i]
 		print(sl)
 		print(fp0)

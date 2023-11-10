@@ -4,7 +4,7 @@
 
 from ..fp import *
 
-class AvdV3VP9InstHeader(AvdFrameParams):
+class AVDV3VP9InstHeader(AVDFrameParams):
 	subcon = "AvdH264V3InstHeader" / Struct(
 		"hdr_28_height_width_shift3" / u32,
 		"hdr_2c_sps_param" / ExprValidator(u32, obj_ & 0x1000000 == 0x1000000),
@@ -61,10 +61,10 @@ class AvdV3VP9InstHeader(AvdFrameParams):
 	def __init__(self):
 		super().__init__()
 
-class AvdVP9V3FrameParams(AvdFrameParams):
+class AVDVP9V3FrameParams(AVDFrameParams):
 	subcon = Struct(
-		"pio" / AvdV3PiodmaHeader,
-		"hdr" / AvdV3VP9InstHeader,
+		"pio" / AVDV3PiodmaHeader,
+		"hdr" / AVDV3VP9InstHeader,
 	)
 	def __init__(self):
 		super().__init__()
@@ -72,7 +72,7 @@ class AvdVP9V3FrameParams(AvdFrameParams):
 	def __str__(self):
 		return ''.join([str(getattr(self, x)) for x in ["hdr"]])
 
-class AvdVP9V3FakeFrameParams(AVDFakeFrameParams):
+class AVDVP9V3FakeFrameParams(AVDFakeFrameParams):
 	def __init__(self):
 		super().__init__()
 		self.keynames = ["hdr", "slc"]
