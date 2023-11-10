@@ -56,9 +56,9 @@ class AVDVP9Decoder(AVDDecoder):
 		# plus a page for some reason
 		ctx.probs_addr = ctx.probs_base_addr + (probs_slot * (round_up(ctx.probs_size, 0x4000) + 0x4000))
 
-	def setup(self, path):
+	def setup(self, path, num=0):
 		self.new_context()
-		slices = self.parser.parse(path)
+		slices = self.parser.parse(path, num)
 		self.refresh(slices[0])
 		return slices
 
