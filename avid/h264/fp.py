@@ -58,7 +58,7 @@ class AvdH264V3InstHeader(AvdFrameParams):
 	def __init__(self):
 		super().__init__()
 
-class AvdH264V3DumbFuckingWasteofMemory(AvdFrameParams):
+class AvdH264V3DumbFuckingWasteOfMemory(AvdFrameParams):
 	subcon = Struct(
 		"dfw_220_pad" / ZPadding(0x60),
 		"dfw_280_chunk0" / Bytes(0x1e4),
@@ -109,7 +109,7 @@ class AvdH264V3FrameParams(AvdFrameParams):
 	subcon = Struct(
 		"pio" / AvdH264V3PiodmaHeader,
 		"hdr" / AvdH264V3InstHeader,
-		"dfw" / AvdH264V3DumbFuckingWasteofMemory,
+		"dfw" / AvdH264V3DumbFuckingWasteOfMemory,
 		"slc" / AvdH264V3Slice,
 		#"slc2" / Array(599, AvdH264V3Slice), # comment out for greatly faster construct parsing time
 		#"inp" / AvdH264V3Input,
