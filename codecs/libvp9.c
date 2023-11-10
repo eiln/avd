@@ -52,7 +52,7 @@ void libvp9_free(LibVP9Context *ctx)
 	free(ctx);
 }
 
-int libvp9_decode(LibVP9Context *ctx, const uint8_t *buf, int size)
+int libvp9_decode(LibVP9Context *ctx, const uint8_t *buf, int size, int do_probs)
 {
 	VP9Context *s = ctx->s;
 	int err;
@@ -69,10 +69,13 @@ int libvp9_decode(LibVP9Context *ctx, const uint8_t *buf, int size)
 		return err;
 	}
 
-	ctx->p = s->prob.p;
+	if (do_probs)
+		ctx->p = s->prob.p;
 
 	vp9_print_header(s);
-	vp9_adapt_probs(s);
+
+	if (do_probs)
+		vp9_adapt_probs(s);
 
 	return 0;
 }

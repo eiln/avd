@@ -87,7 +87,7 @@ class AVDVP9Parser(AVDParser):
 		super().__init__(lib_path="libvp9.so")
 		self.lib.libvp9_init.restype = ctypes.c_void_p
 		self.lib.libvp9_free.argtypes = [ctypes.c_void_p]
-		self.lib.libvp9_decode.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int]
+		self.lib.libvp9_decode.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int, ctypes.c_int]
 
 		self.arr_keys = [
 			("ref_frame_idx", VP9_REF_FRAMES),
@@ -98,7 +98,7 @@ class AVDVP9Parser(AVDParser):
 		self.slccls = AVDVP9Slice
 		self.reader = IVFDemuxer()
 
-	def parse(self, path, num=0):
+	def parse(self, path, num=0, do_probs=1):
 		header = self.reader.read_header(path)
 
 		handle = self.lib.libvp9_init()
@@ -110,19 +110,23 @@ class AVDVP9Parser(AVDParser):
 			probs_all = []
 			for i in range(header.frame_count):
 				frame = self.reader.read_frame()
-				err = self.lib.libvp9_decode(handle, frame.payload, frame.size)
-				probs = ctypes.string_at(handle, LibVP9Probs.sizeof()) # not great but it works
 				frames_all.append(frame)
-				probs_all.append(probs)
+				err = self.lib.libvp9_decode(handle, frame.payload, frame.size, int(do_probs))
+				if (do_probs):
+					probs = ctypes.string_at(handle, LibVP9Probs.sizeof())
+					probs_all.append(probs)
 				if (num and (i == num)):
 					break
 		stdout = out.read()
 		self.lib.libvp9_free(handle)
 
 		headers = self.parse_headers(stdout)
-		assert(len(headers) == len(frames_all) == len(probs_all))
+		assert(len(headers) == len(frames_all))
+		if (do_probs):
+			assert(len(headers) == len(probs_all))
 		for i,hdr in enumerate(headers):
 			hdr.frame = frames_all[i]
-			hdr.probs = LibVP9Probs.parse(probs_all[i])
-			hdr.probs_data = hdr.probs.to_avdprobs(hdr.probs)
+			if (do_probs):
+				hdr.probs = LibVP9Probs.parse(probs_all[i])
+				hdr.probs_data = hdr.probs.to_avdprobs(hdr.probs)
 		return headers

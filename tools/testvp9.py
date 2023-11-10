@@ -85,10 +85,12 @@ if __name__ == "__main__":
 	#dec.hal.stfu = True
 	paths = os.listdir(os.path.join(args.prefix, args.dir))
 	paths = sorted([os.path.join(args.prefix, args.dir, path) for path in paths if "param" in path or "frame" in path])
+
 	num = len(paths) if args.all else args.num
-	slices = dec.setup(args.path, num)
-	for i,path in enumerate(paths):
-		#print(path)
+	num = min(len(paths), num)
+	slices = dec.setup(args.path, num, do_probs=0)
+	for i in range(num):
+		path = paths[i]
 		fp0 = AVDVP9V3FrameParams.parse(open(path, "rb").read())
 		sl = slices[i]
 		print(sl)

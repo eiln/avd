@@ -56,5 +56,5 @@ if __name__ == "__main__":
 
 	count = len(paths) if args.all else args.count
 	dec = AVDVP9Decoder()
-	slices = dec.setup(args.input)
+	slices = dec.setup(args.input, do_probs=1)
 	main(slices, paths, count)
