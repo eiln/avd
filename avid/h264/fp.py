@@ -105,21 +105,6 @@ class AVDH264V3Input(AVDFrameParams):
 	def __init__(self):
 		super().__init__()
 
-class AVDH264V3FrameParams(AVDFrameParams):
-	subcon = Struct(
-		"pio" / AVDH264V3PiodmaHeader,
-		"hdr" / AVDH264V3InstHeader,
-		"dfw" / AVDH264V3DumbFuckingWasteOfMemory,
-		"slc" / AVDH264V3Slice,
-		#"slc2" / Array(599, AvdH264V3Slice), # comment out for greatly faster construct parsing time
-		#"inp" / AvdH264V3Input,
-	)
-	def __init__(self):
-		super().__init__()
-
-	def __str__(self):
-		return ''.join([str(getattr(self, x)) for x in ["pio", "hdr", "slc"]])
-
 class AVDH264V3FakeFrameParams(AVDFakeFrameParams):
 	def __init__(self):
 		super().__init__()
@@ -146,3 +131,19 @@ class AVDH264V3FakeFrameParams(AVDFakeFrameParams):
 		obj["slc_770_cmd_weights_weights"] = [0] * 96
 		obj["slc_8f0_cmd_weights_offsets"] = [0] * 96
 		return obj
+
+class AVDH264V3FrameParams(AVDFrameParams):
+	subcon = Struct(
+		"pio" / AVDH264V3PiodmaHeader,
+		"hdr" / AVDH264V3InstHeader,
+		"dfw" / AVDH264V3DumbFuckingWasteOfMemory,
+		"slc" / AVDH264V3Slice,
+		#"slc2" / Array(599, AvdH264V3Slice), # comment out for greatly faster construct parsing time
+		#"inp" / AvdH264V3Input,
+	)
+	_ffpcls = AVDH264V3FakeFrameParams
+	def __init__(self):
+		super().__init__()
+
+	def __str__(self):
+		return ''.join([str(getattr(self, x)) for x in ["pio", "hdr", "slc"]])

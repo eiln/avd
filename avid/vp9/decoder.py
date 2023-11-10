@@ -4,6 +4,7 @@
 
 from ..decoder import AVDDecoder
 from ..utils import *
+from .fp import AVDVP9V3FrameParams
 from .halv3 import AVDVP9HalV3
 from .parser import AVDVP9Parser
 from .probs import AVDVP9Probs
@@ -14,7 +15,9 @@ class AVDVP9Ctx(dotdict):
 
 class AVDVP9Decoder(AVDDecoder):
 	def __init__(self):
-		super().__init__(AVDVP9Parser, AVDVP9HalV3)
+		super().__init__(AVDVP9Parser, AVDVP9HalV3, AVDVP9V3FrameParams)
+		self.mode = "vp09"
+		self.probscls = AVDVP9Probs
 
 	def new_context(self):
 		self.ctx = AVDVP9Ctx()
@@ -94,7 +97,7 @@ class AVDVP9Decoder(AVDDecoder):
 		# plus a page for some reason
 		ctx.probs_addr = ctx.probs_base_addr + (probs_slot * (round_up(ctx.probs_size, 0x4000) + 0x4000))
 
-	def setup(self, path, num=0, do_probs=1):
+	def setup(self, path, num=0, do_probs=1, **kwargs):
 		self.new_context()
 		slices = self.parser.parse(path, num, do_probs)
 		self.refresh(slices[0])

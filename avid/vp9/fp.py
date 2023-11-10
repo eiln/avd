@@ -61,17 +61,6 @@ class AVDV3VP9InstHeader(AVDFrameParams):
 	def __init__(self):
 		super().__init__()
 
-class AVDVP9V3FrameParams(AVDFrameParams):
-	subcon = Struct(
-		"pio" / AVDV3PiodmaHeader,
-		"hdr" / AVDV3VP9InstHeader,
-	)
-	def __init__(self):
-		super().__init__()
-
-	def __str__(self):
-		return ''.join([str(getattr(self, x)) for x in ["hdr"]])
-
 class AVDVP9V3FakeFrameParams(AVDFakeFrameParams):
 	def __init__(self):
 		super().__init__()
@@ -85,3 +74,15 @@ class AVDVP9V3FakeFrameParams(AVDFakeFrameParams):
 		obj["hdr_f4_sps1_tile_addr_lsb8"]  = [0] * 4
 		obj["hdr_11c_curr_rvra_addr_lsb7"] = [0] * 4
 		return obj
+
+class AVDVP9V3FrameParams(AVDFrameParams):
+	subcon = Struct(
+		"pio" / AVDV3PiodmaHeader,
+		"hdr" / AVDV3VP9InstHeader,
+	)
+	_ffpcls = AVDVP9V3FakeFrameParams
+	def __init__(self):
+		super().__init__()
+
+	def __str__(self):
+		return ''.join([str(getattr(self, x)) for x in ["hdr"]])

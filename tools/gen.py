@@ -28,5 +28,5 @@ if __name__ == "__main__":
 	n = len(units) if args.all else args.num
 	for unit in units[:n]:
 		print(unit)
-		inst = dec.generate(unit)
+		inst = dec.decode(unit)
 		print()

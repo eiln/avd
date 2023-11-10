@@ -8,8 +8,8 @@ from .fp import *
 from .types import *
 
 class AVDVP9HalV3(AVDHal):
-	def __init__(self, ctx=None):
-		super().__init__(ctx=ctx)
+	def __init__(self):
+		super().__init__()
 
 	def set_refs(self, ctx, sl):
 		avd_set = self.avd_set
@@ -137,9 +137,6 @@ class AVDVP9HalV3(AVDHal):
 		avd_set(0x1)
 		avd_set(0x2b000400, "fw_cmd_inst_fifo_end")
 
-	def generate(self, ctx, sl):
-		self.inst_stream = []
-		self.fp = AVDVP9V3FakeFrameParams.new()
+	def set_insn(self, ctx, sl):
 		self.set_header(ctx, sl)
 		self.set_slice(ctx, sl)
-		return self.inst_stream

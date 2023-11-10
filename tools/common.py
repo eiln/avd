@@ -5,6 +5,7 @@ import sys, pathlib
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
 import struct
+from avid.utils import *
 
 def hexdump(s, sep=" "): return sep.join(["%02x"%x for x in s])
 def hexdump32(s, sep=" "): return sep.join(["%08x"%x for x in struct.unpack("<%dI" % (len(s)//4), s)])
@@ -108,18 +109,13 @@ def bitrepr(size, bits):
 
 def bitrepr32(x): return bitrepr(4, struct.pack("<I", x))
 
-def cassert(x, y, f=False):
+def bassert(x, y, msg="", nonfatal=False):
     if (x != y):
-        print(hl(f"[ASSERT] {hex(x)} vs. {hex(y)}", ANSI_RED))
-    if not (f):
-        assert(x == y)
-
-def bassert(x, y, f=False): # cassert was "c" for compare. now it looks stupid
-    if (x != y):
-        print(hl(f"[ASSERT]", ANSI_RED))
+        if (msg):
+            print(hl(f"[ASSERT] {msg}", ANSI_RED))
         diff = chexdiff32(x, y)
         print(diff)
-    if not (f):
+    if (not nonfatal):
         assert(x == y)
 
 def ffprobe(path):

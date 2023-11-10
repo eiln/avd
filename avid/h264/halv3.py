@@ -4,12 +4,11 @@
 
 from ..hal import AVDHal
 from ..utils import *
-from .fp import *
 from .types import *
 
 class AVDH264HalV3(AVDHal):
-	def __init__(self, ctx=None):
-		super().__init__(ctx=ctx)
+	def __init__(self):
+		super().__init__()
 
 	# The idea is to pass the HALs a RO struct parsed/managed by AVDH264Decoder
 
@@ -218,9 +217,6 @@ class AVDH264HalV3(AVDHal):
 
 		avd_set(0x2b000400, "fw_cmd_inst_fifo_end")
 
-	def generate(self, ctx, sl):
-		self.inst_stream = []
-		self.fp = AVDH264V3FakeFrameParams.new()
+	def set_insn(self, ctx, sl):
 		self.set_header(ctx, sl)
 		self.set_slice(ctx, sl)
-		return self.inst_stream

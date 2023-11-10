@@ -4,6 +4,7 @@
 
 from ..decoder import AVDDecoder
 from ..utils import *
+from .fp import AVDH264V3FrameParams
 from .halv3 import AVDH264HalV3
 from .parser import AVDH264Parser
 from .types import *
@@ -18,7 +19,8 @@ class AVDH264Picture(dotdict):
 
 class AVDH264Decoder(AVDDecoder):
 	def __init__(self):
-		super().__init__(AVDH264Parser, AVDH264HalV3)
+		super().__init__(AVDH264Parser, AVDH264HalV3, AVDH264V3FrameParams)
+		self.mode = "h264"
 
 	def get_pps(self, sl):
 		return self.ctx.pps_list[sl.pic_parameter_set_id]
@@ -142,7 +144,7 @@ class AVDH264Decoder(AVDDecoder):
 		ctx.rvra_size3 = ctx.rvra_total_size - ctx.rvra_size2 - ctx.rvra_size1 - ctx.rvra_size0
 		ctx.rvra_count = ctx.max_dpb_frames + 1 + 1
 
-	def setup(self, path):
+	def setup(self, path, **kwargs):
 		sps_list, pps_list, slices = self.parser.parse(path)
 		self.new_context(sps_list, pps_list)
 		# realistically we'd have the height/width as metadata w/o relying on sps

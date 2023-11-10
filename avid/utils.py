@@ -45,9 +45,23 @@ ANSI_PURPLE = 35
 ANSI_CYAN   = 36
 ANSI_WHITE  = 37
 
-def hl(x, n):
+def hl(x, n=None):
     if (n == None): return x
     return f"\033[1;{n}m{str(x)}\033[0m"
+
+def cassert(x, y, msg=""):
+    if (x != y):
+        if (msg):
+            print(hl(f"[ASSERT] {msg}", ANSI_RED))
+        print(hl(f"[ASSERT] {hex(x)} vs. {hex(y)}", ANSI_RED))
+    assert(x == y)
+
+def dassert(x, y, msg=""):
+    if (x != y):
+        if (msg):
+            print(hl(f"[ASSERT] {msg}", ANSI_RED))
+        print(hl(f"[ASSERT] {x} vs. {y}", ANSI_RED))
+    assert(x == y)
 
 class dotdict(dict):
     __setattr__ = dict.__setitem__

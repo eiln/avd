@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright 2023 Eileen Yoon <eyn@gmx.com>
 
+from ..utils import dassert
 from ..parser import *
 from .probs import *
 from .types import *
@@ -39,7 +40,7 @@ class IVFDemuxer:
 		self.stream = open(path, "rb").read()
 		h = IVFHeader.parse(self.stream[:32])
 		self.header = h
-		print("[IVF] codec: %s %dx%d frames: %d" % (h.fourcc, h.width, h.height, h.frame_count))
+		#print("[IVF] codec: %s %dx%d frames: %d" % (h.fourcc, h.width, h.height, h.frame_count))
 		self.pos += 32
 		return h
 
@@ -98,32 +99,27 @@ class AVDVP9Parser(AVDParser):
 		self.slccls = AVDVP9Slice
 		self.reader = IVFDemuxer()
 
-	def parse(self, path, num=0, do_probs=1):
-		header = self.reader.read_header(path)
-
+	def parse(self, path, num=0, do_probs=0):
+		frames_all = self.reader.read_all(path)
 		handle = self.lib.libvp9_init()
 		if (handle == None):
 			raise RuntimeError("Failed to init libvp9")
 
 		with pipes() as (out, err):
-			frames_all = []
 			probs_all = []
-			for i in range(header.frame_count):
-				frame = self.reader.read_frame()
-				frames_all.append(frame)
-				err = self.lib.libvp9_decode(handle, frame.payload, frame.size, int(do_probs))
-				if (do_probs):
-					probs = ctypes.string_at(handle, LibVP9Probs.sizeof())
-					probs_all.append(probs)
+			for i in range(len(frames_all)):
 				if (num and (i == num)):
 					break
+				frame = frames_all[i]
+				err = self.lib.libvp9_decode(handle, frame.payload, frame.size, int(do_probs))
+				if (do_probs):
+					probs_all.append(ctypes.string_at(handle, LibVP9Probs.sizeof()))
 		stdout = out.read()
 		self.lib.libvp9_free(handle)
 
 		headers = self.parse_headers(stdout)
-		assert(len(headers) == len(frames_all))
 		if (do_probs):
-			assert(len(headers) == len(probs_all))
+			dassert(len(headers), len(probs_all))
 		for i,hdr in enumerate(headers):
 			hdr.frame = frames_all[i]
 			if (do_probs):
