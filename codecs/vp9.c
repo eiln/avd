@@ -769,7 +769,11 @@ static void vp9_print_uncompressed_header(VP9Context *s)
     vp9_field("show_frame", !s->s.h.invisible);
     vp9_field("error_resilient_mode", s->s.h.errorres);
     if (s->s.h.keyframe) {
-        ;
+        vp9_field("bit_depth", s->bpp_index);
+        vp9_field("color_space", s->color_space);
+        vp9_field("color_range", s->color_range);
+        vp9_field("subsampling_x", s->sx);
+        vp9_field("subsampling_y", s->sy);
     }
     else {
         vp9_field("intra_only", s->s.h.intraonly);
