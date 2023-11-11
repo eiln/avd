@@ -212,7 +212,8 @@ class AVDEmulator:
 	def set_params(self, frame_path):
 		self.log("reading frame params from %s" % (frame_path))
 		frame_params = open(frame_path, "rb").read()
-		xxde(frame_params[:0x40], print_fn=self.log)
+		if (not self.stfu):
+			xxde(frame_params[:0x40], print_fn=self.log)
 		header = struct.unpack("<%dI" % (0x10), frame_params[:0x40])
 		assert(header[5] == 0xdeadcafe) # sanity check
 
@@ -240,8 +241,9 @@ class AVDEmulator:
 		self.log(f"starting @ {initial_pc:08x} with SP {initial_sp:08x}")
 		self.emu.reg_write(UC_ARM_REG_SP, initial_sp)
 		self.emu.emu_start(initial_pc, 0)
-		self.dump_regs()
-		self.dump_firmware_logs()
+		if (not self.stfu):
+			self.dump_regs()
+			self.dump_firmware_logs()
 
 	def trigger_irq(self, irq_handler):
 		emu = self.emu
@@ -287,7 +289,7 @@ class AVDEmulator:
 			pc = emu.reg_read(UC_ARM_REG_PC)
 			self.log('PC: %04x INST: %s' % (pc, instruction_str))
 			self.dump_regs()
- 
+
 	def hook_mmio(self, emu, access, addr, size, val, data):
 		if addr in self.mmio_map:
 			if access == UC_MEM_READ:
@@ -379,9 +381,11 @@ class AVDEmulator:
 		size = (val << 2) >> 8
 		self.log("PIODMA: copying 0x%x bytes to 0x%x" % (size, dst_addr))
 		buf = self.dart1_space[piodma_iova+word_size:piodma_iova+size]
-		xxde(buf[:0x40], print_fn=self.log)
 		self.avd_write(dst_addr, buf)
-		if (self.verbose): self.dump_firmware_logs()
+		if (not self.stfu):
+			xxde(buf[:0x40], print_fn=self.log)
+			if (self.verbose):
+				self.dump_firmware_logs()
 
 	def save_inst(self, addr, val):
 		if (self.inst_only):
@@ -452,9 +456,10 @@ class AVDEmulator:
 
 	def r_50010058(self, addr): # 0x50010058: read_cm3ctrl_mbox0_retrieve
 		fifo_addr = self.get_cmd_addr(self.cmd_idx)
-		self.log("got cmd at 0x%x n=%d" % (fifo_addr, self.cmd_idx))
-		cmd = self.avd_read(fifo_addr, AVD_CM3_CMD_SIZE)
-		xxde(cmd, print_fn=self.log)
+		if (not self.stfu):
+			self.log("got cmd at 0x%x n=%d" % (fifo_addr, self.cmd_idx))
+			cmd = self.avd_read(fifo_addr, AVD_CM3_CMD_SIZE)
+			xxde(cmd, print_fn=self.log)
 		return fifo_addr
 
 	def set_mmio_map(self):
@@ -527,9 +532,10 @@ class AVDEmulator:
 		addr = self.get_cmd_addr(self.cmd_idx)
 		self.avd_write(addr, cmd[:AVD_CM3_CMD_SIZE])
 		self.doorbell_ring()
-		opcode = struct.unpack("<I", cmd[:4])[0] & 0x1f
-		self.log("Command opcode 0x%x queue n=%d success!" % (opcode, self.cmd_idx))
-		self.dump_firmware_logs()
+		if (not self.stfu):
+			opcode = struct.unpack("<I", cmd[:4])[0] & 0x1f
+			self.log("Command opcode 0x%x queue n=%d success!" % (opcode, self.cmd_idx))
+			self.dump_firmware_logs()
 		self.cmd_idx = 0
 
 	def avd_cm3_cmd_init(self):
@@ -569,7 +575,7 @@ if __name__ == "__main__":
 	parser.add_argument('-b', '--show_bits', action='store_true', help="show bits on the side for -u")
 	args = parser.parse_args()
 
-	emu = AVDEmulator(firmware=args.firmware, trace_sram=args.trace_sram, trace_code=args.trace_code, 	
+	emu = AVDEmulator(firmware=args.firmware, trace_sram=args.trace_sram, trace_code=args.trace_code,
 			format_mmio=args.format_mmio, verbose=args.verbose, stfu=args.stfu,
 			inst_only=args.inst_only, show_bits=args.show_bits)
 	emu.start()
