@@ -71,7 +71,9 @@ class AVDH264HalV3(AVDHal):
 		avd_set((((ctx.height - 1) & 0xffff) << 16) | ((ctx.width - 1) & 0xffff), "hdr_3c_height_width")
 		avd_set(0x0, "fw_dma_config_0")
 		avd_set((((ctx.height - 1) >> 3) << 16) | ((ctx.width - 1) >> 3), "hdr_28_height_width_shift3")
-		avd_set(0x1002881, "hdr_2c_sps_param")
+
+		x = 0x1000000 * self.get_sps(ctx, sl).chroma_format_idc | 0x2881
+		avd_set(x, "hdr_2c_sps_param")
 
 		x = 0x100000
 		if (sl.nal_unit_type != H264_NAL_SLICE_IDR):

@@ -88,6 +88,7 @@ class AVDH264Decoder(AVDDecoder):
 
 	def allocate(self):
 		ctx = self.ctx
+		sps = ctx.sps_list[ctx.cur_sps_id]
 		# matching macOS allocations makes for easy diffs
 		# see tools/dims264.py experiment
 
@@ -99,10 +100,14 @@ class AVDH264Decoder(AVDDecoder):
 		ctx.sps_tile_count = 24  # again, nothing to do with sps; just a name for work buf group 2
 		ctx.rvra0_addr = 0x734000
 
+		assert((sps.chroma_format_idc == H264_CHROMA_IDC_420) or (sps.chroma_format_idc == H264_CHROMA_IDC_422))
+
 		if (ctx.width == 128 and ctx.height == 64):
 			ctx.slice_data_size = 0x8000
 			ctx.sps_tile_size = 0x8000
 			ctx.rvra_total_size = 0x8000
+			if (sps.chroma_format_idc == H264_CHROMA_IDC_422):
+				ctx.rvra_total_size = 0xc000
 		elif (ctx.width == 1024 and ctx.height == 512):
 			ctx.slice_data_size = 0x44000
 			ctx.sps_tile_size = 0x24000
@@ -129,9 +134,15 @@ class AVDH264Decoder(AVDDecoder):
 
 		scale = min(pow2div(ctx.height), pow2div(ctx.width))
 		if (scale >= 32):
-			chroma_size = ctx.height * ctx.width // 2
+			if (sps.chroma_format_idc == H264_CHROMA_IDC_420):
+				chroma_size = ctx.height * ctx.width // 2
+			elif (sps.chroma_format_idc == H264_CHROMA_IDC_422):
+				chroma_size = ctx.height * ctx.width
 		else:
-			chroma_size = round_up(ctx.height * ctx.width // 2, 0x4000)
+			if (sps.chroma_format_idc == H264_CHROMA_IDC_420):
+				chroma_size = round_up(ctx.height * ctx.width // 2, 0x4000)
+			elif (sps.chroma_format_idc == H264_CHROMA_IDC_422):
+				chroma_size = round_up(ctx.height * ctx.width, 0x4000)
 		ctx.slice_data_addr = round_up(ctx.uv_addr + chroma_size, 0x4000) + 0x4000
 
 		ctx.sps_tile_addr = ctx.slice_data_addr + ctx.slice_data_size
@@ -139,7 +150,10 @@ class AVDH264Decoder(AVDDecoder):
 		ctx.rvra1_addr = ctx.pps_tile_addr + (ctx.pps_tile_size * ctx.pps_tile_count)
 
 		ctx.rvra_size0 = (round_up(ctx.height, 32) * round_up(ctx.width, 32)) + ((round_up(ctx.height, 32) * round_up(ctx.width, 32)) // 4)
-		ctx.rvra_size2 = ctx.rvra_size0 // 2
+		if (sps.chroma_format_idc == H264_CHROMA_IDC_420):
+			ctx.rvra_size2 = ctx.rvra_size0 // 2
+		else:
+			ctx.rvra_size2 = ctx.rvra_size0
 		ctx.rvra_size1 = ((nextpow2(ctx.height) // 32) * nextpow2(ctx.width))
 		ctx.rvra_size3 = ctx.rvra_total_size - ctx.rvra_size2 - ctx.rvra_size1 - ctx.rvra_size0
 		ctx.rvra_count = ctx.max_dpb_frames + 1 + 1
