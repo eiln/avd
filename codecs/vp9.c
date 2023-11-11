@@ -768,9 +768,6 @@ static void vp9_print_uncompressed_header(VP9Context *s)
     vp9_field("frame_type", !s->s.h.keyframe);
     vp9_field("show_frame", !s->s.h.invisible);
     vp9_field("error_resilient_mode", s->s.h.errorres);
-    vp9_field("refresh_frame_context", s->s.h.refreshctx);
-    vp9_field("frame_parallel_decoding_mode", s->s.h.parallelmode);
-    vp9_field("frame_context_idx", s->s.h.framectxid);
     if (s->s.h.keyframe) {
         ;
     }
@@ -783,8 +780,13 @@ static void vp9_print_uncompressed_header(VP9Context *s)
             vp9_field("ref_frame_sign_bias[%d]", i, s->s.h.signbias[i]);
         }
         vp9_field("allow_high_precision_mv", s->s.h.highprecisionmvs);
-        vp9_field("mcomp_filter_type", s->s.h.filtermode);
+        vp9_field("is_filter_switchable", s->s.h.filtermode == FILTER_SWITCHABLE);
+        if (s->s.h.filtermode != FILTER_SWITCHABLE)
+            vp9_field("raw_interpolation_filter_type", s->s.h.filtermode);
     }
+    vp9_field("refresh_frame_context", s->s.h.refreshctx);
+    vp9_field("frame_parallel_decoding_mode", s->s.h.parallelmode);
+    vp9_field("frame_context_idx", s->s.h.framectxid);
 
     vp9_field("loop_filter_level", s->s.h.filter.level);
     vp9_field("loop_filter_sharpness", s->s.h.filter.sharpness);
