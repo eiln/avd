@@ -96,7 +96,7 @@ def bitrepr32(x): return bitrepr(4, struct.pack("<I", x))
 
 class AVDEmulator:
 	def __init__(self, firmware, trace_sram=False, format_mmio=False, verbose=False,
-			trace_code=False, stfu=False, inst_only=False, show_bits=False):
+			trace_code=False, stfu=False, inst_only=False, show_bits=False, **kwargs):
 		self.firmware = open(firmware, 'rb').read()
 		self.trace_sram = trace_sram
 		self.format_mmio = format_mmio
@@ -565,19 +565,17 @@ if __name__ == "__main__":
 	parser.add_argument('-n', '--num', type=int, default=1, help="count from start")
 	parser.add_argument('-a', '--all', action='store_true', help="emulate all in dir")
 
-	parser.add_argument('-r', '--trace_sram', action='store_true', help="trace SRAM R/Ws")
-	parser.add_argument('-c', '--trace_code', action='store_true', help="trace code")
-	parser.add_argument('-m', '--format_mmio', action='store_true', help="format MMIO R/Ws")
+	parser.add_argument('-r', '--trace-sram', action='store_true', help="trace SRAM R/Ws")
+	parser.add_argument('-c', '--trace-code', action='store_true', help="trace code")
+	parser.add_argument('-m', '--format-mmio', action='store_true', help="format MMIO R/Ws")
 	parser.add_argument('-v', '--verbose', action='store_true', help="verbose")
 	parser.add_argument('-t', '--stfu', action='store_true')
 
-	parser.add_argument('-u', '--inst_only', action='store_true', help="trace instruction stream only")
-	parser.add_argument('-b', '--show_bits', action='store_true', help="show bits on the side for -u")
+	parser.add_argument('-u', '--inst-only', action='store_true', help="trace instruction stream only")
+	parser.add_argument('-b', '--show-bits', action='store_true', help="show bits on the side for -u")
 	args = parser.parse_args()
 
-	emu = AVDEmulator(firmware=args.firmware, trace_sram=args.trace_sram, trace_code=args.trace_code,
-			format_mmio=args.format_mmio, verbose=args.verbose, stfu=args.stfu,
-			inst_only=args.inst_only, show_bits=args.show_bits)
+	emu = AVDEmulator(**vars(args))
 	emu.start()
 
 	if args.dir:
