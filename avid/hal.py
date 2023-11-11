@@ -7,10 +7,10 @@ from .utils import *
 
 class AVDInst(namedtuple('AVDInst', ['val', 'name', 'pos', 'idx'])):
 	def get_disp_name(self):
-		if  self.name.startswith("hdr"):
-			n = ANSI_PURPLE
-		elif self.name.startswith("slc"):
+		if (self.name.startswith("slc")) or ("lsb7" in self.name):
 			n = ANSI_CYAN
+		elif  self.name.startswith("hdr"):
+			n = ANSI_PURPLE
 		elif self.name.startswith("fw"):
 			n = ANSI_YELLOW
 		else:

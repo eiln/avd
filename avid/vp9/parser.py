@@ -72,10 +72,8 @@ class AVDVP9Slice(AVDSlice):
 		self.mode = "vp09"
 		self._banned_keys = ["idx", "frame", "probs", "probs_data"]
 
-	def __repr__(self):
-		s = "\n[slice: %d key_frame: %d]\n" % (self.idx, not self.frame_type)
-		s += self.show_entries()
-		return s
+	def show_slice_header(self):
+		return "\n[slice: %d key_frame: %d size: %d]\n" % (self.idx, not self.frame_type, self.frame.size)
 
 	def get_payload(self):
 		return self.frame.payload

@@ -39,8 +39,11 @@ class AVDSlice(dotdict):
 				s += self.show_list_entry(key, val)
 		return s
 
+	def show_slice_header(self):
+		return "\n[slice: %d]\n" % (self.idx)
+
 	def __repr__(self):
-		s = "\n[slice: %d]\n" % (self.idx)
+		s = self.show_slice_header()
 		s += self.show_entries()
 		return s
 

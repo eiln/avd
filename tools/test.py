@@ -198,21 +198,28 @@ class AVDVP9UnitTest(AVDUnitTest):
 			"hdr_30_cmd_start_hdr",
 			"hdr_34_const_20",
 			"hdr_38_height_width_shift3",
-			#"hdr_40_flags1_pt1",
+			"hdr_40_flags1_pt1",
 
 			"hdr_e0_const_240",
 			"hdr_104_probs_addr_lsb8",
 			"hdr_118_pps0_tile_addr_lsb8",
 			"hdr_108_pps1_tile_addr_lsb8",
 
-			#"hdr_48_flags2_pt1",
-			#"hdr_44_flags1_pt2",
-			#"hdr_4c_flags2_pt2",
+			"hdr_4c_base_q_idx",
+			"hdr_44_flags1_pt2",
+			"hdr_48_loop_filter_level",
 
 			"hdr_e8_sps0_tile_addr_lsb8",
 			"hdr_f4_sps1_tile_addr_lsb8",
 
+			"hdr_70_ref_height_width",
+			"hdr_7c_ref_align",
+			"hdr_9c_ref_100",
 			"hdr_11c_curr_rvra_addr_lsb7",
+			"hdr_138_ref_rvra0_addr_lsb7",
+			"hdr_144_ref_rvra1_addr_lsb7",
+			"hdr_150_ref_rvra2_addr_lsb7",
+			"hdr_15c_ref_rvra3_addr_lsb7",
 
 			#"hdr_168_y_addr_lsb8",
 			#"hdr_16c_uv_addr_lsb8",
