@@ -3,6 +3,7 @@
 # Copyright 2023 Eileen Yoon <eyn@gmx.com>
 
 import ctypes
+import re
 import struct
 from collections import namedtuple
 from pathlib import Path
@@ -24,7 +25,13 @@ class AVDSlice(dotdict):
 		for i,v in enumerate(val):
 			if (v != None):
 				kr = ("\t%s[%d]" % (key, i)).ljust(self._reprwidth)
-				s += "%s %d\n" % (kr, v)
+				if (isinstance(v, list)):
+					for j,w in enumerate(v):
+						if (w != None):
+							kr = ("\t%s[%d][%d]" % (key, i, j)).ljust(self._reprwidth)
+							s += "%s %d\n" % (kr, w)
+				else:
+					s += "%s %d\n" % (kr, v)
 		return s
 
 	def show_entries(self):
@@ -75,29 +82,30 @@ class AVDParser:
 			for kv in content:
 				key = kv.split()[0].split("[", 1)[0]
 				val = kv.split()[2]
-				val = float(val) if '.' in val else int(val)
+				val = int(val)
+
 				if ((key in unit) and (isinstance(unit[key], list))):
-					i = int(kv.split()[0].split("[")[1].split("]")[0])
-					unit[key][i] = val
+					idxs = re.findall(r"\[([A-Za-z0-9_]+)\]", kv.split()[0])
+					if (len(idxs) == 1):
+						unit[key][int(idxs[0])] = val
+					else:
+						unit[key][int(idxs[0])][int(idxs[1])] = val
 					continue
 
-				if any(a[0] in key for a in self.arr_keys):
+				if any(a[0] == key for a in self.arr_keys):
 					for a in self.arr_keys:
-						if (a[0] in key):
+						if (a[0] == key):
 							nm, cnt = a
-							i = int(kv.split()[0].split("[")[1].split("]")[0])
+							idxs = re.findall(r"\[([A-Za-z0-9_]+)\]", kv.split()[0])
 							if nm not in unit:
-								unit[nm] = [None] * cnt
-								unit[nm][i] = val
+								if (isinstance(cnt, int)):
+									unit[nm] = [None] * cnt
+								else:
+									unit[nm] = [[None] * cnt[1] for n in range(cnt[0])]
+							if (len(idxs) == 1):
+								unit[nm][int(idxs[0])] = val
 							else:
-								unit[nm][i] = val
-				elif (1 == 0):
-					key = kv.split()[0].replace("[", "_").replace("]", "_").replace("__", "_").rstrip("_")
-					if ((key in unit)):
-						unit[key] = [unit[key]] if not isinstance(unit[key], list) else unit[key]
-						unit[key].append(val)
-					else:
-						unit[key] = val
+								unit[nm][int(idxs[0])][int(idxs[1])] = val
 				else:
 					unit[key] = val
 			units.append(unit)

@@ -96,6 +96,7 @@ class AVDUnitTest:
 			x0 = inst0_stream[n]
 			x1 = inst1_stream[n]
 			if ((not self.args.show_all) and (x0 == x1.val)): continue
+			if (x1.name in self.emu_ignore_keys): continue
 
 			s = ""
 			if (self.args.show_index):
@@ -134,11 +135,8 @@ class AVDUnitTest:
 			inst0_stream = self.emu.avd_cm3_cmd_decode(path)
 
 			sl = slices[i]
-			self.log("")
 			if (self.args.show_headers):
 				print(sl)
-			else:
-				self.log("[slice: %d, %s]" % (sl.idx, args.dir))
 
 			inst1_stream = self.dec.decode(sl)
 			self.diff_emu(sl, inst0_stream, inst1_stream)
@@ -187,6 +185,7 @@ class AVDH264UnitTest(AVDUnitTest):
 			#"inp_8b4d4_slice_addr_low",
 			#"inp_8b4d8_slice_hdr_size",
 		]
+		self.emu_ignore_keys = ["inp_8b4d4_slice_addr_low"]
 
 class AVDVP9UnitTest(AVDUnitTest):
 	def __init__(self, **kwargs):

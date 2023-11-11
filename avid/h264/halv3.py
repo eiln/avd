@@ -114,56 +114,44 @@ class AVDH264HalV3(AVDHal):
 
 	def set_weights(self, ctx, sl):
 		avd_set = self.avd_set
-		if not ((sl.slice_type == H264_SLICE_TYPE_P) or (sl.slice_type == H264_SLICE_TYPE_B)): return
 
-		if (sl.slice_type == H264_SLICE_TYPE_B):
-			x = 0x2dd000ad
-		else:
+		if (sl.slice_type == H264_SLICE_TYPE_P):
 			x = 0x2dd00040
-
-		if not (hasattr(sl, "luma_weight_l0_flag_0")):
+		else:
+			x = 0x2dd000ad
+		if (sl.has_luma_weights == 0):
 			avd_set(x, "slc_76c_cmd_mb")
 			return
-
-		if (sl.luma_weight_l0_flag_0 == 0):
-			avd_set(x)
-			if (sl.modification_of_pic_nums_idc_l0[0] == 3): # ???
-				return
-			avd_set(0x2de04201, "slc_770_cmd_weights_weights", 0)
-			avd_set(0x2df0ffff, "slc_8f0_cmd_weights_offsets", 0)
-			return
-
-		avd_set(0x2dd000ad, "slc_76c_cmd_mb")
+		x |= (sl.luma_log2_weight_denom << 3) | sl.chroma_log2_weight_denom
+		avd_set(x, "slc_76c_cmd_mb")
 
 		def get_wbase(i, j): return 0x2de00000 | ((j + 1) * 0x4000) | (i * 0x200)
-
 		num = 0
-		lidx = 0
 		for i in range(sl.num_ref_idx_l0_active_minus1 + 1):
-			if (sl[f'luma_weight_l{lidx}_flag_{i}']):
-				avd_set(get_wbase(i, 0) | sl[f'luma_weight_l{lidx}_{i}'], "slc_770_cmd_weights_weights", num)
-				avd_set(0x2df00000 | swrap(sl[f'luma_offset_l{lidx}_{i}'], 0x10000), "slc_8f0_cmd_weights_offsets", num)
+			if (sl.luma_weight_l0_flag[i]):
+				avd_set(get_wbase(i, 0) | sl.luma_weight_l0[i], "slc_770_cmd_weights_weights", num)
+				avd_set(0x2df00000 | swrap(sl.luma_offset_l0[i], 0x10000), "slc_8f0_cmd_weights_offsets", num)
 				num += 1
-			if (sl[f'chroma_weight_l{lidx}_flag_{i}']):
-				avd_set(get_wbase(i, 1) | sl[f'chroma_weight_l{lidx}_{i}_0'], "slc_770_cmd_weights_weights", num)
-				avd_set(0x2df00000 | swrap(sl[f'chroma_offset_l{lidx}_{i}_0'], 0x10000), "slc_8f0_cmd_weights_offsets", num)
+			if (sl.chroma_weight_l0_flag[i]):
+				avd_set(get_wbase(i, 1) | sl.chroma_weight_l0[i][0], "slc_770_cmd_weights_weights", num)
+				avd_set(0x2df00000 | swrap(sl.chroma_offset_l0[i][0], 0x10000), "slc_8f0_cmd_weights_offsets", num)
 				num += 1
-				avd_set(get_wbase(i, 2) | sl[f'chroma_weight_l{lidx}_{i}_1'], "slc_770_cmd_weights_weights", num)
-				avd_set(0x2df00000 | swrap(sl[f'chroma_offset_l{lidx}_{i}_1'], 0x10000), "slc_8f0_cmd_weights_offsets", num)
+				avd_set(get_wbase(i, 2) | sl.chroma_weight_l0[i][1], "slc_770_cmd_weights_weights", num)
+				avd_set(0x2df00000 | swrap(sl.chroma_offset_l0[i][1], 0x10000), "slc_8f0_cmd_weights_offsets", num)
 				num += 1
 
 		if (sl.slice_type == H264_SLICE_TYPE_B):
-			lidx = 1
 			for i in range(sl.num_ref_idx_l1_active_minus1 + 1):
-				avd_set(get_wbase(i, 0) | sl[f'luma_weight_l{lidx}_{i}'], "slc_770_cmd_weights_weights", num)
-				avd_set(0x2df00000 | swrap(sl[f'luma_offset_l{lidx}_{i}'], 0x10000), "slc_8f0_cmd_weights_offsets", num)
-				num += 1
-				if (sl[f'chroma_weight_l{lidx}_flag_{i}']):
-					avd_set(get_wbase(i, 1) | sl[f'chroma_weight_l{lidx}_{i}_0'], "slc_770_cmd_weights_weights", num)
-					avd_set(0x2df00000 | swrap(sl[f'chroma_offset_l{lidx}_{i}_0'], 0x10000), "slc_8f0_cmd_weights_offsets", num)
+				if (sl.luma_weight_l1_flag[i]):
+					avd_set(get_wbase(i, 0) | sl.luma_weight_l1[i], "slc_770_cmd_weights_weights", num)
+					avd_set(0x2df00000 | swrap(sl.luma_offset_l1[i], 0x10000), "slc_8f0_cmd_weights_offsets", num)
 					num += 1
-					avd_set(get_wbase(i, 2) | sl[f'chroma_weight_l{lidx}_{i}_1'], num)
-					avd_set(0x2df00000 | swrap(sl[f'chroma_offset_l{lidx}_{i}_1'], 0x10000), "slc_8f0_cmd_weights_offsets", num)
+				if (sl.chroma_weight_l1_flag[i]):
+					avd_set(get_wbase(i, 1) | sl.chroma_weight_l1[i][0], "slc_770_cmd_weights_weights", num)
+					avd_set(0x2df00000 | swrap(sl.chroma_offset_l1[i][0], 0x10000), "slc_8f0_cmd_weights_offsets", num)
+					num += 1
+					avd_set(get_wbase(i, 2) | sl.chroma_weight_l1[i][1], num)
+					avd_set(0x2df00000 | swrap(sl.chroma_offset_l1[i][1], 0x10000), "slc_8f0_cmd_weights_offsets", num)
 					num += 1
 
 	def set_slice(self, ctx, sl):

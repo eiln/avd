@@ -389,7 +389,6 @@ struct h264_slice {
 	uint32_t nal_unit_type;
 	struct h264_nal_svc_header svc;
 	uint32_t first_mb_in_slice;
-	uint32_t header_size;
 	uint32_t pic_parameter_set_id;
 
 	uint32_t slice_type;
@@ -413,6 +412,8 @@ struct h264_slice {
 	struct h264_ref_pic_list_modification ref_pic_list_modification_l0;
 	struct h264_ref_pic_list_modification ref_pic_list_modification_l1;
 
+	int has_luma_weights;
+	int has_chroma_weights;
 	uint32_t base_pred_weight_table_flag;
 	uint32_t luma_log2_weight_denom;
 	uint32_t chroma_log2_weight_denom;
@@ -440,6 +441,7 @@ struct h264_slice {
 	uint32_t slice_group_change_cycle;
 
 	/* derived stuff starts here */
+	uint32_t header_size;
 	uint32_t width;
 	uint32_t height;
 	uint32_t width_mbs;
@@ -465,6 +467,8 @@ struct h264_context {
 	(&((ctx)->sps_list[(h264_get_pps(ctx, id)->seq_parameter_set_id)]))
 #define h264_get_sub_sps(ctx, id) \
 	(&((ctx)->sub_sps_list[(h264_get_pps(ctx, id)->seq_parameter_set_id)]))
+#define h264_sl_get_sps(ctx, sl) \
+	(&((ctx)->sps_list[(h264_get_pps(ctx, sl->pic_parameter_set_id)->seq_parameter_set_id)]))
 
 int h264_find_nal_unit(uint8_t *buf, int size, int *nal_start, int *nal_end);
 int h264_decode_nal_unit(struct h264_context *ctx, uint8_t *buf, int size);

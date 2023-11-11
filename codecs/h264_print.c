@@ -440,28 +440,36 @@ static void h264_print_ref_pic_list_modification(struct h264_ref_pic_list_modifi
 static void h264_print_pred_weight_table(struct h264_slice *sl)
 {
 	uint32_t i;
+
+	h264_field("has_chroma_weights", sl->has_chroma_weights);
 	h264_field("luma_log2_weight_denom", sl->luma_log2_weight_denom);
 	h264_field("chroma_log2_weight_denom", sl->chroma_log2_weight_denom);
+
 	for (i = 0; i < sl->num_ref_idx_l0_active; i++) {
 		h264_field("luma_weight_l0_flag[%d]", i, sl->pwt_l0[i].luma_weight_flag);
 		h264_field("luma_weight_l0[%d]", i, sl->pwt_l0[i].luma_weight);
 		h264_field("luma_offset_l0[%d]", i, sl->pwt_l0[i].luma_offset);
-		h264_field("chroma_weight_l0_flag[%d]", i, sl->pwt_l0[i].chroma_weight_flag);
-		h264_field("chroma_weight_l0[%d][0]", i, sl->pwt_l0[i].chroma_weight[0]);
-		h264_field("chroma_weight_l0[%d][1]", i, sl->pwt_l0[i].chroma_weight[1]);
-		h264_field("chroma_offset_l0[%d][0]", i, sl->pwt_l0[i].chroma_offset[0]);
-		h264_field("chroma_offset_l0[%d][1]", i, sl->pwt_l0[i].chroma_offset[1]);
+		if (sl->has_chroma_weights) {
+			h264_field("chroma_weight_l0_flag[%d]", i, sl->pwt_l0[i].chroma_weight_flag);
+			h264_field("chroma_weight_l0[%d][0]", i, sl->pwt_l0[i].chroma_weight[0]);
+			h264_field("chroma_weight_l0[%d][1]", i, sl->pwt_l0[i].chroma_weight[1]);
+			h264_field("chroma_offset_l0[%d][0]", i, sl->pwt_l0[i].chroma_offset[0]);
+			h264_field("chroma_offset_l0[%d][1]", i, sl->pwt_l0[i].chroma_offset[1]);
+		}
 	}
+
 	if (sl->slice_type_nos == H264_SLICE_TYPE_B) {
 		for (i = 0; i < sl->num_ref_idx_l1_active; i++) {
 			h264_field("luma_weight_l1_flag[%d]", i, sl->pwt_l1[i].luma_weight_flag);
 			h264_field("luma_weight_l1[%d]", i, sl->pwt_l1[i].luma_weight);
 			h264_field("luma_offset_l1[%d]", i, sl->pwt_l1[i].luma_offset);
-			h264_field("chroma_weight_l1_flag[%d]", i, sl->pwt_l1[i].chroma_weight_flag);
-			h264_field("chroma_weight_l1[%d][0]", i, sl->pwt_l1[i].chroma_weight[0]);
-			h264_field("chroma_weight_l1[%d][1]", i, sl->pwt_l1[i].chroma_weight[1]);
-			h264_field("chroma_offset_l1[%d][0]", i, sl->pwt_l1[i].chroma_offset[0]);
-			h264_field("chroma_offset_l1[%d][1]", i, sl->pwt_l1[i].chroma_offset[1]);
+			if (sl->has_chroma_weights) {
+				h264_field("chroma_weight_l1_flag[%d]", i, sl->pwt_l1[i].chroma_weight_flag);
+				h264_field("chroma_weight_l1[%d][0]", i, sl->pwt_l1[i].chroma_weight[0]);
+				h264_field("chroma_weight_l1[%d][1]", i, sl->pwt_l1[i].chroma_weight[1]);
+				h264_field("chroma_offset_l1[%d][0]", i, sl->pwt_l1[i].chroma_offset[0]);
+				h264_field("chroma_offset_l1[%d][1]", i, sl->pwt_l1[i].chroma_offset[1]);
+			}
 		}
 	}
 }
@@ -582,15 +590,10 @@ void h264_print_slice_header(struct h264_context *ctx, struct h264_slice *sl)
 			h264_print_ref_pic_list_modification(
 				&sl->ref_pic_list_modification_l1, "l1");
 	}
-	if ((pps->weighted_pred_flag && (sl->slice_type == H264_SLICE_TYPE_P ||
-					 sl->slice_type == H264_SLICE_TYPE_SP)) ||
-	    (pps->weighted_bipred_idc == 1 && sl->slice_type == H264_SLICE_TYPE_B)) {
-		h264_field("base_pred_weight_table_flag",
-		       sl->base_pred_weight_table_flag);
-		if (!sl->base_pred_weight_table_flag) {
-			h264_print_pred_weight_table(sl);
-		}
-	}
+
+	h264_field("has_luma_weights", sl->has_luma_weights);
+	if (sl->has_luma_weights)
+		h264_print_pred_weight_table(sl);
 
 	h264_print_dec_ref_pic_marking(sl);
 	if (sps->is_svc && !sps->slice_header_restriction_flag)

@@ -910,26 +910,33 @@ static void h264_pred_weight_table_entry(struct bitstream *gb, struct h264_slice
 		entry->luma_offset = 0;
 	}
 
-	entry->chroma_weight_flag = get_bits1(gb);
-	if (entry->chroma_weight_flag) {
-		for (i = 0; i < 2; i++) {
-			entry->chroma_weight[i] = get_se_golomb(gb);
-			entry->chroma_offset[i] = get_se_golomb(gb);
-		}
-	} else {
-		for (i = 0; i < 2; i++) {
-			entry->chroma_weight[i] = 1 << sl->chroma_log2_weight_denom;
-			entry->chroma_offset[i] = 0;
+	if (sl->has_chroma_weights) {
+		entry->chroma_weight_flag = get_bits1(gb);
+		if (entry->chroma_weight_flag) {
+			for (i = 0; i < 2; i++) {
+				entry->chroma_weight[i] = get_se_golomb(gb);
+				entry->chroma_offset[i] = get_se_golomb(gb);
+			}
+		} else {
+			for (i = 0; i < 2; i++) {
+				entry->chroma_weight[i] = 1 << sl->chroma_log2_weight_denom;
+				entry->chroma_offset[i] = 0;
+			}
 		}
 	}
 }
 
-static int h264_pred_weight_table(struct bitstream *gb, struct h264_slice *sl)
+static int h264_pred_weight_table(struct h264_context *ctx, struct h264_slice *sl)
 {
+	struct h264_sps *sps = h264_sl_get_sps(ctx, sl);
+	struct bitstream *gb = &ctx->gb;
 	uint32_t i;
 
+	sl->has_luma_weights = 1;
 	sl->luma_log2_weight_denom = get_ue_golomb_31(gb);
-	sl->chroma_log2_weight_denom = get_ue_golomb_31(gb);
+	sl->has_chroma_weights = !sps->separate_colour_plane_flag && sps->chroma_format_idc != 0;
+	if (sl->has_chroma_weights)
+		sl->chroma_log2_weight_denom = get_ue_golomb_31(gb);
 
 	for (i = 0; i < sl->num_ref_idx_l0_active; i++)
 		h264_pred_weight_table_entry(gb, sl, &sl->pwt_l0[i]);
@@ -1071,6 +1078,9 @@ static int h264_parse_slice_header(struct h264_context *ctx, struct h264_slice *
 	if (pps->redundant_pic_cnt_present_flag)
 		sl->redundant_pic_cnt = get_ue_golomb(gb);
 
+	sl->has_luma_weights = 0;
+	sl->has_chroma_weights = 0;
+
 	if (!sps->is_svc || sl->svc.quality_id == 0) {
 		if (sl->slice_type == H264_SLICE_TYPE_B)
 			sl->direct_spatial_mb_pred_flag = get_bits1(gb);
@@ -1112,17 +1122,10 @@ static int h264_parse_slice_header(struct h264_context *ctx, struct h264_slice *
 			}
 		}
 
-		if ((pps->weighted_pred_flag && (sl->slice_type == H264_SLICE_TYPE_P ||
-						 sl->slice_type == H264_SLICE_TYPE_SP)) ||
-		    (pps->weighted_bipred_idc == 1 &&
-		     sl->slice_type == H264_SLICE_TYPE_B)) {
-			sl->base_pred_weight_table_flag = 0;
-			if (sps->is_svc && !sl->svc.no_inter_layer_pred_flag)
-				sl->base_pred_weight_table_flag = get_bits1(gb);
-			if (!sl->base_pred_weight_table_flag) {
-				if (h264_pred_weight_table(gb, sl))
+		if ((pps->weighted_pred_flag && (sl->slice_type == H264_SLICE_TYPE_P || sl->slice_type == H264_SLICE_TYPE_SP)) ||
+			(pps->weighted_bipred_idc == 1 && sl->slice_type == H264_SLICE_TYPE_B)) {
+			if (h264_pred_weight_table(ctx, sl))
 					return -1;
-			}
 		}
 
 		sl->num_mmcos = 0;
