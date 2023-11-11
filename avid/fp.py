@@ -24,7 +24,7 @@ class AVDFrameParams(ConstructClass):
         for key in keys:
             if key in ignore or key.startswith('_'):
                 continue
-            if "pad" in key: continue
+            if "pad" in key or "zero" in key: continue
 
             str += f"\t\033[0;36m{key.ljust(32)}\033[0m = "
 
