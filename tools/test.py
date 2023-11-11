@@ -4,13 +4,15 @@
 import sys, pathlib
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
+import argparse
 import os
-import numpy as np
 
 from avid.fp import *
 from avid.utils import *
 from avid.h264.decoder import AVDH264Decoder
 from avid.vp9.decoder import AVDVP9Decoder
+from avd_emu import AVDEmulator
+
 from tools.common import *
 
 class AVDUnitTest:
@@ -18,21 +20,28 @@ class AVDUnitTest:
 	# I don't like any of the unit test frameworks
 	# They can't even print simple asserts in hex
 
-	def __init__(self, deccls, stfu=False, verbose=False):
+	def __init__(self, deccls, **kwargs):
 		self.dec = deccls()
 		self.dec.stfu = True
 		self.dec.hal.stfu = True
 		self.fp_keys = []
 		self.pr_keys = []
-		#self.emu = AVDEmulator()
-		self.stfu = stfu
-		self.verbose = verbose
+		self.emu_ignore_keys = []
+		self.args = dotdict(kwargs)
+		if (self.args.debug_mode):
+			self.dec.hal.stfu = False
 
 	def log(self, x, verbose=False):
-		if ((not self.stfu) and ((not verbose) or (verbose and self.verbose))):
-			print(f"[TEST][{self.name}] {x}")
+		if ((not self.args.stfu) and ((not verbose) or (verbose and self.args.verbose))):
+			print(f"[{hl('TST', ANSI_CYAN)}] {x}")
 
-	def diff_fp(self, fp0, fp1, args):
+	def diff_fp_field(self, sl, x0, x1, name):
+		if (x1 == 0): return # they fill out N/A fields
+		if (x0 != x1):
+			print(sl)
+		cassert(x0, x1, name)
+
+	def diff_fp(self, sl, fp0, fp1, args):
 		for cand in self.fp_keys:
 			if (not isinstance(cand, str)):
 				name, count = cand
@@ -44,10 +53,9 @@ class AVDUnitTest:
 				num = len(x0) if not count else count
 				for n in range(num):
 					if (x1[n] == 0): continue  # they fill out N/A fields
-					cassert(x0[n], x1[n], "%s[%d]" % (name, n))
+					self.diff_fp_field(sl, x0[n], x1[n],  "%s[%d]" % (name, n))
 			else:
-				if (x1 == 0): continue
-				cassert(x0, x1, name)
+				self.diff_fp_field(sl, x0, x1,  name)
 
 	def get_paths(self, ident, args):
 		paths = os.listdir(os.path.join(args.prefix, args.dir))
@@ -58,26 +66,88 @@ class AVDUnitTest:
 		self.log(args)
 		return paths, num
 
-	def test_inst(self, args):
-		self.log(hl("Testing inst '%s...'" % (args.dir), None))
+	def test_fp(self, args):
+		self.log(hl("Testing fp '%s...'" % (args.dir), None))
 		paths, num = self.get_paths("frame", args)
 		slices = self.dec.setup(args.input, num=num, do_probs=0)
 		count = 0
 		for i in range(num):
 			path = paths[i]
-			self.log("%03d: %s" % (count, path), verbose=True)
-			sl = slices[i]
-			inst = self.dec.decode(sl)
-			assert(os.path.isfile(path))
+			if (self.args.show_paths):
+				print(path)
 			fp0 = self.dec.fpcls.parse(open(path, "rb").read())
+
+			sl = slices[i]
+			if (self.args.show_headers):
+				print(sl)
+			if (self.args.debug_mode):
+				print(fp0)
+
+			inst = self.dec.decode(sl)
 			fp1 = self.dec.ffp
-			res = self.diff_fp(fp0, fp1, args)
+			res = self.diff_fp(sl, fp0, fp1, args)
 			count += 1
 		self.log(hl(f"Inst test '{args.dir}' ({count} frames) all good", ANSI_GREEN))
 
+	def diff_emu(self, sl, inst0_stream, inst1_stream):
+		l0, l1 = len(inst0_stream), len(inst1_stream)
+		num = min(l0, l1)
+		for n in range(num):
+			x0 = inst0_stream[n]
+			x1 = inst1_stream[n]
+			if ((not self.args.show_all) and (x0 == x1.val)): continue
+
+			s = ""
+			if (self.args.show_index):
+				s += f'[{hl(str(sl.idx).rjust(2), ANSI_CYAN)}]'
+			s += f'[{hl(str(n).rjust(2), ANSI_GREEN)}] '
+
+			if (self.args.show_bits):
+				x0r = bitrepr32(x0)
+				x1r = bitrepr32(x1.val)
+				diff = f'{bitrepr_diff(x0r, x1r)} | {x1.get_disp_name()}'
+				self.log(s + diff)
+			else:
+				x0r = f'{hex(x0).rjust(2+8)}'
+				x1r = f'{hex(x1.val).rjust(2+8)}'
+				if (x0 != x1.val):
+					x0r = hl(x0r, ANSI_RED)
+					x1r = hl(x1r, ANSI_RED)
+				diff = f'{x0r} | {x1r} | {x1.get_disp_name()}'
+				self.log(s + diff)
+
+	def test_emu(self, args):
+		self.dec.hal.stfu = True
+		self.emu = AVDEmulator(args.firmware, stfu=True)
+		self.emu.start()
+		self.log(hl("Testing emu '%s...'" % (args.dir), None))
+		paths, num = self.get_paths("frame", args)
+		slices = self.dec.setup(args.input, num=num, do_probs=0)
+		count = 0
+		for i in range(num):
+			path = paths[i]
+			if (self.args.debug_mode):
+				print()
+			if (self.args.show_paths):
+				print(path)
+			assert(os.path.isfile(path))
+			inst0_stream = self.emu.avd_cm3_cmd_decode(path)
+
+			sl = slices[i]
+			self.log("")
+			if (self.args.show_headers):
+				print(sl)
+			else:
+				self.log("[slice: %d, %s]" % (sl.idx, args.dir))
+
+			inst1_stream = self.dec.decode(sl)
+			self.diff_emu(sl, inst0_stream, inst1_stream)
+			count += 1
+		self.log(hl(f"Emu test '{args.dir}' ({count} frames) all good", ANSI_GREEN))
+
 class AVDH264UnitTest(AVDUnitTest):
-	def __init__(self):
-		super().__init__(AVDH264Decoder)
+	def __init__(self, **kwargs):
+		super().__init__(AVDH264Decoder, **kwargs)
 		self.name = hl("H264", ANSI_BLUE)
 		self.fp_keys = [
 			"hdr_28_height_width_shift3",
@@ -119,8 +189,8 @@ class AVDH264UnitTest(AVDUnitTest):
 		]
 
 class AVDVP9UnitTest(AVDUnitTest):
-	def __init__(self):
-		super().__init__(AVDVP9Decoder)
+	def __init__(self, **kwargs):
+		super().__init__(AVDVP9Decoder, **kwargs)
 		self.name = hl("VP9", ANSI_GREEN)
 		self.fp_keys = [
 			"hdr_28_height_width_shift3",
@@ -182,7 +252,8 @@ class AVDVP9UnitTest(AVDUnitTest):
 			if (pidx > len(paths)):
 				break
 			path = paths[pidx]
-			self.log("%03d: %s" % (count, path), verbose=True)
+			if (self.args.show_paths):
+				print(path)
 			assert(os.path.isfile(path))
 			x0 = open(paths[pidx], "rb").read()[:self.dec.probscls.sizeof()]
 			prx0 = self.dec.probscls.parse(x0)
@@ -201,6 +272,47 @@ class AVDVP9UnitTest(AVDUnitTest):
 						ret |= self.diff_prob_field(sl, a, b, key)
 			if (ret):
 				print(sl)
-			bassert(x0, x1, nonfatal=False)
+			bassert(x0, x1)
 			count += 1
 		self.log(hl(f"Prob test '{args.dir}' ({count} frames) all good", ANSI_GREEN))
+
+if __name__ == "__main__":
+	parser = argparse.ArgumentParser(prog='Unit test')
+	parser.add_argument('-i', '--input', type=str, required=True, help="path to bitstream")
+	parser.add_argument('-d','--dir', type=str, required=True, help="matching trace dir")
+	parser.add_argument('-f', '--firmware', type=str, help="path to firmware (for emutest)")
+	parser.add_argument('-p','--prefix', type=str, default="", help="dir prefix")
+	parser.add_argument('-n', '--num', type=int, default=1, help="count from start")
+	parser.add_argument('-a', '--all', action='store_true', help="run all")
+
+	parser.add_argument('-j', '--test-fp', action='store_true')
+	parser.add_argument('-e', '--test-emu', action='store_true')
+	parser.add_argument('-q', '--test-probs', action='store_true')
+
+	parser.add_argument('-v', '--verbose', action='store_true')
+	parser.add_argument('-x', '--stfu', action='store_true')
+
+	parser.add_argument('-u', '--debug-mode', action='store_true')
+	parser.add_argument('-b', '--show-bits', action='store_true', help="show bits on the side for emu")
+	parser.add_argument('--show-all', action='store_true')
+	parser.add_argument('--show-headers', action='store_true')
+	parser.add_argument('--show-index', action='store_true')
+	parser.add_argument('--show-paths', action='store_true')
+
+	args = parser.parse_args()
+
+	mode = ffprobe(args.input)
+	if  (mode == "h264"):
+		ut = AVDH264UnitTest(**vars(args))
+	elif (mode == "vp09"):
+		ut = AVDVP9UnitTest(**vars(args))
+	else:
+		raise ValueError("Codec %s not supported" % mode)
+
+	if (args.test_fp):
+		ut.test_fp(args)
+	elif (args.test_emu):
+		ut.test_emu(args)
+	if (args.test_probs):
+		import numpy as np
+		ut.test_probs(args)

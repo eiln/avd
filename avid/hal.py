@@ -6,7 +6,7 @@ from collections import namedtuple
 from .utils import *
 
 class AVDInst(namedtuple('AVDInst', ['val', 'name', 'pos', 'idx'])):
-	def __repr__(self):
+	def get_disp_name(self):
 		if  self.name.startswith("hdr"):
 			n = ANSI_PURPLE
 		elif self.name.startswith("slc"):
@@ -19,6 +19,10 @@ class AVDInst(namedtuple('AVDInst', ['val', 'name', 'pos', 'idx'])):
 		disp_name = c + self.name + "\033[0m"
 		if isinstance(self.idx, int):
 			disp_name += f"{c}[\033[0m{self.idx}{c}]\033[0m"
+		return disp_name
+
+	def __repr__(self):
+		disp_name = self.get_disp_name()
 		disp_val = f"{hex(self.val).rjust(2+8)}"
 		disp_idx = f"[{hl(str(self.pos).rjust(2), ANSI_GREEN)}]"
 		return f'{disp_idx} {disp_val} | {disp_name}'

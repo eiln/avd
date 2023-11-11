@@ -109,6 +109,15 @@ def bitrepr(size, bits):
 
 def bitrepr32(x): return bitrepr(4, struct.pack("<I", x))
 
+def bitrepr_diff(x, y):
+	out = []
+	for i in range(32):
+		if (x[i] == y[i]):
+			out.append(hl(x[i], None))
+		else:
+			out.append(hl(x[i], ANSI_RED))
+	return "".join(out)
+
 def bassert(x, y, msg="", nonfatal=False):
     if (x != y):
         if (msg):
