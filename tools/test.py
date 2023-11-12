@@ -159,7 +159,7 @@ class AVDH264UnitTest(AVDUnitTest):
 			"hdr_54_height_width",
 			"hdr_58_const_3a",
 
-			("hdr_9c_pps_tile_addr_lsb8", 4),
+			"hdr_9c_pps_tile_addr_lsb8",
 			"hdr_bc_sps_tile_addr_lsb8",
 
 			"hdr_c0_curr_ref_addr_lsb7",

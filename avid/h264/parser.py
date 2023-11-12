@@ -74,7 +74,7 @@ class AVDH264Parser(AVDParser):
 		]
 		self.slccls = AVDH264Slice
 
-	def parse_payloads(self, path):
+	def parse_payloads(self, path, num=0):
 		buf = open(path, "rb").read()
 		bufpos = 0
 		bytesnum = len(buf)
@@ -88,8 +88,9 @@ class AVDH264Parser(AVDParser):
 		with pipes() as (out, err):
 			nalus = []
 			while (bytesnum > 0):
+				if ((num) and (len(nalus) >= num)) and 0:
+					break
 				self.lib.libh264_decode(handle, buf[bufpos:], bytesnum, ctypes.byref(nal_start), ctypes.byref(nal_end))
-				#print(nal_end.value - nal_start.value, bufpos, bytesnum)
 				payload = buf[bufpos:bufpos+nal_end.value]
 				nalus.append(payload)
 				bufpos += nal_end.value
@@ -99,8 +100,8 @@ class AVDH264Parser(AVDParser):
 		self.lib.libh264_free(handle)
 		return nalus, stdout
 
-	def parse(self, path):
-		payloads, stdout = self.parse_payloads(path)
+	def parse(self, path, num=0):
+		payloads, stdout = self.parse_payloads(path, num=num)
 		units = self.parse_headers(stdout)
 
 		slice_idx = 0

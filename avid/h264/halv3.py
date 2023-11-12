@@ -32,7 +32,7 @@ class AVDH264HalV3(AVDHal):
 		avd_set = self.avd_set
 
 		avd_set(0x4020002, "cm3_dma_config_6")
-		avd_set((ctx.pps_tile_addr + (ctx.pps_tile_size * 4)) >> 8, "pps_tile_addr")
+		avd_set(ctx.pps_tile_addrs[4] >> 8, "hdr_9c_pps_tile_addr_lsb8", 7)
 		avd_set(self.get_sps_tile_iova(ctx, ctx.access_idx) >> 8, "hdr_bc_sps_tile_addr_lsb8")
 
 		avd_set(0x70007, "cm3_dma_config_7")
@@ -60,7 +60,7 @@ class AVDH264HalV3(AVDHal):
 
 		assert((ctx.inst_fifo_idx >= 0) and (ctx.inst_fifo_idx <= ctx.inst_fifo_count))
 		avd_set(0x2b000100 + (ctx.inst_fifo_idx * 0x10), "cm3_cmd_inst_fifo_start")
-		#print("x: 0x%x y: 0x%x" % (avd_r32(0x1104020), avd_r32(0x1104034))) FW BP
+		# ---- FW BP -----
 
 		x = 0x2db012e0
 		if (sl.nal_unit_type == H264_NAL_SLICE_IDR):
@@ -85,15 +85,15 @@ class AVDH264HalV3(AVDHal):
 		avd_set(0x4020002, "cm3_dma_config_1")
 		avd_set(0x20002, "cm3_dma_config_2")
 		avd_set(0x0)
-		avd_set((ctx.pps_tile_addr + (ctx.pps_tile_size * 0)) >> 8, "hdr_9c_pps_tile_addr_lsb8", 0)
-		#print("x: 0x%x y: 0x%x" % (avd_r32(0x1104020), avd_r32(0x1104034))) FW BP
+		avd_set(ctx.pps_tile_addrs[0] >> 8, "hdr_9c_pps_tile_addr_lsb8", 0)
+		# ---- FW BP -----
 
 		avd_set(0x4020002, "cm3_dma_config_3")
 		avd_set(0x4020002, "cm3_dma_config_4")
 		avd_set(0x0)
-		avd_set((ctx.pps_tile_addr + (ctx.pps_tile_size * 1)) >> 8, "hdr_9c_pps_tile_addr_lsb8", 1)
-		avd_set((ctx.pps_tile_addr + (ctx.pps_tile_size * 2)) >> 8, "hdr_9c_pps_tile_addr_lsb8", 2)
-		avd_set((ctx.pps_tile_addr + (ctx.pps_tile_size * 3)) >> 8, "hdr_9c_pps_tile_addr_lsb8", 3)
+		avd_set(ctx.pps_tile_addrs[1] >> 8, "hdr_9c_pps_tile_addr_lsb8", 1)
+		avd_set(ctx.pps_tile_addrs[2] >> 8, "hdr_9c_pps_tile_addr_lsb8", 2)
+		avd_set(ctx.pps_tile_addrs[3] >> 8, "hdr_9c_pps_tile_addr_lsb8", 3)
 		avd_set(0x70007, "cm3_dma_config_5")
 
 		avd_set((sl.pic.addr + self.rvra_offset(ctx, 0)) >> 7, "hdr_c0_curr_ref_addr_lsb7", 0)
@@ -112,7 +112,7 @@ class AVDH264HalV3(AVDHal):
 			self.set_refs(ctx, sl)
 
 		avd_set(0x0)
-		#print("x: 0x%x y: 0x%x" % (avd_r32(0x1104020), avd_r32(0x1104034))) FW BP
+		# ---- FW BP -----
 
 	def set_weights(self, ctx, sl):
 		avd_set = self.avd_set
@@ -162,7 +162,7 @@ class AVDH264HalV3(AVDHal):
 		avd_set(ctx.slice_data_addr + sl.get_payload_offset(), "inp_8b4d4_slice_addr_low")
 		avd_set(sl.get_payload_size(), "inp_8b4d8_slice_hdr_size")
 		avd_set(0x2c000000)
-		#print("x: 0x%x y: 0x%x" % (avd_r32(0x1104020), avd_r32(0x1104034))) FW BP
+		# ---- FW BP -----
 
 		avd_set(0x2d900000 | ((26 + self.get_pps(ctx, sl).pic_init_qp_minus26 + sl.slice_qp_delta) * 0x400), "slc_a70_cmd_slice_qpy")
 		avd_set(0x2da30000, "slc_a74_cmd_a3")

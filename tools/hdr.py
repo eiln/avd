@@ -20,7 +20,7 @@ if __name__ == "__main__":
 	if  (mode == "h264"):
 		from avid.h264.parser import AVDH264Parser
 		parser = AVDH264Parser()
-		sps_list, pps_list, units = parser.parse(path)
+		sps_list, pps_list, units = parser.parse(path, num=args.num)
 		for n in range(len(sps_list)):
 			if (sps_list[n]):
 				print(sps_list[n])

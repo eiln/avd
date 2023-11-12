@@ -7,6 +7,7 @@ def round_down(x, y): return (x - (x % y))
 
 def swrap(x, w): return ((w + x) & ~w)
 
+def isdiv(x, d): return ((x & (d - 1)) == 0)
 def ispow2(x): return (x != 0) and (x & (x - 1) == 0)
 def pow2div(x): return (x & (~(x - 1)))
 
@@ -49,12 +50,13 @@ def hl(x, n=None):
     if (n == None): return x
     return f"\033[1;{n}m{str(x)}\033[0m"
 
-def cassert(x, y, msg=""):
+def cassert(x, y, msg="", fatal=True):
     if (x != y):
         if (msg):
             print(hl(f"[ASSERT] {msg}", ANSI_RED))
         print(hl(f"[ASSERT] {hex(x)} vs. {hex(y)}", ANSI_RED))
-    assert(x == y)
+    if (fatal):
+        assert(x == y)
 
 def dassert(x, y, msg=""):
     if (x != y):

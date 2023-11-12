@@ -63,24 +63,30 @@ class AVDH264Decoder(AVDDecoder):
 
 		width = ((sps.pic_width_in_mbs_minus1 + 1) * 16) - (sps.frame_crop_right_offset * 2) - (sps.frame_crop_left_offset * 2)
 		height = ((2 - sps.frame_mbs_only_flag) * (sps.pic_height_in_map_units_minus1 + 1) * 16) - (sps.frame_crop_bottom_offset * 2) - (sps.frame_crop_top_offset * 2)
-		if ((width == ctx.width) and (height == ctx.height)):
-			return
 
-		self.log("dimensions changed from %dx%d -> %dx%d" % (ctx.width, ctx.height, width, height))
+		ctx.orig_width = width
+		ctx.orig_height = height
+		if (width & 15):
+			width = round_up(width, 16)
+		if (height & 15):
+			height = round_up(height, 16)
+		if ((width != ctx.orig_width) or (height != ctx.orig_height)):
+			self.log("dimensions changed from %dx%d -> %dx%d" % (ctx.width, ctx.height, width, height))
 		ctx.width = width
 		ctx.height = height
+
 		assert((64 <= width and width <= 4096) and (64 <= height and height <= 4096)) # hardware caps
 		assert(not(width & 15) and not(height & 15)) # hardware caps
 		ctx.max_frame_num = 1 << (sps.log2_max_frame_num_minus4 + 4)
 
-		width_mbs = (ctx.width + 15) // 16
-		height_mbs = (ctx.height + 15) // 16
+		width_mbs = (ctx.orig_width + 15) // 16
+		height_mbs = (ctx.orig_height + 15) // 16
 		assert(width_mbs == (sps.pic_width_in_mbs_minus1 + 1))
 		assert(height_mbs == (sps.pic_height_in_map_units_minus1 + 1))
 
 		level = [level for level in h264_levels if level[1] == sps.level_idc][0]
 		ctx.max_dpb_frames = min((level[5]) // (width_mbs * height_mbs), 16) # max_dpb_mbs
-		#assert((width_mbs * height_mbs) <= level[4]) # MaxFS
+		assert((width_mbs * height_mbs) <= level[4]) # MaxFS
 		assert(width_mbs <= sqrt(level[4] * 8))
 		assert(height_mbs <= sqrt(level[4] * 8))
 		ctx.cur_sps_id = sps_id
@@ -88,9 +94,11 @@ class AVDH264Decoder(AVDDecoder):
 
 	def allocate(self):
 		ctx = self.ctx
-		sps = ctx.sps_list[ctx.cur_sps_id]
 		# matching macOS allocations makes for easy diffs
 		# see tools/dims264.py experiment
+		sps = ctx.sps_list[ctx.cur_sps_id]
+		assert((sps.chroma_format_idc == H264_CHROMA_IDC_420) or
+		       (sps.chroma_format_idc == H264_CHROMA_IDC_422))
 
 		# constants
 		ctx.inst_fifo_iova = 0x4000
@@ -100,66 +108,65 @@ class AVDH264Decoder(AVDDecoder):
 		ctx.sps_tile_count = 24  # again, nothing to do with sps; just a name for work buf group 2
 		ctx.rvra0_addr = 0x734000
 
-		assert((sps.chroma_format_idc == H264_CHROMA_IDC_420) or (sps.chroma_format_idc == H264_CHROMA_IDC_422))
+		ws = round_up(ctx.width, 32)
+		hs = round_up(ctx.height, 32)
+		ctx.rvra_size0 = (ws * hs) + ((ws * hs) // 4) # 1. luma padded to stride 32, 4x4
+		ctx.rvra_size2 = ctx.rvra_size0  # 2. chroma, 422
+		if (sps.chroma_format_idc == H264_CHROMA_IDC_420):
+			ctx.rvra_size2 //= 2
 
+		# 3. luma weights, likely
+		ctx.rvra_size1 = ((nextpow2(ctx.height) // 32) * nextpow2(ctx.width))
+		# 4. chroma weights, likely. can't figure this one out, sorry guys
 		if (ctx.width == 128 and ctx.height == 64):
-			ctx.slice_data_size = 0x8000
-			ctx.sps_tile_size = 0x8000
-			ctx.rvra_total_size = 0x8000
+			ctx.rvra_size3 = 0x4300
 			if (sps.chroma_format_idc == H264_CHROMA_IDC_422):
-				ctx.rvra_total_size = 0xc000
+				ctx.rvra_size3 = 0x6f00
 		elif (ctx.width == 1024 and ctx.height == 512):
-			ctx.slice_data_size = 0x44000
-			ctx.sps_tile_size = 0x24000
-			ctx.rvra_total_size = 0xfc000
-		else:
-			# worst case, oops
-			ctx.slice_data_size = 0x10000  # this is so trivial but I can't figure it out
-			#dims.sps_tile_size = 0x4000 * ((clog2(dims.width) - 6) * (clog2(dims.height) - 6))
-			ctx.sps_tile_size = 0x40000
-			ctx.rvra_total_size = 0x1000000
+			ctx.rvra_size3 = 0x8000
+		elif (ctx.width == 1920 and ctx.height == 1088):
+			ctx.rvra_size3 = 0xfc00
+		elif (ctx.width == 3840 and ctx.height == 2160):
+			ctx.rvra_size3 = 0x27000
+		else:   # worst case, oops
+			ctx.rvra_size3 = 0x40000
+
+		ctx.rvra_total_size = ctx.rvra_size0 + ctx.rvra_size1 + ctx.rvra_size2 + ctx.rvra_size3
+		ctx.rvra_count = ctx.max_dpb_frames + 1 + 1  # all refs + IDR + current
 
 		ctx.y_addr = ctx.rvra0_addr + ctx.rvra_total_size + 0x100
 
-		# Pixel/disp buf != buf stored in DPB as reference.
-		# Refs are tiled/scaled smaller than the orig. They call it "rvra scaler buffer".
-		# Searching "rvra" "scaler" "apple" led to US10045089B2,
-		# "video resolution adaptation (VRA), reference VRA (RVRA)" which answers little
-		scale = min(pow2div(ctx.height), pow2div(ctx.width))
-		if (scale >= 32):
-			luma_size = ctx.height * ctx.width
-		else:   # scale to 64 if it's <32, but leave it if it's >=32 (?)
-			luma_size = round_up(ctx.width, 64) * round_up(ctx.height, 64)
+		if (not(isdiv(ctx.width, 32))):
+			wr = round_up(ctx.width, 64)
+		else:
+			wr = ctx.width
+		luma_size = wr * ctx.height
 		ctx.uv_addr = ctx.y_addr + luma_size
 
-		scale = min(pow2div(ctx.height), pow2div(ctx.width))
-		if (scale >= 32):
-			if (sps.chroma_format_idc == H264_CHROMA_IDC_420):
-				chroma_size = ctx.height * ctx.width // 2
-			elif (sps.chroma_format_idc == H264_CHROMA_IDC_422):
-				chroma_size = ctx.height * ctx.width
-		else:
-			if (sps.chroma_format_idc == H264_CHROMA_IDC_420):
-				chroma_size = round_up(ctx.height * ctx.width // 2, 0x4000)
-			elif (sps.chroma_format_idc == H264_CHROMA_IDC_422):
-				chroma_size = round_up(ctx.height * ctx.width, 0x4000)
+		chroma_size = wr * ctx.height
+		if (sps.chroma_format_idc == H264_CHROMA_IDC_420):
+			chroma_size //= 2
 		ctx.slice_data_addr = round_up(ctx.uv_addr + chroma_size, 0x4000) + 0x4000
 
+		ctx.slice_data_size = min((((ws - 1) * (hs - 1) // 0x8000) + 2), 0xff) * 0x4000
 		ctx.sps_tile_addr = ctx.slice_data_addr + ctx.slice_data_size
-		ctx.pps_tile_addr = ctx.sps_tile_addr + (ctx.sps_tile_size * ctx.sps_tile_count)
-		ctx.rvra1_addr = ctx.pps_tile_addr + (ctx.pps_tile_size * ctx.pps_tile_count)
+		ctx.sps_tile_size = (((ctx.width - 1) * (ctx.height - 1) // 0x10000) + 2) * 0x4000
 
-		ctx.rvra_size0 = (round_up(ctx.height, 32) * round_up(ctx.width, 32)) + ((round_up(ctx.height, 32) * round_up(ctx.width, 32)) // 4)
-		if (sps.chroma_format_idc == H264_CHROMA_IDC_420):
-			ctx.rvra_size2 = ctx.rvra_size0 // 2
-		else:
-			ctx.rvra_size2 = ctx.rvra_size0
-		ctx.rvra_size1 = ((nextpow2(ctx.height) // 32) * nextpow2(ctx.width))
-		ctx.rvra_size3 = ctx.rvra_total_size - ctx.rvra_size2 - ctx.rvra_size1 - ctx.rvra_size0
-		ctx.rvra_count = ctx.max_dpb_frames + 1 + 1
+		pps_tile_addrs = [0] * ctx.pps_tile_count
+		pps_tile_base_addr = ctx.sps_tile_addr + (ctx.sps_tile_size * ctx.sps_tile_count)
+		addr = pps_tile_base_addr
+		for n in range(ctx.pps_tile_count):
+			pps_tile_addrs[n] = addr
+			if (n == 2) and (sps.level_idc >= 50): # literally fuck OFF
+				offset = 0xc000
+			else:
+				offset = 0x8000
+			addr += offset
+		ctx.pps_tile_addrs = pps_tile_addrs
+		ctx.rvra1_addr = addr
 
-	def setup(self, path, **kwargs):
-		sps_list, pps_list, slices = self.parser.parse(path)
+	def setup(self, path, num=0, **kwargs):
+		sps_list, pps_list, slices = self.parser.parse(path, num=num)
 		self.new_context(sps_list, pps_list)
 		# realistically we'd have the height/width as metadata w/o relying on sps
 		self.refresh(slices[0])
@@ -255,7 +262,7 @@ class AVDH264Decoder(AVDDecoder):
 			ctx.rvra_pool_count += 1
 		elif (sl.nal_unit_type == H264_NAL_SLICE_IDR):
 			pool = ctx.unused_refs + ctx.dpb_list # gather refs
-			cand = sorted(pool, key=lambda x: x.poc)[0]
+			cand = sorted(ctx.unused_refs, key=lambda x: x.poc)[0]
 			index = cand.idx
 			pool = [x for x in pool if x != cand]
 			ctx.drain_list = sorted(pool, key=lambda x:x.poc)
