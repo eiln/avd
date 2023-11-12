@@ -43,17 +43,15 @@ https://github.com/eiln/avd/assets/113484710/e7ab13fb-6472-47bf-93d3-1dbfb266799
 
 - What works:
 	- High Profile (100) i.e. 8-bit 4:2:0 I/P/B (i.e. normal x264 output)
-	- .. Almost
+	- Up to hardware cap of 4096x4096 (that includes 4K)
 
 - Works in macOS but not in mine:
-	- Long term references. This is mainly blocked by my parser/decoder impl
-	- div16/div32 height/width works but the display buffer gets tiled/scaled weirdly. WIP
+	- Long term references. This is mainly blocked by my RLM impl
 	- frame_num gaps
 	- Scaling lists
-	- 4:2:2
+	- 4:2:2 (just few quirks left)
 
 - Don't know if it works in macOS:
-	- 4:4:4, 4:0:0 (monochrome)
 	- Bitdepth > 8-bit
 	- Top/bottom field coding (x264 doesn't support)
 	- Display formats other than NV12
