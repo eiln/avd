@@ -31,14 +31,14 @@ class AVDH264HalV3(AVDHal):
 	def set_refs(self, ctx, sl):
 		avd_set = self.avd_set
 
-		avd_set(0x4020002, "fw_dma_config_6")
+		avd_set(0x4020002, "cm3_dma_config_6")
 		avd_set((ctx.pps_tile_addr + (ctx.pps_tile_size * 4)) >> 8, "pps_tile_addr")
 		avd_set(self.get_sps_tile_iova(ctx, ctx.access_idx) >> 8, "hdr_bc_sps_tile_addr_lsb8")
 
-		avd_set(0x70007, "fw_dma_config_7")
-		avd_set(0x70007, "fw_dma_config_8")
-		avd_set(0x70007, "fw_dma_config_9")
-		avd_set(0x70007, "fw_dma_config_a")
+		avd_set(0x70007, "cm3_dma_config_7")
+		avd_set(0x70007, "cm3_dma_config_8")
+		avd_set(0x70007, "cm3_dma_config_9")
+		avd_set(0x70007, "cm3_dma_config_a")
 
 		pred = sl.pic.poc
 		for n,rvra in enumerate(ctx.dpb_list):
@@ -59,7 +59,7 @@ class AVDH264HalV3(AVDHal):
 		avd_set = self.avd_set
 
 		assert((ctx.inst_fifo_idx >= 0) and (ctx.inst_fifo_idx <= ctx.inst_fifo_count))
-		avd_set(0x2b000100 + (ctx.inst_fifo_idx * 0x10), "fw_cmd_inst_fifo_start")
+		avd_set(0x2b000100 + (ctx.inst_fifo_idx * 0x10), "cm3_cmd_inst_fifo_start")
 		#print("x: 0x%x y: 0x%x" % (avd_r32(0x1104020), avd_r32(0x1104034))) FW BP
 
 		x = 0x2db012e0
@@ -69,7 +69,7 @@ class AVDH264HalV3(AVDHal):
 
 		avd_set(0x1000000, "hdr_38_pixfmt")
 		avd_set((((ctx.height - 1) & 0xffff) << 16) | ((ctx.width - 1) & 0xffff), "hdr_3c_height_width")
-		avd_set(0x0, "fw_dma_config_0")
+		avd_set(0x0, "cm3_dma_config_0")
 		avd_set((((ctx.height - 1) >> 3) << 16) | ((ctx.width - 1) >> 3), "hdr_28_height_width_shift3")
 
 		x = 0x1000000 * self.get_sps(ctx, sl).chroma_format_idc | 0x2881
@@ -82,19 +82,19 @@ class AVDH264HalV3(AVDHal):
 
 		avd_set(0x3de, "hdr_48_3de")
 		avd_set(0x30000a, "hdr_58_const_3a")
-		avd_set(0x4020002, "fw_dma_config_1")
-		avd_set(0x20002, "fw_dma_config_2")
+		avd_set(0x4020002, "cm3_dma_config_1")
+		avd_set(0x20002, "cm3_dma_config_2")
 		avd_set(0x0)
 		avd_set((ctx.pps_tile_addr + (ctx.pps_tile_size * 0)) >> 8, "hdr_9c_pps_tile_addr_lsb8", 0)
 		#print("x: 0x%x y: 0x%x" % (avd_r32(0x1104020), avd_r32(0x1104034))) FW BP
 
-		avd_set(0x4020002, "fw_dma_config_3")
-		avd_set(0x4020002, "fw_dma_config_4")
+		avd_set(0x4020002, "cm3_dma_config_3")
+		avd_set(0x4020002, "cm3_dma_config_4")
 		avd_set(0x0)
 		avd_set((ctx.pps_tile_addr + (ctx.pps_tile_size * 1)) >> 8, "hdr_9c_pps_tile_addr_lsb8", 1)
 		avd_set((ctx.pps_tile_addr + (ctx.pps_tile_size * 2)) >> 8, "hdr_9c_pps_tile_addr_lsb8", 2)
 		avd_set((ctx.pps_tile_addr + (ctx.pps_tile_size * 3)) >> 8, "hdr_9c_pps_tile_addr_lsb8", 3)
-		avd_set(0x70007, "fw_dma_config_5")
+		avd_set(0x70007, "cm3_dma_config_5")
 
 		avd_set((sl.pic.addr + self.rvra_offset(ctx, 0)) >> 7, "hdr_c0_curr_ref_addr_lsb7", 0)
 		avd_set((sl.pic.addr + self.rvra_offset(ctx, 1)) >> 7, "hdr_c0_curr_ref_addr_lsb7", 1)
@@ -182,7 +182,7 @@ class AVDH264HalV3(AVDHal):
 			self.set_weights(ctx, sl)
 
 		avd_set(0x2a000000)
-		avd_set((((ctx.height - 1) >> 4) << 12) | ((ctx.width - 1) >> 4), "fw_height_width_shift_4")
+		avd_set((((ctx.height - 1) >> 4) << 12) | ((ctx.width - 1) >> 4), "cm3_height_width_shift_4")
 
 		x = 0x2d000000
 		if   (sl.slice_type == H264_SLICE_TYPE_I):
@@ -205,7 +205,7 @@ class AVDH264HalV3(AVDHal):
 			n = ctx.last_p_sps_tile_idx + sl.num_ref_idx_l1_active_minus1
 			avd_set(self.get_sps_tile_iova(ctx, n) >> 8, "sps_tile_addr_b")
 
-		avd_set(0x2b000400, "fw_cmd_inst_fifo_end")
+		avd_set(0x2b000400, "cm3_cmd_inst_fifo_end")
 
 	def set_insn(self, ctx, sl):
 		self.set_header(ctx, sl)

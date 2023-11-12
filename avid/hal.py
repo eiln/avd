@@ -11,7 +11,7 @@ class AVDInst(namedtuple('AVDInst', ['val', 'name', 'pos', 'idx'])):
 			n = ANSI_CYAN
 		elif  self.name.startswith("hdr"):
 			n = ANSI_PURPLE
-		elif self.name.startswith("fw"):
+		elif self.name.startswith("cm3"):
 			n = ANSI_YELLOW
 		else:
 			n = ANSI_WHITE
