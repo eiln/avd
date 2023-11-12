@@ -10,21 +10,22 @@ import numpy as np
 np.set_printoptions(formatter={'int':lambda x: "0x%06x" % (x)})
 
 import struct
+from tools.common import resolve_input
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(prog='macOS frame_params parser')
 	group = parser.add_mutually_exclusive_group(required=True)
 	group.add_argument('-i', '--input', type=str, help="path to frame_params")
-	group.add_argument('-d','--dir', type=str, help="frame_params dir name")
-	parser.add_argument('-p','--prefix', type=str, default="", help="dir prefix")
+	group.add_argument('-d','--dir', type=str, help="trace dir name")
 	parser.add_argument('-s', '--start', type=int, default=0, help="starting index")
 	parser.add_argument('-n', '--num', type=int, default=1, help="count from start")
 	parser.add_argument('-a', '--all', action='store_true', help="run all")
 	args = parser.parse_args()
 
-	if args.dir:
-		paths = os.listdir(os.path.join(args.prefix, args.dir))
-		paths = sorted([os.path.join(args.prefix, args.dir, path) for path in paths if "param" in path or "frame" in path])
+	if (args.dir):
+		dirname = resolve_input(args.dir, isdir=True)
+		paths = os.listdir(dirname)
+		paths = sorted([os.path.join(dirname, path) for path in paths if "frame" in path])
 		paths = paths if args.all else paths[args.start:args.start+args.num]
 	else:
 		paths = [args.input]
@@ -42,11 +43,10 @@ if __name__ == "__main__":
 
 	out = []
 	for i,path in enumerate(paths):
+		print(path)
 		params = open(path, "rb").read()
 		fp = fpcls.parse(params)
 		print(fp)
-		#print("="*80)
-		#print()
 		#out.append((fp.hdr.hdr_48_incr_addr, fp.hdr.hdr_4c_incr_size))
 	#out = np.array(out) # useful for finding regressions
 	#print(out)

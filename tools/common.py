@@ -4,7 +4,10 @@
 import sys, pathlib
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
+import os
 import struct
+from pathlib import Path
+
 from avid.utils import *
 
 def hexdump(s, sep=" "): return sep.join(["%02x"%x for x in s])
@@ -127,15 +130,40 @@ def bassert(x, y, msg="", nonfatal=False):
     if (not nonfatal):
         assert(x == y)
 
+def getext(mode):
+    if (mode in ["vp9", "vp09", "av1", "av01"]): return ".ivf"
+    if (mode in ["h264", "avc"]): return ".h264"
+    if (mode in ["h265", "hevc"]): return ".h265"
+
+def mode2fourcc(mode):
+    if (mode in ["h264", "avc"]): return "h264"
+    if (mode in ["h264", "hevc"]): return "h265"
+    if (mode in ["vp9", "vp09"]): return "vp09"
+    if (mode in ["av1", "av01"]): return "av01"
+
 def ffprobe(path):
-	import os
-	fname, ext = os.path.splitext(path)
-	if ext in [".h264", ".264"]:
-		return "h264"
-	if ext in [".h265", ".265"]:
-		return "h265"
-	if ext in [".ivf", "ivp9"]:
-		from avid.vp9.parser import IVFDemuxer
-		dmx = IVFDemuxer()
-		return dmx.read_mode(path)
-	raise ValueError("unsupported format (%s)" % (ext))
+    fname, ext = os.path.splitext(path)
+    if (not ext): # dir
+        mode = os.path.split(os.path.split(path)[0])[1]
+        return mode2fourcc(mode)
+    if ext in [".h264", ".264"]: return "h264"
+    if ext in [".h265", ".265"]: return "h265"
+    if ext in [".ivf"]:
+        from avid.vp9.parser import IVFDemuxer
+        dmx = IVFDemuxer()
+        return dmx.read_mode(path)
+    raise ValueError("unsupported format (%s)" % (ext))
+
+def resolve_datadir(path):
+    if (not Path(path).exists()):
+        return (Path(__file__).parent / ('../data/%s' % (path))).resolve()
+    return path
+
+def resolve_input(path, isdir=False):
+    path = resolve_datadir(path)
+    if (isdir): return path
+    if (not Path(path).exists()) or (os.path.isdir(path)):
+        mode = os.path.split(os.path.split(path)[0])[1]
+        ext = getext(mode)
+        return path.as_posix() + ext
+    return path

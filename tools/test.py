@@ -29,6 +29,7 @@ class AVDUnitTest:
 		self.emu_ignore_keys = []
 		self.args = dotdict(kwargs)
 		if (self.args.debug_mode):
+			self.dec.stfu = False
 			self.dec.hal.stfu = False
 
 	def log(self, x, verbose=False):
@@ -67,7 +68,7 @@ class AVDUnitTest:
 		return paths, num
 
 	def test_fp(self, args):
-		self.log(hl("Testing fp '%s...'" % (args.dir), None))
+		self.log(hl("Testing fp '%s'..." % (args.dir), None))
 		paths, num = self.get_paths("frame", args)
 		slices = self.dec.setup(args.input, num=num, do_probs=0)
 		count = 0
@@ -96,7 +97,7 @@ class AVDUnitTest:
 			x0 = inst0_stream[n]
 			x1 = inst1_stream[n]
 			if ((not self.args.show_all) and (x0 == x1.val)): continue
-			if (x1.name in self.emu_ignore_keys): continue
+			if (not self.args.debug_mode and x1.name in self.emu_ignore_keys): continue
 
 			s = ""
 			if (self.args.show_index):
@@ -121,14 +122,12 @@ class AVDUnitTest:
 		self.dec.hal.stfu = True
 		self.emu = AVDEmulator(args.firmware, stfu=True)
 		self.emu.start()
-		self.log(hl("Testing emu '%s...'" % (args.dir), None))
+		self.log(hl("Testing emu '%s'..." % (args.dir), None))
 		paths, num = self.get_paths("frame", args)
 		slices = self.dec.setup(args.input, num=num, do_probs=0)
 		count = 0
 		for i in range(num):
 			path = paths[i]
-			if (self.args.debug_mode):
-				print()
 			if (self.args.show_paths):
 				print(path)
 			assert(os.path.isfile(path))
@@ -140,6 +139,8 @@ class AVDUnitTest:
 
 			inst1_stream = self.dec.decode(sl)
 			self.diff_emu(sl, inst0_stream, inst1_stream)
+			if (self.args.debug_mode):
+				print()
 			count += 1
 		self.log(hl(f"Emu test '{args.dir}' ({count} frames) all good", ANSI_GREEN))
 
@@ -246,7 +247,7 @@ class AVDVP9UnitTest(AVDUnitTest):
 
 	def test_probs(self, args):
 		assert(self.dec.probscls)
-		self.log(hl("Testing probs %s..." % (args.dir), None))
+		self.log(hl("Testing probs '%s'..." % (args.dir), None))
 		paths, num = self.get_paths("probs", args)
 		slices = self.dec.setup(args.input, num=num, do_probs=1)
 
@@ -284,30 +285,31 @@ class AVDVP9UnitTest(AVDUnitTest):
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(prog='Unit test')
-	parser.add_argument('-i', '--input', type=str, required=True, help="path to bitstream")
-	parser.add_argument('-d','--dir', type=str, required=True, help="matching trace dir")
-	parser.add_argument('-f', '--firmware', type=str, help="path to firmware (for emutest)")
-	parser.add_argument('-p','--prefix', type=str, default="", help="dir prefix")
+	parser.add_argument('-i', '--input', type=str, default="", help="path to bitstream")
+	parser.add_argument('-d', '--dir', type=str, required=True, help="matching trace dir")
+	parser.add_argument('-f', '--firmware', type=str, default="j293ap-13.5-viola-firmware.bin")
+	parser.add_argument('-p', '--prefix', type=str, default="",  help="dir prefix")
 	parser.add_argument('-n', '--num', type=int, default=1, help="count from start")
 	parser.add_argument('-a', '--all', action='store_true', help="run all")
+	parser.add_argument('-v', '--verbose', action='store_true')
+	parser.add_argument('-x', '--stfu', action='store_true')
 
 	parser.add_argument('-j', '--test-fp', action='store_true')
 	parser.add_argument('-e', '--test-emu', action='store_true')
 	parser.add_argument('-q', '--test-probs', action='store_true')
 
-	parser.add_argument('-v', '--verbose', action='store_true')
-	parser.add_argument('-x', '--stfu', action='store_true')
-
 	parser.add_argument('-u', '--debug-mode', action='store_true')
-	parser.add_argument('-b', '--show-bits', action='store_true', help="show bits on the side for emu")
+	parser.add_argument('-b', '--show-bits', action='store_true')
 	parser.add_argument('--show-all', action='store_true')
 	parser.add_argument('--show-headers', action='store_true')
 	parser.add_argument('--show-index', action='store_true')
 	parser.add_argument('--show-paths', action='store_true')
 
 	args = parser.parse_args()
-
-	mode = ffprobe(args.input)
+	args.firmware = resolve_input(args.firmware)
+	args.dir = resolve_input(args.dir, isdir=True)
+	args.input = resolve_input(args.dir)
+	mode = ffprobe(args.dir)
 	if  (mode == "h264"):
 		ut = AVDH264UnitTest(**vars(args))
 	elif (mode == "vp09"):
@@ -317,7 +319,7 @@ if __name__ == "__main__":
 
 	if (args.test_fp):
 		ut.test_fp(args)
-	elif (args.test_emu):
+	if (args.test_emu):
 		ut.test_emu(args)
 	if (args.test_probs):
 		import numpy as np

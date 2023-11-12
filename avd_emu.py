@@ -554,13 +554,13 @@ class AVDEmulator:
 		return self.inst_stream
 
 if __name__ == "__main__":
-	parser = argparse.ArgumentParser(prog='CM3 Firmware Emulator')
-	parser.add_argument('firmware', type=str, help="path to firmware")
+	parser = argparse.ArgumentParser(prog='AVD CM3 Firmware Emulator')
+	parser.add_argument('-f', '--firmware', type=str, required=True, help="path to firmware")
 
 	group = parser.add_mutually_exclusive_group(required=True)
-	group.add_argument('-f', '--path', type=str, help="path to frame_params")
+	group.add_argument('-i', '--path', type=str, help="path to frame_params")
 	group.add_argument('-d','--dir', type=str, help="frame_params trace directory")
-	parser.add_argument('-p','--prefix', type=str, default="", help="directory prefix")
+	parser.add_argument('-p','--prefix', type=str, default="data", help="directory prefix")
 	parser.add_argument('-s', '--start', type=int, default=0, help="start index")
 	parser.add_argument('-n', '--num', type=int, default=1, help="count from start")
 	parser.add_argument('-a', '--all', action='store_true', help="emulate all in dir")
@@ -578,7 +578,7 @@ if __name__ == "__main__":
 	emu = AVDEmulator(**vars(args))
 	emu.start()
 
-	if args.dir:
+	if (args.dir):
 		paths = os.listdir(os.path.join(args.prefix, args.dir))
 		paths = sorted([os.path.join(args.prefix, args.dir, path) for path in paths if "param" in path or "frame" in path])
 		paths = paths if args.all else paths[args.start:args.start+args.num]
