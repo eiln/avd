@@ -105,6 +105,21 @@ class AVDVP9V3DumbFuckingWasteOfMemory(AVDFrameParams):
 	def __init__(self):
 		super().__init__()
 
+class AVDVP9V3TileAddr(AVDFrameParams):
+	subcon = Struct(
+		"til_ab4_tile_addr_low" / u32,
+		"til_ab8_tile_size" / u32,
+		"til_abc_tile_partition" / u32,
+		"til_ac0_tile_dims" / u32,
+		"til_ac4_pio_addr" / u32,
+		"til_ac8_index" / u32,
+		"til_acc_dims" / u32,
+		"til_ad0_40004" / u32,
+		"til_ad4_zero" / ExprValidator(u32, obj_ == 0x0),
+	)
+	def __init__(self):
+		super().__init__()
+
 class AVDVP9V3Tiles(AVDFrameParams):
 	subcon = Struct(
 		"til_2a4_0" / Array(2, u32),
@@ -121,14 +136,8 @@ class AVDVP9V3Tiles(AVDFrameParams):
 		"til_aac_zero" / ExprValidator(u32, obj_ == 0x0),
 		"til_ab0_40005" / ExprValidator(u32, obj_ == 0x40005),
 		"til_ab4_zero" / ExprValidator(u32, obj_ == 0x0),
-		"til_ab4_0" / Array(9, u32),
-		"til_ab4_1" / Array(9, u32),
-		"til_ab4_2" / Array(9, u32),
-		"til_ab4_3" / Array(9, u32),
-		"til_ab4_4" / Array(9, u32),
-		"til_ab4_5" / Array(9, u32),
-		"til_ab4_6" / Array(9, u32),
-		"til_ab4_7" / Array(9, u32),
+		"til_ab4_tiles" / AVDVP9V3TileAddr,
+		"til_abc_tiles" / AVDVP9V3TileAddr,
 	)
 	def __init__(self):
 		super().__init__()
@@ -136,7 +145,6 @@ class AVDVP9V3Tiles(AVDFrameParams):
 class AVDVP9V3FakeFrameParams(AVDFakeFrameParams):
 	def __init__(self):
 		super().__init__()
-		self.keynames = ["hdr", "slc"]
 
 	@classmethod
 	def new(cls):

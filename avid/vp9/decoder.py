@@ -9,10 +9,16 @@ from .halv3 import AVDVP9HalV3
 from .parser import AVDVP9Parser
 from .probs import AVDVP9Probs
 from .types import *
+import struct
+from collections import namedtuple
 from copy import deepcopy
 
 class AVDVP9Ctx(dotdict):
 	pass
+
+class AVDVP9Tile(namedtuple('AVDVP9Tile', ['row', 'col', 'size', 'offset'])):
+	def __repr__(self):
+		return f"[tile: row: {self.row} col: {self.col} size: {hex(self.size).rjust(4+2)} offset: {hex(self.offset).rjust(4+2)}]"
 
 class AVDVP9Decoder(AVDDecoder):
 	def __init__(self):
@@ -144,12 +150,35 @@ class AVDVP9Decoder(AVDDecoder):
 
 		ctx.curr_rvra_addrs = rvra_addrs
 
+	def read_tiles(self):
+		ctx = self.ctx; sl = self.ctx.active_sl
+		header_size = sl.compressed_header_size + sl.uncompressed_header_size
+		num_tile_rows = 1 << sl.tile_rows_log2
+		num_tile_cols = 1 << sl.tile_cols_log2
+		data = sl.frame.payload
+		size = sl.frame.size - header_size
+		offset = header_size
+		tiles = []
+		for tile_row in range(num_tile_rows):
+			for tile_col in range(num_tile_cols):
+				if ((tile_col == num_tile_cols - 1) and (tile_row == num_tile_rows - 1)):
+					tile_size = size
+				else:
+					tile_size = struct.unpack(">I", data[offset:offset+4])[0]
+					offset += 4
+					size -= 4
+				tile = AVDVP9Tile(tile_row, tile_col, tile_size, offset)
+				tiles.append(tile)
+				offset += tile_size
+				size -= tile_size
+		sl.tiles = tiles
+
 	def init_slice(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
 		if (sl.frame_type == VP9_FRAME_TYPE_KEY):
 			ctx.kidx = 0
-
 		self.refresh(sl)
+		self.read_tiles()
 		self.calc_curr_rvra()
 
 	def finish_slice(self):

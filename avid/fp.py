@@ -17,7 +17,7 @@ class AVDFrameParams(ConstructClass):
         super().__init__()
 
     def __str__(self, ignore=[], other=None, show_all=False) -> str:
-        str = "  \033[1;37m" + self.__class__.__name__ + ":\033[0m\n"
+        s = "  \033[1;37m" + self.__class__.__name__ + ":\033[0m\n"
 
         keys = list(self)
         keys.sort(key = lambda x: self._off.get(x, (-1, 0))[0])
@@ -26,7 +26,7 @@ class AVDFrameParams(ConstructClass):
                 continue
             if "pad" in key or "zero" in key: continue
 
-            str += f"\t\033[0;36m{key.ljust(32)}\033[0m = "
+            sk = f"\t\033[0;36m{key.ljust(32)}\033[0m = "
 
             v = getattr(self, key)
             if isinstance(v, stringtypes):
@@ -51,9 +51,10 @@ class AVDFrameParams(ConstructClass):
                     tmp.append(t)
                 val_repr = "\n".join(tmp)
             else:
+                s += "\n" + str(v).strip() + "\n"
                 continue
-            str += val_repr + "\n"
-        return str + "\n"
+            s += sk + val_repr + "\n"
+        return s + "\n"
 
 class AVDV3PiodmaHeader(AVDFrameParams):
 	subcon = Struct(

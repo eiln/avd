@@ -231,6 +231,7 @@ class AVDVP9UnitTest(AVDUnitTest):
 				"intra_inter", "comp_inter", "single_ref",
 				"comp_ref", "y_mode", "uv_mode", "partition",
 				"mv_joint"]
+		self.emu_ignore_keys = ["hdr_168_y_addr_lsb8", "hdr_16c_uv_addr_lsb8"]
 
 	def diff_prob_field(self, sl, a, b, key):
 		if (not np.array_equal(a, b)):

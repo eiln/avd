@@ -70,7 +70,8 @@ class AVDVP9Slice(AVDSlice):
 	def __init__(self):
 		super().__init__()
 		self.mode = "vp09"
-		self._banned_keys = ["idx", "frame", "probs", "probs_data"]
+		self._banned_keys = ["idx", "frame", "probs", "probs_data", "tiles"]
+		self.tiles = []
 
 	def show_slice_header(self):
 		return "\n[slice: %d key_frame: %d size: %d]\n" % (self.idx, not self.frame_type, self.frame.size)

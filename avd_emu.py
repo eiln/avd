@@ -178,6 +178,12 @@ class AVDEmulator:
 		cmd[18] = fifo1_iova + 0x6c8
 		return struct.pack("<" + "I"*(len(cmd)), *cmd)
 
+	def vp9_get_tile_count(self, frame_params):
+		start, end = 0x2a0, 0xaa0
+		up = struct.unpack("<%dI" % ((end - start) // 4), frame_params[start:end])
+		tile_count = len([x for x in up if x != 0])
+		return tile_count
+
 	def set_params_vp9(self, frame_params):
 		fifo1_idx = self.set_dart1_space(frame_params, 0x209ef15)
 		fifo1_iova = 0x4000 + (AVD_DART1_FIFO_WIDTH * fifo1_idx)
@@ -195,7 +201,7 @@ class AVDEmulator:
 		cmd[ 4] = 0x3
 		cmd[ 5] = 0x108ef38 + (AVD_CM3_FIFO_WIDTH * (fifo1_idx % AVD_CM3_FIFO_COUNT))
 		cmd[ 6] = 0x108ef40 + (AVD_CM3_FIFO_WIDTH * (fifo1_idx % AVD_CM3_FIFO_COUNT))
-		cmd[ 7] = 0x1
+		cmd[ 7] = self.vp9_get_tile_count(frame_params)
 		cmd[ 8] = fifo1_iova + 0xaa4
 		cmd[ 9] = 0x108efb8 + (AVD_CM3_FIFO_WIDTH * (fifo1_idx % AVD_CM3_FIFO_COUNT))
 		cmd[10] = 0x108f088 + (AVD_CM3_FIFO_WIDTH * (fifo1_idx % AVD_CM3_FIFO_COUNT))
@@ -396,11 +402,20 @@ class AVDEmulator:
 			print(s)
 		self.inst_stream.append(val)
 
+	def save_decode_command(self, addr, val):
+		if (self.inst_only):
+			disp_name = "decode command"
+			s = "[EMU] %s" % (f'[{self.hl(str(len(self.inst_stream)).rjust(2))}] {hex(val).rjust(2+8)} | {disp_name}')
+			print(s)
+
 	def w_4010400c(self, addr, val): # 0x4010400c: H264 inst FIFO
 		self.save_inst(addr, val)
 
 	def w_40104010(self, addr, val): # 0x40104010: VP9 inst FIFO
 		self.save_inst(addr, val)
+
+	def w_40104014(self, addr, val): # 0x40104010: VP9 inst FIFO
+		self.save_decode_command(addr, val)
 
 	def r_40104060(self, addr): # 0x40104060: decode status
 		self.status_poll_count += 1

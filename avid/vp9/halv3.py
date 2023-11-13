@@ -187,18 +187,24 @@ class AVDVP9HalV3(AVDHal):
 
 		# ---- FW BP ----
 
-	def set_slice(self, ctx, sl):
+	def set_tiles(self, ctx, sl):
 		avd_set = self.avd_set
-		avd_set(0x2d800000, "cm3_cmd_set_slice_data")
-		header_size = sl.compressed_header_size + sl.uncompressed_header_size
-		payload_size = sl.frame.size - header_size
-		avd_set(ctx.slice_data_addr + header_size, "inp_8b4d4_slice_addr_low")
-		avd_set(payload_size, "inp_8b4d8_slice_hdr_size")
-
-		avd_set(0x2a000000)
-		avd_set(0x1, "cm3_height_width_shift")
-		avd_set(0x2b000400, "cm3_cmd_inst_fifo_end")
+		# tiles instead of slice for VP9
+		for i,tile in enumerate(sl.tiles):
+			avd_set(0x2d800000, "cm3_cmd_set_slice_data")
+			avd_set(ctx.slice_data_addr + tile.offset, "til_ab4_tile_addr_low")
+			avd_set(tile.size, "til_ab8_tile_size")
+			avd_set(0x2a000000 | i * 4)
+			if (len(sl.tiles) == 1):
+				dims = 1
+			else:
+				dims = i << 24 | ((tile.row + 1) * 8 - 1) << 12 | ((tile.col + 1) * 4 - 1)
+			avd_set(dims, "til_ac0_tile_dims")
+			if (i < len(sl.tiles) - 1):
+				avd_set(0x2bfff000, "cm3_cmd_inst_fifo_end")
+			else:
+				avd_set(0x2b000400, "cm3_cmd_inst_fifo_end")
 
 	def set_insn(self, ctx, sl):
 		self.set_header(ctx, sl)
-		self.set_slice(ctx, sl)
+		self.set_tiles(ctx, sl)
