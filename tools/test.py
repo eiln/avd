@@ -177,6 +177,8 @@ class AVDH264UnitTest(AVDUnitTest):
 			"slc_6e4_cmd_ref_type",
 			"slc_6e8_cmd_ref_list_0",
 			"slc_728_cmd_ref_list_1",
+
+			#"slc_76c_cmd_weights_denom",
 			"slc_770_cmd_weights_weights",
 			"slc_8f0_cmd_weights_offsets",
 			"slc_a70_cmd_slice_qpy",

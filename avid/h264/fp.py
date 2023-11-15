@@ -76,7 +76,7 @@ class AVDH264V3Slice(AVDFrameParams):
 		"slc_6e8_cmd_ref_list_0" / Array(16, u32),
 		"slc_728_cmd_ref_list_1" / Array(16, u32),
 		"slc_768_unk" / u32,
-		"slc_76c_cmd_mb" / u32,
+		"slc_76c_cmd_weights_denom" / u32,
 		"slc_770_cmd_weights_weights" / Array(96, u32),
 		"slc_8f0_cmd_weights_offsets" / Array(96, u32),
 		"slc_a70_cmd_slice_qpy" / u32,

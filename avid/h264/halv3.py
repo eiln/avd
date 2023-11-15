@@ -122,10 +122,10 @@ class AVDH264HalV3(AVDHal):
 		else:
 			x = 0x2dd000ad
 		if (sl.has_luma_weights == 0):
-			avd_set(x, "slc_76c_cmd_mb")
+			avd_set(x, "slc_76c_cmd_weights_denom")
 			return
 		x |= (sl.luma_log2_weight_denom << 3) | sl.chroma_log2_weight_denom
-		avd_set(x, "slc_76c_cmd_mb")
+		avd_set(x, "slc_76c_cmd_weights_denom")
 
 		def get_wbase(i, j): return 0x2de00000 | ((j + 1) * 0x4000) | (i * 0x200)
 		num = 0
