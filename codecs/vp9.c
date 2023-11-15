@@ -809,6 +809,9 @@ static void vp9_print_uncompressed_header(VP9Context *s)
         }
     }
 
+    vp9_field("txfm_mode", s->s.h.txfmmode);
+    vp9_field("comp_pred_mode", s->s.h.comppredmode);
+
     vp9_field("base_q_idx", s->s.h.yac_qi);
     vp9_field("delta_q_y_dc", s->s.h.ydc_qdelta);
     vp9_field("delta_q_uv_dc", s->s.h.uvdc_qdelta);

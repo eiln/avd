@@ -119,7 +119,10 @@ class AVDVP9HalV3(AVDHal):
 		avd_set((((sl.frame_height - 1) & 0xffff) << 16) | ((sl.frame_width - 1) & 0xffff), "hdr_28_height_width_shift3")
 		avd_set(0x0, "cm3_dma_config_0")
 		avd_set((((sl.frame_height - 1) & 0xffff) << 16) | ((sl.frame_width - 1) & 0xffff), "hdr_38_height_width_shift3")
-		avd_set(0x1001981, "hdr_2c_sps_param")
+
+		x = 0x1000000
+		x |= 0x1800 | (min(sl.txfm_mode, 3) << 7)
+		avd_set(x | (sl.txfm_mode == 4), "hdr_2c_txfm_mode")
 
 		avd_set(self.make_flags1(ctx, sl), "hdr_40_flags1_pt1")
 
