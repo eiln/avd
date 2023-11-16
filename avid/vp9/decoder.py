@@ -29,6 +29,11 @@ class AVDVP9Decoder(AVDDecoder):
 		ctx.width = -1
 		ctx.height = -1
 		ctx.active_sl = None
+		ctx.num_kf = 0
+		ctx.last_kf = 0
+		ctx.kidx = 0
+		ctx.last_flag = -1
+		ctx.acc_refresh_mask = 0
 
 		ctx.inst_fifo_count = 7
 		ctx.inst_fifo_idx = 0
@@ -112,6 +117,9 @@ class AVDVP9Decoder(AVDDecoder):
 		ctx = self.ctx; sl = self.ctx.active_sl
 		if (sl.frame_type == VP9_FRAME_TYPE_KEY):
 			ctx.kidx = 0
+			ctx.num_kf += 1
+			ctx.acc_refresh_mask = 0b00000000
+			sl.refresh_frame_flags = 0xff
 		self.refresh(sl)
 
 	def finish_slice(self):
@@ -122,3 +130,15 @@ class AVDVP9Decoder(AVDDecoder):
 		ctx.access_idx += 1
 		if (sl.frame_type != VP9_FRAME_TYPE_KEY):
 			ctx.kidx += 1
+		if (ctx.kidx == 1):
+			ctx.acc_refresh_mask |= sl.refresh_frame_flags & 0b1
+		if (ctx.kidx >= 2):
+			ctx.acc_refresh_mask |= sl.refresh_frame_flags
+
+		if (sl.frame_type == VP9_FRAME_TYPE_KEY):
+			ctx.last_kf = 1
+		else:
+			ctx.last_kf = 0
+		ctx.last_flag = sl.refresh_frame_flags
+
+		ctx.access_idx += 1

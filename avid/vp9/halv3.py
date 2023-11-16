@@ -8,7 +8,7 @@ from .fp import *
 from .types import *
 from copy import deepcopy
 
-def set_bit(n, x=1): return ((x & 1) << n)
+def set_bit(n, x=1): return ((x != 0) << n)
 
 class AVDVP9HalV3(AVDHal):
 	def __init__(self):
@@ -72,33 +72,32 @@ class AVDVP9HalV3(AVDHal):
 	def make_flags1(self, ctx, sl):
 		x = 0
 
-		# always set
-		x |= set_bit( 0)
-		x |= set_bit(14)
-		x |= set_bit(15)
+		# always set. just random ones to see if it breaks
+		x |= set_bit( 0, sl.show_existing_frame == 0)
+		x |= set_bit(14, sl.error_resilient_mode == 0)
+		x |= set_bit(15, sl.show_frame)
 
 		if (sl.frame_type != VP9_FRAME_TYPE_KEY):
 			x |= set_bit(19)  # has ref #1
 			if (ctx.kidx > 0):
 				x |= set_bit(21)  # has ref #2
 
-			x |= set_bit(18, sl.is_filter_switchable)
 			if (not sl.is_filter_switchable):
 				if (sl.raw_interpolation_filter_type == 0):
 					x |= set_bit(16)
 				elif (sl.raw_interpolation_filter_type == 2):
 					x |= set_bit(17)
+			x |= set_bit(18, sl.is_filter_switchable)
 
-		# ???
-		if (ctx.kidx < 1) or (ctx.kidx >= 10):
-			x |= set_bit(8)
-		if (ctx.kidx > 0):
-			x |= set_bit(9)  # ?
-
-		if (ctx.kidx % 10 == 0):
+		if (ctx.last_flag == 0b11) or (ctx.kidx < 1):
 			x |= set_bit(4)
 		else:
 			x |= set_bit(5)
+
+		if (ctx.acc_refresh_mask & (1 << 1)) or (ctx.kidx < 1):
+			x |= set_bit(8)
+		if (ctx.acc_refresh_mask & (1 << 0)):
+			x |= set_bit(9)
 
 		return x
 
