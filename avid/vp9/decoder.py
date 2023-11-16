@@ -9,16 +9,10 @@ from .halv3 import AVDVP9HalV3
 from .parser import AVDVP9Parser
 from .probs import AVDVP9Probs
 from .types import *
-import struct
-from collections import namedtuple
 from copy import deepcopy
 
 class AVDVP9Ctx(dotdict):
 	pass
-
-class AVDVP9Tile(namedtuple('AVDVP9Tile', ['row', 'col', 'size', 'offset'])):
-	def __repr__(self):
-		return f"[tile: row: {self.row} col: {self.col} size: {hex(self.size).rjust(4+2)} offset: {hex(self.offset).rjust(4+2)}]"
 
 class AVDVP9Decoder(AVDDecoder):
 	def __init__(self):
@@ -114,72 +108,11 @@ class AVDVP9Decoder(AVDDecoder):
 		self.refresh(slices[0])
 		return slices
 
-	def calc_curr_rvra(self):
-		ctx = self.ctx; sl = self.ctx.active_sl
-
-		# VP9 RVRA
-		# [0x0ef80, 0x0eb82, 0x0f080, 0x0ec12] 0 (keyframe)
-		# [0x0f180, 0x12082, 0x0f280, 0x12112] 1
-		# [0x0f380, 0x12382, 0x0f480, 0x12412] 2
-		# [0x0f580, 0x12682, 0x0f680, 0x12712] 3
-		# [0x0f380, 0x12202, 0x0f480, 0x12292] 4
-		# [0x0f580, 0x12382, 0x0f680, 0x12412] 5
-		# [0x0f380, 0x12682, 0x0f480, 0x12712] 6
-		# [0x0f580, 0x12202, 0x0f680, 0x12292] 7
-		# [0x0f380, 0x12382, 0x0f480, 0x12412] 8
-		# [0x0f580, 0x12682, 0x0f680, 0x12712] 9
-		# [0x0f380, 0x12202, 0x0f480, 0x12292] a
-		#
-		# where
-		# if (i <= 11): return int((not i & 1)) * 1 + 1
-		# if (i <= 21): return int((not i & 1)) * 2 + 1
-		# if (i <= 31): return int((not i & 1)) * 3 + 1
-		# etc..
-		if (sl.frame_type == VP9_FRAME_TYPE_KEY):
-			rvra_addrs = deepcopy(ctx.rvra0_base_addrs)
-		else:
-			rvra_addrs = deepcopy(ctx.rvra1_base_addrs)
-
-		if (sl.idx >= 2) and (not ((sl.idx - 2) & 1)):
-			n = (((sl.idx - 2) // 10) % 2)
-			m = (((sl.idx - 2) // 10) % len(ctx.rvra1_odd_offsets))
-			rvra_addrs[0] += (ctx.rvra1_even_offset * (n + 1))
-			rvra_addrs[2] += (ctx.rvra1_even_offset * (n + 1))
-			rvra_addrs[1] += ctx.rvra1_odd_offsets[m]
-			rvra_addrs[3] += ctx.rvra1_odd_offsets[m]
-
-		ctx.curr_rvra_addrs = rvra_addrs
-
-	def read_tiles(self):
-		ctx = self.ctx; sl = self.ctx.active_sl
-		header_size = sl.compressed_header_size + sl.uncompressed_header_size
-		num_tile_rows = 1 << sl.tile_rows_log2
-		num_tile_cols = 1 << sl.tile_cols_log2
-		data = sl.frame.payload
-		size = sl.frame.size - header_size
-		offset = header_size
-		tiles = []
-		for tile_row in range(num_tile_rows):
-			for tile_col in range(num_tile_cols):
-				if ((tile_col == num_tile_cols - 1) and (tile_row == num_tile_rows - 1)):
-					tile_size = size
-				else:
-					tile_size = struct.unpack(">I", data[offset:offset+4])[0]
-					offset += 4
-					size -= 4
-				tile = AVDVP9Tile(tile_row, tile_col, tile_size, offset)
-				tiles.append(tile)
-				offset += tile_size
-				size -= tile_size
-		sl.tiles = tiles
-
 	def init_slice(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
 		if (sl.frame_type == VP9_FRAME_TYPE_KEY):
 			ctx.kidx = 0
 		self.refresh(sl)
-		self.read_tiles()
-		self.calc_curr_rvra()
 
 	def finish_slice(self):
 		ctx = self.ctx; sl = self.ctx.active_sl

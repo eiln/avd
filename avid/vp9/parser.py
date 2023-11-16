@@ -8,6 +8,8 @@ from .probs import *
 from .types import *
 
 import ctypes
+import struct
+from collections import namedtuple
 from construct import *
 
 IVFHeader = Struct(
@@ -66,6 +68,10 @@ class IVFDemuxer:
 		self.pos += f.size
 		return AVDFrame(b, f.size, f.timestamp)
 
+class AVDVP9Tile(namedtuple('AVDVP9Tile', ['row', 'col', 'size', 'offset'])):
+	def __repr__(self):
+		return f"[tile: row: {self.row} col: {self.col} size: {hex(self.size).rjust(4+2)} offset: {hex(self.offset).rjust(4+2)}]"
+
 class AVDVP9Slice(AVDSlice):
 	def __init__(self):
 		super().__init__()
@@ -81,6 +87,29 @@ class AVDVP9Slice(AVDSlice):
 
 	def get_probs(self):
 		return self.probs_data
+
+	def read_tiles(self):
+		sl = self
+		header_size = sl.compressed_header_size + sl.uncompressed_header_size
+		num_tile_rows = 1 << sl.tile_rows_log2
+		num_tile_cols = 1 << sl.tile_cols_log2
+		data = sl.frame.payload
+		size = sl.frame.size - header_size
+		offset = header_size
+		tiles = []
+		for tile_row in range(num_tile_rows):
+			for tile_col in range(num_tile_cols):
+				if ((tile_col == num_tile_cols - 1) and (tile_row == num_tile_rows - 1)):
+					tile_size = size
+				else:
+					tile_size = struct.unpack(">I", data[offset:offset+4])[0]
+					offset += 4
+					size -= 4
+				tile = AVDVP9Tile(tile_row, tile_col, tile_size, offset)
+				tiles.append(tile)
+				offset += tile_size
+				size -= tile_size
+		sl.tiles = tiles
 
 class AVDVP9Parser(AVDParser):
 	def __init__(self):
@@ -122,6 +151,7 @@ class AVDVP9Parser(AVDParser):
 			dassert(len(headers), len(probs_all))
 		for i,hdr in enumerate(headers):
 			hdr.frame = frames_all[i]
+			hdr.read_tiles()
 			if (do_probs):
 				hdr.probs = LibVP9Probs.parse(probs_all[i])
 				hdr.probs_data = hdr.probs.to_avdprobs(hdr.probs)
