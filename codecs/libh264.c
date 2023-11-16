@@ -26,7 +26,9 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+
 #include "h264.h"
+#include "h2645.h"
 
 typedef struct __attribute__((packed)) LibH264Context {
 	struct h264_context *s;
@@ -58,7 +60,7 @@ int libh264_decode(LibH264Context *ctx, uint8_t *bytes, int size, int *nal_start
 	if (!bytes || size < 0)
 		return -1;
 
-	h264_find_nal_unit(bytes, size, nal_start, nal_end);
+	h2645_find_nal_unit(bytes, size, nal_start, nal_end);
 	if (size < (*nal_end - *nal_start)) {
 		fprintf(stderr, "[LIBH264] no more NAL units left\n");
 		return -1;

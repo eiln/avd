@@ -470,7 +470,6 @@ struct h264_context {
 #define h264_sl_get_sps(ctx, sl) \
 	(&((ctx)->sps_list[(h264_get_pps(ctx, sl->pic_parameter_set_id)->seq_parameter_set_id)]))
 
-int h264_find_nal_unit(uint8_t *buf, int size, int *nal_start, int *nal_end);
 int h264_decode_nal_unit(struct h264_context *ctx, uint8_t *buf, int size);
 
 void h264_print_sps(struct h264_sps *sps);

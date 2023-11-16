@@ -1,7 +1,7 @@
 /*
  * Copyright 2023 Eileen Yoon <eyn@gmx.com>
  *
- * Based on envytools, libavcodec, h264bitstream
+ * Based on envytools, libavcodec
  *
  * All Rights Reserved.
  *
@@ -31,6 +31,7 @@
 
 #include "bs.h"
 #include "h264.h"
+#include "h2645.h"
 #include "util.h"
 
 #define h264_log(a, ...)  printf("[H264] " a, ##__VA_ARGS__)
@@ -45,97 +46,6 @@ static inline int clog2(uint64_t x)
 	while (x - 1 > (1ull << r) - 1)
 		r++;
 	return r;
-}
-
-int h264_find_nal_unit(uint8_t *buf, int size, int *nal_start, int *nal_end)
-{
-	int i;
-	*nal_start = 0;
-	*nal_end = 0;
-
-	i = 0;
-	while ( // ( next_bits( 24 ) != 0x000001 && next_bits( 32 ) != 0x00000001 )
-		(buf[i] != 0 || buf[i + 1] != 0 || buf[i + 2] != 0x01) &&
-		(buf[i] != 0 || buf[i + 1] != 0 || buf[i + 2] != 0 ||
-		 buf[i + 3] != 0x01)) {
-		i++; // skip leading zero
-		if (i + 4 >= size) {
-			return 0;
-		} // did not find nal start
-	}
-
-	if (buf[i] != 0 || buf[i + 1] != 0 ||
-	    buf[i + 2] != 0x01) // ( next_bits( 24 ) != 0x000001 )
-	{
-		i++;
-	}
-
-	if (buf[i] != 0 || buf[i + 1] != 0 ||
-	    buf[i + 2] != 0x01) { /* error, should never happen */
-		return 0;
-	}
-	i += 3;
-	*nal_start = i;
-
-	while ( //( next_bits( 24 ) != 0x000000 && next_bits( 24 ) != 0x000001 )
-		(buf[i] != 0 || buf[i + 1] != 0 || buf[i + 2] != 0) &&
-		(buf[i] != 0 || buf[i + 1] != 0 || buf[i + 2] != 0x01)) {
-		i++;
-		// FIXME the next line fails when reading a nal that ends exactly at the end of the data
-		if (i + 3 >= size) {
-			*nal_end = size;
-			return -1;
-		} // did not find nal end, stream ended first
-	}
-
-	*nal_end = i;
-	return (*nal_end - *nal_start);
-}
-
-static int h264_nal_to_rbsp(const uint8_t *nal_buf, int *nal_size, uint8_t *rbsp_buf, int *rbsp_size)
-{
-	int i;
-	int j = 0;
-	int count = 0;
-
-	for (i = 0; i < *nal_size; i++) {
-		// in NAL unit, 0x000000, 0x000001 or 0x000002 shall not occur at any byte-aligned position
-		if ((count == 2) && (nal_buf[i] < 0x03)) {
-			return -1;
-		}
-
-		if ((count == 2) && (nal_buf[i] == 0x03)) {
-			// check the 4th byte after 0x000003, except when cabac_zero_word is used, in which case the last three bytes of this NAL unit must be 0x000003
-			if ((i < *nal_size - 1) && (nal_buf[i + 1] > 0x03)) {
-				return -1;
-			}
-
-			// if cabac_zero_word is used, the final byte of this NAL unit(0x03) is discarded, and the last two bytes of RBSP must be 0x0000
-			if (i == *nal_size - 1) {
-				break;
-			}
-
-			i++;
-			count = 0;
-		}
-
-		if (j >= *rbsp_size) {
-			// error, not enough space
-			return -1;
-		}
-
-		rbsp_buf[j] = nal_buf[i];
-		if (nal_buf[i] == 0x00) {
-			count++;
-		} else {
-			count = 0;
-		}
-		j++;
-	}
-
-	*nal_size = i;
-	*rbsp_size = j;
-	return j;
 }
 
 static int h264_more_rbsp_data(struct bitstream *gb)
@@ -1207,7 +1117,7 @@ int h264_decode_nal_unit(struct h264_context *ctx, uint8_t *buf, int size)
 	if (!rbsp_buf)
 		return -1;
 
-	err = h264_nal_to_rbsp(buf, &nal_size, rbsp_buf, &rbsp_size);
+	err = h2645_nal_to_rbsp(buf, &nal_size, rbsp_buf, &rbsp_size);
 	if (err < 0) {
 		h264_err("failed to convert NAL to RBSP\n");
 		goto free_rbsp;

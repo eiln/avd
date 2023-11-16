@@ -21,20 +21,20 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "h264.h"
+#include "h265.h"
 #include "h2645.h"
 #include "util.h"
 
 int main(int argc, char *argv[])
 {
-	struct h264_context context;
-	struct h264_context *ctx = &context;
+	struct h265_context context;
+	struct h265_context *ctx = &context;
 	int size, nal_start, nal_end;
 
 	uint8_t *bytes = NULL;
 	char *data = NULL;
 	if (argc <= 1) {
-		fprintf(stderr, "usage: ./deh264 [path to .h264]\n");
+		fprintf(stderr, "usage: ./deh265 [path to .h265]\n");
 		return -1;
 	}
 
@@ -46,7 +46,7 @@ int main(int argc, char *argv[])
 	while (size > 0) {
 		h2645_find_nal_unit(bytes, size, &nal_start, &nal_end);
 		bytes += nal_start;
-		h264_decode_nal_unit(ctx, bytes, nal_end - nal_start);
+		h265_decode_nal_unit(ctx, bytes, nal_end - nal_start);
 		bytes += (nal_end - nal_start);
 		size -= nal_end;
 	}

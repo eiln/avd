@@ -1,6 +1,8 @@
 /*
  * Copyright 2023 Eileen Yoon <eyn@gmx.com>
  *
+ * All Rights Reserved.
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
  * to deal in the Software without restriction, including without limitation
@@ -21,37 +23,12 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "h264.h"
-#include "h2645.h"
-#include "util.h"
+#ifndef __H2645_H__
+#define __H2645_H__
 
-int main(int argc, char *argv[])
-{
-	struct h264_context context;
-	struct h264_context *ctx = &context;
-	int size, nal_start, nal_end;
+#include <stdint.h>
 
-	uint8_t *bytes = NULL;
-	char *data = NULL;
-	if (argc <= 1) {
-		fprintf(stderr, "usage: ./deh264 [path to .h264]\n");
-		return -1;
-	}
+int h2645_find_nal_unit(uint8_t *buf, int size, int *nal_start, int *nal_end);
+int h2645_nal_to_rbsp(const uint8_t *nal_buf, int *nal_size, uint8_t *rbsp_buf, int *rbsp_size);
 
-	data = read_file(argv[1], &size);
-	if (!data || size <= 0)
-		return -1;
-
-	bytes = (uint8_t *)data;
-	while (size > 0) {
-		h2645_find_nal_unit(bytes, size, &nal_start, &nal_end);
-		bytes += nal_start;
-		h264_decode_nal_unit(ctx, bytes, nal_end - nal_start);
-		bytes += (nal_end - nal_start);
-		size -= nal_end;
-	}
-
-	free(data);
-
-	return 0;
-}
+#endif /* __H2645_H__ */
