@@ -196,7 +196,7 @@ class AVDVP9UnitTest(AVDUnitTest):
 		self.name = hl("VP9", ANSI_GREEN)
 		self.fp_keys = [
 			"hdr_28_height_width_shift3",
-			#"hdr_2c_sps_param",
+			"hdr_2c_txfm_mode",
 			"hdr_30_cmd_start_hdr",
 			"hdr_34_const_20",
 			"hdr_38_height_width_shift3",

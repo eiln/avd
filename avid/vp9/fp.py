@@ -23,7 +23,7 @@ class AVDVP9V3PiodmaHeader(AVDFrameParams):
 class AVDVP9V3InstHeader(AVDFrameParams):
 	subcon = "AvdH264V3InstHeader" / Struct(
 		"hdr_28_height_width_shift3" / u32,
-		"hdr_2c_sps_param" / ExprValidator(u32, obj_ & 0x1000000 == 0x1000000),
+		"hdr_2c_txfm_mode" / ExprValidator(u32, obj_ & 0x1000000 == 0x1000000),
 		"hdr_30_cmd_start_hdr" / ExprValidator(u32, obj_ & 0x2db00000 == 0x2db00000),
 		"hdr_34_const_20" / ExprValidator(u32, obj_ == 0x2000000),
 		"hdr_38_height_width_shift3" / u32,
