@@ -19,8 +19,8 @@ All for my J293AP only, but different hardware revisions should only require min
 | Codec | Tracer | Emulator | Parser | Decoder | FParser | testsrc | matrixbench |
 |-------|--------|----------|--------|---------|---------|---------|-------------|
 | H.264 | Y      | Y        | Y      | Y       | Y       | Y       | Y           |
-| H.265 | N      | N        | N      | N       | N       | N       | N           |
-| VP9   | Y      | Y        | Y      | N       | Y       | N       | N           |
+| H.265 | Y      | Y        | N      | N       | N       | N       | N           |
+| VP9   | Y      | Y        | Y      | N       | Y       | Y       | N           |
 | AV1   | N      | N        | N      | N       | N       | N       | N           |
 
 Where
