@@ -14,6 +14,17 @@ class AVDVP9HalV3(AVDHal):
 	def __init__(self):
 		super().__init__()
 
+	def get_rvra_addrs(self, ctx, sl, idx):
+		x = idx
+		n = x
+		m = x
+		rvra_addrs = [0] * 4
+		rvra_addrs[0] = ctx.rvra0_addrs[n]
+		rvra_addrs[1] = ctx.rvra1_addrs[m]
+		rvra_addrs[2] = ctx.rvra2_addrs[n]
+		rvra_addrs[3] = ctx.rvra3_addrs[m]
+		return rvra_addrs
+
 	def set_refs(self, ctx, sl):
 		avd_set = self.avd_set
 
@@ -21,53 +32,18 @@ class AVDVP9HalV3(AVDHal):
 		avd_set(0x70007, "cm3_dma_config_8")
 		avd_set(0x70007, "cm3_dma_config_9")
 
-		if 0:
-			for i,dpb in enumerate(ctx.dpb[:32]):
-				print(i, f"[{', '.join([hex(x) for x in dpb])}]")
-
 		hw = (((sl.frame_height - 1) & 0xffff) << 16) | ((sl.frame_width - 1) & 0xffff)
+		for n in range(VP9_REFS_PER_FRAME):
+			avd_set(0x1000000, "hdr_9c_ref_100", n)
+			avd_set(hw, "hdr_70_ref_height_width", n)
+			avd_set(0x40004000, "hdr_7c_ref_align", n)
 
-		refidx = 0
-		avd_set(0x1000000, "hdr_9c_ref_100", refidx)
-		avd_set(hw, "hdr_70_ref_height_width", refidx)
-		avd_set(0x40004000, "hdr_7c_ref_align", refidx)
-		if (len(ctx.dpb) <= 1):
-			dpb = ctx.rvra0_base_addrs
-		else:
-			dpb = ctx.dpb[-1]
-		avd_set(dpb[0], "hdr_138_ref_rvra0_addr_lsb7", refidx)
-		avd_set(dpb[1], "hdr_144_ref_rvra1_addr_lsb7", refidx)
-		avd_set(dpb[2], "hdr_150_ref_rvra2_addr_lsb7", refidx)
-		avd_set(dpb[3], "hdr_15c_ref_rvra3_addr_lsb7", refidx)
-
-		refidx = 1
-		avd_set(0x1000000, "hdr_9c_ref_100", refidx)
-		avd_set(hw, "hdr_70_ref_height_width", refidx)
-		avd_set(0x40004000, "hdr_7c_ref_align", refidx)
-
-		if (sl.idx == 0):
-			dpb = ctx.rvra0_base_addrs
-		else:
-			if (sl.idx <= 10):
-				m = 0
-			else:
-				m = ((((sl.idx - 1) // 10) - 1) * 10) + 2
-			dpb = ctx.dpb[m]
-
-		avd_set(dpb[0], "hdr_138_ref_rvra0_addr_lsb7", refidx)
-		avd_set(dpb[1], "hdr_144_ref_rvra1_addr_lsb7", refidx)
-		avd_set(dpb[2], "hdr_150_ref_rvra2_addr_lsb7", refidx)
-		avd_set(dpb[3], "hdr_15c_ref_rvra3_addr_lsb7", refidx)
-
-		refidx = 2
-		avd_set(0x1000000, "hdr_9c_ref_100", refidx)
-		avd_set(hw, "hdr_70_ref_height_width", refidx)
-		avd_set(0x40004000, "hdr_7c_ref_align", refidx)
-		dpb = ctx.rvra0_base_addrs
-		avd_set(dpb[0], "hdr_138_ref_rvra0_addr_lsb7", refidx)
-		avd_set(dpb[1], "hdr_144_ref_rvra1_addr_lsb7", refidx)
-		avd_set(dpb[2], "hdr_150_ref_rvra2_addr_lsb7", refidx)
-		avd_set(dpb[3], "hdr_15c_ref_rvra3_addr_lsb7", refidx)
+			x = ctx.ref_frame_map[n]
+			rvra_addrs = self.get_rvra_addrs(ctx, sl, x)
+			avd_set(rvra_addrs[0], "hdr_138_ref_rvra0_addr_lsb7", n)
+			avd_set(rvra_addrs[1], "hdr_144_ref_rvra1_addr_lsb7", n)
+			avd_set(rvra_addrs[2], "hdr_150_ref_rvra2_addr_lsb7", n)
+			avd_set(rvra_addrs[3], "hdr_15c_ref_rvra3_addr_lsb7", n)
 
 	def make_flags1(self, ctx, sl):
 		x = 0
@@ -169,15 +145,17 @@ class AVDVP9HalV3(AVDHal):
 		avd_set((ctx.sps_tile_base_addr + (6 * sps_size)), "hdr_f4_sps1_tile_addr_lsb8", 3) # not 5, that's later
 
 		avd_set(0x70007, "cm3_dma_config_7")
-		avd_set(ctx.curr_rvra_addrs[0], "hdr_11c_curr_rvra_addr_lsb7", 0)
-		avd_set(ctx.curr_rvra_addrs[1], "hdr_11c_curr_rvra_addr_lsb7", 1)
-		avd_set(ctx.curr_rvra_addrs[2], "hdr_11c_curr_rvra_addr_lsb7", 2)
-		avd_set(ctx.curr_rvra_addrs[3], "hdr_11c_curr_rvra_addr_lsb7", 3)
+
+		x = ctx.new_fb_idx
+		rvra_addrs = self.get_rvra_addrs(ctx, sl, x)
+		avd_set(rvra_addrs[0], "hdr_11c_curr_rvra_addr_lsb7", 0)
+		avd_set(rvra_addrs[1], "hdr_11c_curr_rvra_addr_lsb7", 1)
+		avd_set(rvra_addrs[2], "hdr_11c_curr_rvra_addr_lsb7", 2)
+		avd_set(rvra_addrs[3], "hdr_11c_curr_rvra_addr_lsb7", 3)
 
 		avd_set((ctx.sps_tile_base_addr + (5 * sps_size)), "hdr_f4_sps1_tile_addr_lsb8", 2)
 
 		avd_set(ctx.y_addr >> 8, "hdr_168_y_addr_lsb8")
-
 		avd_set(ctx.height_width_align, "hdr_170_width_align")
 		avd_set(ctx.uv_addr >> 8, "hdr_16c_uv_addr_lsb8")
 		avd_set(ctx.height_width_align, "hdr_174_width_align")

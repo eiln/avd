@@ -14,6 +14,13 @@ from copy import deepcopy
 class AVDVP9Ctx(dotdict):
 	pass
 
+class AVDVP9RefBuffer(dotdict):
+	def __repr__(self):
+		return f"[refbuf {self.idx}: ref_count: {self.ref_count}]"
+
+	def decrease_ref_count(self):
+		self.ref_count -= 1
+
 class AVDVP9Decoder(AVDDecoder):
 	def __init__(self):
 		super().__init__(AVDVP9Parser, AVDVP9HalV3, AVDVP9V3FrameParams)
@@ -25,7 +32,6 @@ class AVDVP9Decoder(AVDDecoder):
 		ctx = self.ctx
 
 		ctx.access_idx = 0
-		ctx.kidx = 0
 		ctx.width = -1
 		ctx.height = -1
 		ctx.active_sl = None
@@ -37,7 +43,12 @@ class AVDVP9Decoder(AVDDecoder):
 
 		ctx.inst_fifo_count = 7
 		ctx.inst_fifo_idx = 0
-		ctx.dpb = []
+
+		ctx.frame_bufs = [AVDVP9RefBuffer(dict(ref_count=0, idx=n)) for n in range(VP9_FRAME_BUFFERS)]
+		ctx.ref_frame_map = [-1] * VP9_REF_FRAMES
+		ctx.next_ref_frame_map = [-1] * VP9_REF_FRAMES
+		ctx.new_fb_idx = -1
+		ctx.idx_map = {}
 
 	def allocate(self):
 		ctx = self.ctx
@@ -56,6 +67,11 @@ class AVDVP9Decoder(AVDDecoder):
 			ctx.pps0_tile_addr = 0x8dc0
 			ctx.pps1_tile_base = 0x88c0
 			ctx.pps2_tile_addrs = [0x87c0, 0x8840]
+
+			ctx.rvra0_addrs = [0x0ef80, 0x0f180, 0x0f380, 0x0f580]
+			ctx.rvra2_addrs = [0x0f080, 0x0f280, 0x0f480, 0x0f680]
+			ctx.rvra1_addrs = [0x0eb82, 0x012082, 0x012382, 0x12682]
+			ctx.rvra3_addrs = [0x0ec12, 0x012112, 0x012682, 0x012202]
 			ctx.y_addr = 0x768100
 			ctx.uv_addr = 0x76c900
 			ctx.slice_data_addr = 0x774000
@@ -67,10 +83,10 @@ class AVDVP9Decoder(AVDDecoder):
 			ctx.pps2_tile_addrs = [0x9640, 0x97c0]
 			ctx.pps1_tile_base = 0x9940
 
-			ctx.rvra0_base_addrs  = [0x0ff80, 0x0eb80, 0x10a00, 0x10000]
-			ctx.rvra1_base_addrs  = [0x15780, 0x14380, 0x16200, 0x15800] # [+0x200, +0x3500, +0x200, +0x3500]
-			ctx.rvra1_even_offset = 0x3880
-			ctx.rvra1_odd_offsets = [0x3880, 0x7100]
+			ctx.rvra0_addrs = [0xff80, 0x15780, 0x19000, 0x1c880]
+			ctx.rvra2_addrs = [0x10a00, 0x16200, 0x19a80, 0x1d300]
+			ctx.rvra1_addrs = [0xeb80, 0x14380, 0x17c00, 0x1b480]
+			ctx.rvra3_addrs = [0x10000, 0x15800, 0x19080, 0x1c900]
 
 			ctx.y_addr = 0x858100
 			ctx.uv_addr = 0x8d8100
@@ -107,6 +123,51 @@ class AVDVP9Decoder(AVDDecoder):
 		self.refresh(slices[0])
 		return slices
 
+	def get_free_fb(self):
+		ctx = self.ctx; sl = self.ctx.active_sl
+		n = 0
+		for i in range(VP9_FRAME_BUFFERS):
+			if (ctx.frame_bufs[i].ref_count <= 0):
+				break
+			n += 1
+		if (n != VP9_FRAME_BUFFERS):
+			ctx.frame_bufs[n].ref_count = 1
+		else:
+			n = -1
+		return n
+
+	def gen_ref_map(self):
+		ctx = self.ctx; sl = self.ctx.active_sl
+		ctx.new_fb_idx = self.get_free_fb()
+		assert((ctx.new_fb_idx != -1))
+
+		ref_index = 0
+		for i in range(8):
+			if (sl.refresh_frame_flags & (1 << i)):
+				ctx.next_ref_frame_map[ref_index] = ctx.new_fb_idx
+				ctx.frame_bufs[ctx.new_fb_idx].ref_count += 1
+			else:
+				ctx.next_ref_frame_map[ref_index] = ctx.ref_frame_map[ref_index]
+
+			#if (ctx.ref_frame_map[ref_index] >= 0):
+			#	ctx.frame_bufs[ctx.ref_frame_map[ref_index]].ref_count += 1
+			ref_index += 1
+
+	def swap_frame_buffers(self):
+		ctx = self.ctx; sl = self.ctx.active_sl
+
+		ref_index = 0
+		for i in range(8):
+			old_idx = ctx.ref_frame_map[ref_index]
+			#if (old_idx != -1):
+			#	ctx.frame_bufs[old_idx].decrease_ref_count()
+			if (sl.refresh_frame_flags & (1 << i)):
+				ctx.frame_bufs[old_idx].decrease_ref_count()
+			ctx.ref_frame_map[ref_index] = ctx.next_ref_frame_map[ref_index]
+			ref_index += 1
+
+		ctx.frame_bufs[ctx.new_fb_idx].decrease_ref_count()
+
 	def init_slice(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
 		if (sl.frame_type == VP9_FRAME_TYPE_KEY):
@@ -115,13 +176,12 @@ class AVDVP9Decoder(AVDDecoder):
 			ctx.acc_refresh_mask = 0b00000000
 			sl.refresh_frame_flags = 0xff
 		self.refresh(sl)
+		self.gen_ref_map()
 
 	def finish_slice(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
 
-		ctx.dpb.append(ctx.curr_rvra_addrs)
-
-		ctx.access_idx += 1
+		self.swap_frame_buffers()
 		if (sl.frame_type != VP9_FRAME_TYPE_KEY):
 			ctx.kidx += 1
 		if (ctx.kidx == 1):
