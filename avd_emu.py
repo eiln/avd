@@ -26,6 +26,7 @@ AVD_CM3_CMD_INIT     = 0x0
 AVD_CM3_CMD_DECODE   = 0x1
 AVD_CM3_CMD_ABORT    = 0x2
 
+AVD_CM3_MODE_H265    = 0x0  # 265 before 264, interesting
 AVD_CM3_MODE_H264    = 0x1
 AVD_CM3_MODE_VP9     = 0x2
 
@@ -147,6 +148,37 @@ class AVDEmulator:
 		self.dart1_space = b"\00"*fifo1_iova + frame_params
 		return fifo1_idx
 
+	def set_params_h265(self, frame_params):
+		fifo1_idx = self.set_dart1_space(frame_params, 0x221ef15)
+		fifo1_iova = 0x4000 + (AVD_DART1_FIFO_WIDTH * fifo1_idx)
+
+		"""
+		00000000  00000001 00000000 00004000 00000001 00010003 00000001 00000000 0108ef38
+		00000020  00004228 0108ef5c 0000460c 00004a84 00038ce4 00000000 0108efac 0108f0d4
+		00000040  0108f130 000049f0 00004a6c 00000000 00000000 00000000 00000000 00000000
+		"""
+		cmd = [0x0] * (AVD_CM3_CMD_SIZE // 4)
+		cmd[ 0] = ((AVD_CM3_MODE_H265 << 2) << 8) | AVD_CM3_CMD_DECODE
+		cmd[ 1] = ((fifo1_idx % AVD_DART1_FIFO_COUNT) << 16) | fifo1_idx
+		cmd[ 2] = fifo1_iova
+		cmd[ 3] = fifo1_idx + 1
+		cmd[ 4] = 0x10003
+		cmd[ 5] = 0x1
+		cmd[ 6] = 0x0
+		cmd[ 7] = 0x108ef38 + (AVD_CM3_FIFO_WIDTH * (fifo1_idx % AVD_CM3_FIFO_COUNT))
+		cmd[ 8] = fifo1_iova + 0x288
+		cmd[ 9] = 0x108ef5c + (AVD_CM3_FIFO_WIDTH * (fifo1_idx % AVD_CM3_FIFO_COUNT))
+		cmd[10] = fifo1_iova + 0x60c
+		cmd[11] = fifo1_iova + 0xa84
+		cmd[12] = fifo1_iova + 0x34ce4
+		cmd[13] = 0x0
+		cmd[14] = 0x108efac + (AVD_CM3_FIFO_WIDTH * (fifo1_idx % AVD_CM3_FIFO_COUNT))
+		cmd[15] = 0x108f0d4 + (AVD_CM3_FIFO_WIDTH * (fifo1_idx % AVD_CM3_FIFO_COUNT))
+		cmd[16] = 0x108f130 + (AVD_CM3_FIFO_WIDTH * (fifo1_idx % AVD_CM3_FIFO_COUNT))
+		cmd[17] = fifo1_iova + 0x9f0
+		cmd[18] = fifo1_iova + 0xa6c
+		return struct.pack("<" + "I"*(len(cmd)), *cmd)
+
 	def set_params_h264(self, frame_params):
 		fifo1_idx = self.set_dart1_space(frame_params, 0x27def15)
 		fifo1_iova = 0x4000 + (AVD_DART1_FIFO_WIDTH * fifo1_idx)
@@ -157,7 +189,7 @@ class AVDEmulator:
 		00000040: 0108f18c 0000464c 000046c8 00000000 00000000 00000000 00000000 00000000
 		"""
 		cmd = [0x0] * (AVD_CM3_CMD_SIZE // 4)
-		cmd[ 0] = 0x400 | AVD_CM3_CMD_DECODE
+		cmd[ 0] = ((AVD_CM3_MODE_H264 << 2) << 8) | AVD_CM3_CMD_DECODE
 		cmd[ 1] = ((fifo1_idx % AVD_DART1_FIFO_COUNT) << 16) | fifo1_idx
 		cmd[ 2] = fifo1_iova
 		cmd[ 3] = fifo1_idx + 1
@@ -178,15 +210,14 @@ class AVDEmulator:
 		cmd[18] = fifo1_iova + 0x6c8
 		return struct.pack("<" + "I"*(len(cmd)), *cmd)
 
-	def vp9_get_tile_count(self, frame_params):
-		start, end = 0x2a0, 0xaa0
-		up = struct.unpack("<%dI" % ((end - start) // 4), frame_params[start:end])
-		tile_count = len([x for x in up if x != 0])
-		return tile_count
-
 	def set_params_vp9(self, frame_params):
 		fifo1_idx = self.set_dart1_space(frame_params, 0x209ef15)
 		fifo1_iova = 0x4000 + (AVD_DART1_FIFO_WIDTH * fifo1_idx)
+
+		# 0.7MiB struct and it doesn't include the number of tiles
+		start, end = 0x2a0, 0xaa0
+		up = struct.unpack("<%dI" % ((end - start) // 4), frame_params[start:end])
+		tile_count = len([x for x in up if x != 0])
 
 		"""
 		00000000: 00000801 00000000 00004000 000002c1 00000003 0108ef38 0108ef40 00000001
@@ -194,14 +225,14 @@ class AVDEmulator:
 		00000040: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
 		"""
 		cmd = [0x0] * (AVD_CM3_CMD_SIZE // 4)
-		cmd[ 0] = 0x800 | AVD_CM3_CMD_DECODE
+		cmd[ 0] = ((AVD_CM3_MODE_VP9 << 2) << 8) | AVD_CM3_CMD_DECODE
 		cmd[ 1] = ((fifo1_idx % AVD_DART1_FIFO_COUNT) << 16) | fifo1_idx
 		cmd[ 2] = fifo1_iova
 		cmd[ 3] = fifo1_idx + 1
 		cmd[ 4] = 0x3
 		cmd[ 5] = 0x108ef38 + (AVD_CM3_FIFO_WIDTH * (fifo1_idx % AVD_CM3_FIFO_COUNT))
 		cmd[ 6] = 0x108ef40 + (AVD_CM3_FIFO_WIDTH * (fifo1_idx % AVD_CM3_FIFO_COUNT))
-		cmd[ 7] = self.vp9_get_tile_count(frame_params)
+		cmd[ 7] = tile_count
 		cmd[ 8] = fifo1_iova + 0xaa4
 		cmd[ 9] = 0x108efb8 + (AVD_CM3_FIFO_WIDTH * (fifo1_idx % AVD_CM3_FIFO_COUNT))
 		cmd[10] = 0x108f088 + (AVD_CM3_FIFO_WIDTH * (fifo1_idx % AVD_CM3_FIFO_COUNT))
@@ -223,11 +254,18 @@ class AVDEmulator:
 		header = struct.unpack("<%dI" % (0x10), frame_params[:0x40])
 		assert(header[5] == 0xdeadcafe) # sanity check
 
-		if   (header[1] == AVD_CM3_MODE_H264):
+		if   (header[1] == AVD_CM3_MODE_H265):
+			self.mode = AVD_CM3_MODE_H265
+			self.hl_color = 35  # purple
+			self.log(f"Mode: {self.hl('H265')}")
+			return self.set_params_h265(frame_params)
+
+		elif (header[1] == AVD_CM3_MODE_H264):
 			self.mode = AVD_CM3_MODE_H264
 			self.hl_color = 34  # blue
 			self.log(f"Mode: {self.hl('H264')}")
 			return self.set_params_h264(frame_params)
+
 		elif (header[1] == AVD_CM3_MODE_VP9):
 			self.mode = AVD_CM3_MODE_VP9
 			self.hl_color = 32  # green
@@ -385,7 +423,7 @@ class AVDEmulator:
 		dst_addr |= 0x1080000
 
 		size = (val << 2) >> 8
-		self.log("PIODMA: copying 0x%x bytes to 0x%x" % (size, dst_addr))
+		self.log(f"PIODMA: transfer size {hex(size)} to cm3 dst {hex(dst_addr)}")
 		buf = self.dart1_space[piodma_iova+word_size:piodma_iova+size]
 		self.avd_write(dst_addr, buf)
 		if (not self.stfu):
@@ -408,13 +446,16 @@ class AVDEmulator:
 			s = "[EMU] %s" % (f'[{self.hl(str(len(self.inst_stream)).rjust(2))}] {hex(val).rjust(2+8)} | {disp_name}')
 			print(s)
 
+	def w_40104004(self, addr, val): # 0x40104004: H265 inst FIFO
+		self.save_inst(addr, val)
+
 	def w_4010400c(self, addr, val): # 0x4010400c: H264 inst FIFO
 		self.save_inst(addr, val)
 
 	def w_40104010(self, addr, val): # 0x40104010: VP9 inst FIFO
 		self.save_inst(addr, val)
 
-	def w_40104014(self, addr, val): # 0x40104010: VP9 inst FIFO
+	def w_40104014(self, addr, val): # 0x40104014: decode command
 		self.save_decode_command(addr, val)
 
 	def r_40104060(self, addr): # 0x40104060: decode status
