@@ -79,14 +79,19 @@ class AVDUnitTest:
 			fp0 = self.dec.fpcls.parse(open(path, "rb").read())
 
 			sl = slices[i]
+			if (self.args.debug_mode) and (not self.args.show_headers):
+				print(sl.show_slice_header().strip())
 			if (self.args.show_headers):
 				print(sl)
-			if (self.args.debug_mode):
-				print(fp0)
+			#if (self.args.debug_mode):
+			#	print(fp0)
 
 			inst = self.dec.decode(sl)
 			fp1 = self.dec.ffp
 			res = self.diff_fp(sl, fp0, fp1, args)
+
+			if (self.args.debug_mode):
+				print()
 			count += 1
 		self.log(hl(f"Inst test '{args.dir}' ({count} frames) all good", ANSI_GREEN))
 
@@ -134,6 +139,8 @@ class AVDUnitTest:
 			inst0_stream = self.emu.avd_cm3_cmd_decode(path)
 
 			sl = slices[i]
+			if (self.args.debug_mode) and (not self.args.show_headers):
+				print(sl.show_slice_header().strip())
 			if (self.args.show_headers):
 				print(sl)
 
