@@ -51,20 +51,11 @@ class AVDVP9Decoder(AVDDecoder):
 		ctx.probs_count = 4  # rotating FIFO slots
 		ctx.probs_base_addr = 0x4000  # (round_up(ctx.probs_size), 0x4000) * ctx.probs_count
 
-		ctx.pps_tile_addrs = [0] * 4
-
 		if   (ctx.width == 128 and ctx.height == 64):
 			ctx.sps_tile_base_addr = 0x8cc000 >> 8  # [0x8cc0, 0x8d40, 0x8e40, 0x8ec0, 0x8f40, 0x8fc0]
-			ctx.pps_tile_base_addr = 0x87c000 >> 8  # [0x8dc0, 0x8940, 0x87c0, 0x8840]
-			ctx.pps_tile_addrs[3] = ctx.pps_tile_base_addr + 0x80
-			ctx.pps_tile_addrs[1] = ctx.pps_tile_base_addr + 0x80 + 0x100          # 0x180
-			ctx.pps_tile_addrs[0] = ctx.pps_tile_base_addr + 0x80 + 0x100 + 0x480  # 0x600
-
-			ctx.rvra0_base_addrs  = [0x0ef80, 0x0eb82, 0x0f080, 0x0ec12]
-			ctx.rvra1_base_addrs  = [0x0f180, 0x12082, 0x0f280, 0x12112] # [+0x200, +0x3500, +0x200, +0x3500]
-			ctx.rvra1_even_offset = 0x200
-			ctx.rvra1_odd_offsets = [0x300, 0x600, 0x180]
-
+			ctx.pps0_tile_addr = 0x8dc0
+			ctx.pps1_tile_base = 0x88c0
+			ctx.pps2_tile_addrs = [0x87c0, 0x8840]
 			ctx.y_addr = 0x768100
 			ctx.uv_addr = 0x76c900
 			ctx.slice_data_addr = 0x774000
@@ -72,10 +63,9 @@ class AVDVP9Decoder(AVDDecoder):
 
 		elif (ctx.width == 1024 and ctx.height == 512):
 			ctx.sps_tile_base_addr = 0x9d4000 >> 8  # [0x9d40, 0x9dc0, 0x9ec0, 0x9f40, 0x9fc0, 0xa040]
-			ctx.pps_tile_base_addr = 0x964000 >> 8  # [0x9e40, 0x99c0, 0x9640, 0x97c0]
-			ctx.pps_tile_addrs[3] = ctx.pps_tile_base_addr + 0x180
-			ctx.pps_tile_addrs[1] = ctx.pps_tile_base_addr + 0x180 + 0x200  # 0x380
-			ctx.pps_tile_addrs[0] = ctx.pps_tile_base_addr + 0x180 + 0x200 + 0x480  # 0x800
+			ctx.pps0_tile_addr = 0x9e40
+			ctx.pps2_tile_addrs = [0x9640, 0x97c0]
+			ctx.pps1_tile_base = 0x9940
 
 			ctx.rvra0_base_addrs  = [0x0ff80, 0x0eb80, 0x10a00, 0x10000]
 			ctx.rvra1_base_addrs  = [0x15780, 0x14380, 0x16200, 0x15800] # [+0x200, +0x3500, +0x200, +0x3500]
@@ -90,7 +80,11 @@ class AVDVP9Decoder(AVDDecoder):
 		else:
 			raise ValueError("not impl")
 
-		ctx.pps_tile_addrs[2] = ctx.pps_tile_base_addr + 0x0
+		ctx.pps1_tile_size = 0x8000
+		ctx.pps1_tile_count = 8
+		ctx.pps1_tile_addrs = [0] * ctx.pps1_tile_count
+		for n in range(ctx.pps1_tile_count):
+			ctx.pps1_tile_addrs[n] = ctx.pps1_tile_base + (ctx.pps1_tile_size >> 8) * n
 
 	def refresh(self, sl):
 		ctx = self.ctx

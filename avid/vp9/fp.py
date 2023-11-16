@@ -53,7 +53,8 @@ class AVDVP9V3InstHeader(AVDFrameParams):
 		"hdr_f4_sps1_tile_addr_lsb8" / Array(4, u32),
 
 		"hdr_104_probs_addr_lsb8" / u32,
-		"hdr_108_pps1_tile_addr_lsb8" / Array(4, u32),
+		"hdr_108_pps1_tile_addr_lsb8" / Array(2, u32),
+		"hdr_110_pps2_tile_addr_lsb8" / Array(2, u32),
 		"hdr_118_pps0_tile_addr_lsb8" / u32,
 
 		"hdr_11c_curr_rvra_addr_lsb7" / Array(4, u32),
@@ -151,7 +152,8 @@ class AVDVP9V3FakeFrameParams(AVDFakeFrameParams):
 		obj = cls()
 		obj["hdr_e8_sps0_tile_addr_lsb8"]  = [0] * 3
 		obj["hdr_f4_sps1_tile_addr_lsb8"]  = [0] * 4
-		obj["hdr_108_pps1_tile_addr_lsb8"] = [0] * 4
+		obj["hdr_108_pps1_tile_addr_lsb8"] = [0] * 2
+		obj["hdr_110_pps2_tile_addr_lsb8"] = [0] * 2
 		obj["hdr_11c_curr_rvra_addr_lsb7"] = [0] * 4
 		obj["hdr_138_ref_rvra0_addr_lsb7"]  = [0] * 3
 		obj["hdr_144_ref_rvra1_addr_lsb7"]  = [0] * 3

@@ -213,6 +213,7 @@ class AVDVP9UnitTest(AVDUnitTest):
 			"hdr_104_probs_addr_lsb8",
 			"hdr_118_pps0_tile_addr_lsb8",
 			"hdr_108_pps1_tile_addr_lsb8",
+			"hdr_110_pps2_tile_addr_lsb8",
 
 			"hdr_4c_base_q_idx",
 			"hdr_44_flags1_pt2",

@@ -132,24 +132,24 @@ class AVDVP9HalV3(AVDHal):
 		avd_set(0x4020002, "cm3_dma_config_2")
 		avd_set(0x2020202, "cm3_dma_config_3")
 		avd_set(0x240, "hdr_e0_const_240")
-
 		avd_set(ctx.probs_addr >> 8, "hdr_104_probs_addr_lsb8")
 
-		avd_set(ctx.pps_tile_addrs[0], "hdr_118_pps0_tile_addr_lsb8")
-		avd_set(ctx.pps_tile_addrs[1], "hdr_108_pps1_tile_addr_lsb8", 0)
-		avd_set(ctx.pps_tile_addrs[1], "hdr_108_pps1_tile_addr_lsb8", 1)
+		avd_set(ctx.pps0_tile_addr, "hdr_118_pps0_tile_addr_lsb8")
+		n = ((ctx.access_idx // 128) + 1) % 8
+		avd_set(ctx.pps1_tile_addrs[n], "hdr_108_pps1_tile_addr_lsb8", 0)
+		avd_set(ctx.pps1_tile_addrs[n], "hdr_108_pps1_tile_addr_lsb8", 1)
+
 		if (sl.frame_type == VP9_FRAME_TYPE_KEY):
-			n = 2
-			m = 2
+			n = not (ctx.num_kf) & 1
+			m = not (ctx.num_kf) & 1
+		elif (ctx.last_kf):
+			n = (ctx.num_kf) & 1
+			m = not (ctx.num_kf) & 1
 		else:
-			if (not ctx.access_idx & 1):
-				n = 2
-				m = 3
-			else:
-				n = 3
-				m = 2
-		avd_set(ctx.pps_tile_addrs[n], "hdr_108_pps1_tile_addr_lsb8", 2)
-		avd_set(ctx.pps_tile_addrs[m], "hdr_108_pps1_tile_addr_lsb8", 3)
+			n = (ctx.kidx + ctx.num_kf) & 1
+			m = not (ctx.kidx + ctx.num_kf) & 1
+		avd_set(ctx.pps2_tile_addrs[n], "hdr_110_pps2_tile_addr_lsb8", 0)
+		avd_set(ctx.pps2_tile_addrs[m], "hdr_110_pps2_tile_addr_lsb8", 1)
 		# ---- FW BP ----
 
 		avd_set(sl.base_q_idx * 0x8000, "hdr_4c_base_q_idx")
