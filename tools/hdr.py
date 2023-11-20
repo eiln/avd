@@ -17,10 +17,15 @@ if __name__ == "__main__":
 
 	path = resolve_input(args.input)
 	mode = ffprobe(path)
-	if  (mode == "h264"):
-		from avid.h264.parser import AVDH264Parser
-		parser = AVDH264Parser()
-		sps_list, pps_list, units = parser.parse(path, num=args.num)
+	if  (mode == "h264" or mode == "h265"):
+		if (mode == "h264"):
+			from avid.h264.parser import AVDH264Parser
+			parser = AVDH264Parser()
+			sps_list, pps_list, units = parser.parse(path, num=args.num)
+		if (mode == "h265"):
+			from avid.h265.parser import AVDH265Parser
+			parser = AVDH265Parser()
+			vps_list, sps_list, pps_list, units = parser.parse(path, num=args.num)
 		for n in range(len(sps_list)):
 			if (sps_list[n]):
 				print(sps_list[n])

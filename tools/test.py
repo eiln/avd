@@ -10,6 +10,7 @@ import os
 from avid.fp import *
 from avid.utils import *
 from avid.h264.decoder import AVDH264Decoder
+from avid.h265.decoder import AVDH265Decoder
 from avid.vp9.decoder import AVDVP9Decoder
 from avd_emu import AVDEmulator
 
@@ -197,6 +198,11 @@ class AVDH264UnitTest(AVDUnitTest):
 		]
 		self.emu_ignore_keys = ["inp_8b4d4_slice_addr_low"]
 
+class AVDH265UnitTest(AVDUnitTest):
+	def __init__(self, **kwargs):
+		super().__init__(AVDH265Decoder, **kwargs)
+		self.name = hl("H265", ANSI_PURPLE)
+
 class AVDVP9UnitTest(AVDUnitTest):
 	def __init__(self, **kwargs):
 		super().__init__(AVDVP9Decoder, **kwargs)
@@ -323,6 +329,8 @@ if __name__ == "__main__":
 	mode = ffprobe(args.dir)
 	if  (mode == "h264"):
 		ut = AVDH264UnitTest(**vars(args))
+	elif (mode == "h265"):
+		ut = AVDH265UnitTest(**vars(args))
 	elif (mode == "vp09"):
 		ut = AVDVP9UnitTest(**vars(args))
 	else:

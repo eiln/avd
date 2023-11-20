@@ -137,7 +137,7 @@ def getext(mode):
 
 def mode2fourcc(mode):
     if (mode in ["h264", "avc"]): return "h264"
-    if (mode in ["h264", "hevc"]): return "h265"
+    if (mode in ["h265", "hevc"]): return "h265"
     if (mode in ["vp9", "vp09"]): return "vp09"
     if (mode in ["av1", "av01"]): return "av01"
 
