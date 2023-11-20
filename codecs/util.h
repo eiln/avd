@@ -46,13 +46,30 @@
 		typeof (b) _b = (b);		\
 		_a > _b ? _a : _b;		\
 	})
-
 #endif
+
+#ifndef FFMAX
+#define FFMAX(a,b) ((a) > (b) ? (a) : (b))
+#endif
+#ifndef FFMIN
+#define FFMIN(a,b) ((a) > (b) ? (b) : (a))
+#endif
+
+/* ceil log2 */
+static inline int clog2(uint64_t x)
+{
+	if (!x)
+		return x;
+	int r = 0;
+	while (x - 1 > (1ull << r) - 1)
+		r++;
+	return r;
+}
 
 #define CEILDIV(a, b) (((a) + (b) - 1)/(b))
 
 #define extr(a, b, c) ((uint64_t)(a) << (64 - (b) - (c)) >> (64 - (c)))
-#define extrs(a, b, c) ((int64_t)(a) << (64 - (b) - (c)) >> (64 - (c))) 
+#define extrs(a, b, c) ((int64_t)(a) << (64 - (b) - (c)) >> (64 - (c)))
 #define sext(a, b) extrs((a), 0, (b)+1)
 #define bflmask(a) ((2ull << ((a)-1)) - 1)
 #define insrt(a, b, c, d) ((a) = ((a) & ~(bflmask(c) << (b))) | ((d) & bflmask(c)) << (b))
@@ -96,5 +113,26 @@ static inline int write_to_file(const char *path, char *data, int size)
 	fclose(fp);
 	return 0;
 }
+
+#ifndef av_clip_uintp2
+static inline unsigned av_clip_uintp2_c(int a, int p)
+{
+	if (a & ~((1<<p) - 1)) return -a >> 31 & ((1<<p) - 1);
+	else                   return  a;
+}
+#define av_clip_uintp2 av_clip_uintp2_c
+#endif
+
+#ifndef av_clip
+static inline int av_clip_c(int a, int amin, int amax)
+{
+	if      (a < amin) return amin;
+	else if (a > amax) return amax;
+	else               return a;
+}
+#define av_clip av_clip_c
+#endif
+
+#define EINVALDATA 123
 
 #endif /* __UTIL_H__ */

@@ -27,8 +27,7 @@
 
 int main(int argc, char *argv[])
 {
-	struct h265_context context;
-	struct h265_context *ctx = &context;
+	struct h265_context *ctx = NULL;
 	int size, nal_start, nal_end;
 
 	uint8_t *bytes = NULL;
@@ -42,6 +41,10 @@ int main(int argc, char *argv[])
 	if (!data || size <= 0)
 		return -1;
 
+	ctx = malloc(sizeof(*ctx));
+	if (!ctx)
+		goto free_data;
+
 	bytes = (uint8_t *)data;
 	while (size > 0) {
 		h2645_find_nal_unit(bytes, size, &nal_start, &nal_end);
@@ -51,6 +54,8 @@ int main(int argc, char *argv[])
 		size -= nal_end;
 	}
 
+	free(ctx);
+free_data:
 	free(data);
 
 	return 0;

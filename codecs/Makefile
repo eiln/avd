@@ -1,8 +1,8 @@
-CFLAGS := -fpic -Wall -Wextra -pedantic -Wmissing-prototypes -Wstrict-prototypes
+CFLAGS := -fpic -Wall -Wextra -pedantic -Wmissing-prototypes -Wstrict-prototypes -Wno-sign-compare
 H264_OBJECTS := h264.o h2645.o h264_print.o
 H264_OBJECTS := $(patsubst %,build/%,$(H264_OBJECTS))
 
-H265_OBJECTS := h265.o h2645.o
+H265_OBJECTS := h265.o h2645.o h265_print.o
 H265_OBJECTS := $(patsubst %,build/%,$(H265_OBJECTS))
 
 VP9_OBJECTS := ivf.o vp9.o vp9_data.o vp9_probs.o vpx_rac.o

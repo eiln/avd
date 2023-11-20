@@ -37,51 +37,6 @@
 #define h264_log(a, ...)  printf("[H264] " a, ##__VA_ARGS__)
 #define h264_err(a, ...)  fprintf(stderr, "[H264] " a, ##__VA_ARGS__)
 
-/* ceil log2 */
-static inline int clog2(uint64_t x)
-{
-	if (!x)
-		return x;
-	int r = 0;
-	while (x - 1 > (1ull << r) - 1)
-		r++;
-	return r;
-}
-
-static int h264_more_rbsp_data(struct bitstream *gb)
-{
-	struct bitstream bs_tmp;
-
-	/* No more data */
-	if (bs_eof(gb))
-		return 0;
-
-	/* No rbsp_stop_bit yet */
-	if (bs_peek_u1(gb) == 0)
-		return -1;
-
-	/* Next bit is 1, is it the rsbp_stop_bit? only if the rest of bits are 0 */
-	bs_clone(&bs_tmp, gb);
-	bs_skip_u1(&bs_tmp);
-	while (!bs_eof(&bs_tmp)) {
-		// A later bit was 1, it wasn't the rsbp_stop_bit
-		if (bs_read_u1(&bs_tmp) == 1) {
-			return -1;
-		}
-	}
-
-	/* All following bits were 0, it was the rsbp_stop_bit */
-	return 0;
-}
-
-static void h264_read_rbsp_trailing_bits(struct bitstream *gb)
-{
-	skip_bits1(gb); /* rbsp_stop_one_bit */
-	while (!bs_byte_aligned(gb)) {
-		skip_bits1(gb); /* rbsp_alignment_zero_bit */
-	}
-}
-
 static void h264_parse_scaling_list(struct bitstream *gb, uint32_t *scaling_list,
 				   int size, uint32_t *use_default_flag)
 {
@@ -122,26 +77,6 @@ static int h264_parse_hrd_parameters(struct bitstream *gb, struct h264_hrd_param
 
 	return 0;
 }
-
-static const uint32_t h2645_pixel_aspect_ratios[][2] = {
-	{   0,  1 },
-	{   1,  1 },
-	{  12, 11 },
-	{  10, 11 },
-	{  16, 11 },
-	{  40, 33 },
-	{  24, 11 },
-	{  20, 11 },
-	{  32, 11 },
-	{  80, 33 },
-	{  18, 11 },
-	{  15, 11 },
-	{  64, 33 },
-	{ 160, 99 },
-	{   4,  3 },
-	{   3,  2 },
-	{   2,  1 },
-};
 
 static int h264_parse_vui_parameters(struct bitstream *gb, struct h264_vui *vui)
 {
@@ -574,9 +509,8 @@ static int h264_parse_sps_ext(struct h264_context *ctx, uint32_t *pseq_parameter
 
 	if (get_bits1(gb)) {
 		h264_err("WARNING: additional data in SPS extension\n");
-		while (h264_more_rbsp_data(gb)) {
+		while (h2645_more_rbsp_data(gb))
 			get_bits1(gb);
-		}
 	}
 
 	return 0;
@@ -648,7 +582,7 @@ static int h264_parse_pps(struct h264_context *ctx, struct h264_pps *pps)
 	pps->constrained_intra_pred_flag = get_bits1(gb);
 	pps->redundant_pic_cnt_present_flag = get_bits1(gb);
 
-	if (h264_more_rbsp_data(gb)) {
+	if (h2645_more_rbsp_data(gb)) {
 		pps->transform_8x8_mode_flag = get_bits1(gb);
 		pps->pic_scaling_matrix_present_flag = get_bits1(gb);
 		if (pps->pic_scaling_matrix_present_flag) {
@@ -1152,16 +1086,16 @@ int h264_decode_nal_unit(struct h264_context *ctx, uint8_t *buf, int size)
 		h264_print_slice_header(ctx, sl);
 		break;
 	case H264_NAL_SEI:
-		while (h264_more_rbsp_data(gb))
+		while (h2645_more_rbsp_data(gb))
 			skip_bits1(gb); /* XXX */
-		h264_read_rbsp_trailing_bits(gb);
+		h2645_rbsp_trailing_bits(gb);
 		break;
 	case H264_NAL_SEQPARM:
 		if (h264_parse_sps(gb, &sps)) {
 			h264_err("failed to parse sps\n");
 			goto exit;
 		}
-		h264_read_rbsp_trailing_bits(gb);
+		h2645_rbsp_trailing_bits(gb);
 		h264_print_sps(&sps);
 		if (sps.seq_parameter_set_id >= H264_MAX_SPS_COUNT) {
 			h264_err("SPS id out of bounds\n");
@@ -1174,7 +1108,7 @@ int h264_decode_nal_unit(struct h264_context *ctx, uint8_t *buf, int size)
 			h264_err("failed to parse pps\n");
 			goto exit;
 		}
-		h264_read_rbsp_trailing_bits(gb);
+		h2645_rbsp_trailing_bits(gb);
 		h264_print_pps(&pps);
 		if (pps.pic_parameter_set_id >= H264_MAX_PPS_COUNT) {
 			h264_err("PPS id out of bounds\n");
@@ -1188,12 +1122,12 @@ int h264_decode_nal_unit(struct h264_context *ctx, uint8_t *buf, int size)
 			h264_err("failed to parse sps ext\n");
 			goto exit;
 		}
-		h264_read_rbsp_trailing_bits(gb);
+		h2645_rbsp_trailing_bits(gb);
 		h264_print_sps_ext(h264_get_sps(ctx, pseq_parameter_set_id));
 		break;
 	case H264_NAL_ACC_UNIT_DELIM: {
 		int primary_pic_type = get_bits(gb, 3);
-		h264_read_rbsp_trailing_bits(gb);
+		h2645_rbsp_trailing_bits(gb);
 		printf("Access unit delimiter:\n");
 		static const char *const names[8] = {
 			"I",	 "P+I",	 "P+B+I",     "SI",
@@ -1205,11 +1139,11 @@ int h264_decode_nal_unit(struct h264_context *ctx, uint8_t *buf, int size)
 	}
 	case H264_NAL_END_SEQ:
 		/* noop */
-		h264_read_rbsp_trailing_bits(gb);
+		h2645_rbsp_trailing_bits(gb);
 		break;
 	case H264_NAL_END_STREAM:
 		/* noop */
-		h264_read_rbsp_trailing_bits(gb);
+		h2645_rbsp_trailing_bits(gb);
 		break;
 	case H264_NAL_SUBSET_SEQPARM:
 		if (h264_parse_sps(gb, &sps)) {
@@ -1236,10 +1170,10 @@ int h264_decode_nal_unit(struct h264_context *ctx, uint8_t *buf, int size)
 		}
 		if (get_bits1(gb)) { /* additional_extension_flag */
 			h264_err("WARNING: additional data in subset SPS extension\n");
-			while (h264_more_rbsp_data(gb))
+			while (h2645_more_rbsp_data(gb))
 				get_bits1(gb);
 		}
-		h264_read_rbsp_trailing_bits(gb);
+		h2645_rbsp_trailing_bits(gb);
 		h264_print_sps(&sps);
 		if (sps.seq_parameter_set_id >= H264_MAX_SPS_COUNT) {
 			h264_err("SPS id (%d) out of bounds\n", sps.seq_parameter_set_id);

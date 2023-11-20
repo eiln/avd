@@ -1,20 +1,20 @@
-/* 
+/*
  * h264bitstream - a library for reading and writing H.264 video
  * Copyright (C) 2005-2007 Auroras Entertainment, LLC
  * Copyright (C) 2008-2011 Avail-TVN
- * 
+ *
  * Written by Alex Izvorski <aizvorski@gmail.com> and Alex Giladi <alex.giladi@gmail.com>
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
@@ -66,7 +66,9 @@ static inline void     bs_skip_u(bs_t* b, int n);
 static inline void     bs_skip_u1(bs_t* b);
 
 #define get_bits(gb, n)        (bs_read_u(gb, n))
+#define get_bits_long(gb, n)   (bs_read_u(gb, n))
 #define skip_bits(gb, n)       (bs_skip_u(gb, n))
+#define skip_bits_long(gb, n)  (bs_skip_u(gb, n))
 #define get_bits1(gb)          (bs_read_u1(gb))
 #define skip_bits1(gb)         (bs_skip_u1(gb))
 
@@ -97,6 +99,11 @@ static inline int decode210(struct bitstream *gb)
 static inline int get_bits_count(struct bitstream *gb)
 {
     return gb->bits_left;
+}
+
+static inline int get_bits_pos(struct bitstream *gb)
+{
+    return (((uint64_t)(void *)gb->p) * 8) + (8 - gb->bits_left);
 }
 
 static inline void trailing_bits(struct bitstream *gb)
@@ -137,8 +144,8 @@ static inline bs_t* bs_clone(bs_t* dest, const bs_t* src)
     return dest;
 }
 
-static inline uint32_t bs_byte_aligned(bs_t* b) 
-{ 
+static inline uint32_t bs_byte_aligned(bs_t* b)
+{
     return (b->bits_left == 8);
 }
 
@@ -153,7 +160,7 @@ static inline int bs_bytes_left(bs_t* b) { return (b->end - b->p); }
 static inline uint32_t bs_read_u1(bs_t* b)
 {
     uint32_t r = 0;
-    
+
     b->bits_left--;
 
     if (! bs_eof(b))
@@ -167,7 +174,7 @@ static inline uint32_t bs_read_u1(bs_t* b)
 }
 
 static inline void bs_skip_u1(bs_t* b)
-{    
+{
     b->bits_left--;
     if (b->bits_left == 0) { b->p ++; b->bits_left = 8; }
 }
@@ -198,7 +205,7 @@ static inline uint32_t bs_read_u(bs_t* b, int n)
 static inline void bs_skip_u(bs_t* b, int n)
 {
     int i;
-    for ( i = 0; i < n; i++ ) 
+    for ( i = 0; i < n; i++ )
     {
         bs_skip_u1( b );
     }
@@ -233,7 +240,7 @@ static inline uint32_t bs_read_ue(bs_t* b)
     return r;
 }
 
-static inline int32_t bs_read_se(bs_t* b) 
+static inline int32_t bs_read_se(bs_t* b)
 {
     int32_t r = bs_read_ue(b);
     if (r & 0x01)
@@ -255,7 +262,7 @@ static inline void bs_write_u1(bs_t* b, uint32_t v)
     if (! bs_eof(b))
     {
         // FIXME this is slow, but we must clear bit first
-        // is it better to memset(0) the whole buffer during bs_init() instead? 
+        // is it better to memset(0) the whole buffer during bs_init() instead?
         // if we don't do either, we introduce pretty nasty bugs
         (*(b->p)) &= ~(0x01 << b->bits_left);
         (*(b->p)) |= ((v & 0x01) << b->bits_left);
@@ -336,7 +343,7 @@ static inline void bs_write_ue(bs_t* b, uint32_t v)
         {
             len =  8 + len_table[ v >>  8 ];
         }
-        else 
+        else
         {
             len = len_table[ v ];
         }

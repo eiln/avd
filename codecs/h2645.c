@@ -25,7 +25,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <stdint.h>
 #include "h2645.h"
 
 int h2645_find_nal_unit(uint8_t *buf, int size, int *nal_start, int *nal_end)
@@ -117,4 +116,37 @@ int h2645_nal_to_rbsp(const uint8_t *nal_buf, int *nal_size, uint8_t *rbsp_buf, 
 	*nal_size = i;
 	*rbsp_size = j;
 	return j;
+}
+
+int h2645_more_rbsp_data(struct bitstream *gb)
+{
+	struct bitstream bs_tmp;
+
+	/* No more data */
+	if (bs_eof(gb))
+		return 0;
+
+	/* No rbsp_stop_bit yet */
+	if (bs_peek_u1(gb) == 0)
+		return -1;
+
+	/* Next bit is 1, is it the rsbp_stop_bit? only if the rest of bits are 0 */
+	bs_clone(&bs_tmp, gb);
+	bs_skip_u1(&bs_tmp);
+	while (!bs_eof(&bs_tmp)) {
+		// A later bit was 1, it wasn't the rsbp_stop_bit
+		if (bs_read_u1(&bs_tmp) == 1) {
+			return -1;
+		}
+	}
+
+	/* All following bits were 0, it was the rsbp_stop_bit */
+	return 0;
+}
+
+void h2645_rbsp_trailing_bits(struct bitstream *gb)
+{
+	skip_bits1(gb); /* rbsp_stop_one_bit */
+	while (!bs_byte_aligned(gb))
+		skip_bits1(gb); /* rbsp_alignment_zero_bit */
 }
