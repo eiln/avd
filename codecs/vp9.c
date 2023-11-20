@@ -167,8 +167,8 @@ static void vp9_parse_frame_size(VP9Context *s)
 static void vp9_parse_render_size(VP9Context *s)
 {
     if (get_bits1(&s->gb)) { // render_and_frame_size_different
-        get_bits(&s->gb, 16) + 1;
-        get_bits(&s->gb, 16) + 1;
+        get_bits(&s->gb, 16);
+        get_bits(&s->gb, 16);
     }
 }
 
