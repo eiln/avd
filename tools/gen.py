@@ -23,6 +23,9 @@ if __name__ == "__main__":
 	elif (mode == "vp09"):
 		from avid.vp9.decoder import AVDVP9Decoder
 		dec = AVDVP9Decoder()
+	elif  (mode == "h265"):
+		from avid.h265.decoder import AVDH265Decoder
+		dec = AVDH265Decoder()
 	else:
 		raise ValueError("Not supported")
 
