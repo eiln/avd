@@ -123,6 +123,22 @@ class AVDUnitTest:
 					x1r = hl(x1r, ANSI_RED)
 				diff = f'{x0r} | {x1r} | {x1.get_disp_name()}'
 				self.log(s + diff)
+		if (l0 > l1):
+			for n in range(l0 - l1):
+				x0 = inst0_stream[n + l1]
+				x1 = 0xdeadbeef
+
+				s = ""
+				if (self.args.show_index):
+					s += f'[{hl(str(sl.idx).rjust(2), ANSI_CYAN)}]'
+				s += f'[{hl(str(n + l1).rjust(2), ANSI_GREEN)}] '
+				x0r = f'{hex(x0).rjust(2+8)}'
+				x1r = f'{hex(x1).rjust(2+8)}'
+				if (x0 != x1):
+					x0r = hl(x0r, ANSI_RED)
+					#x1r = hl(x1r, ANSI_RED)
+				diff = f'{x0r} | {x1r} | '
+				self.log(s + diff)
 
 	def test_emu(self, args):
 		self.dec.hal.stfu = True
