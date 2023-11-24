@@ -31,7 +31,6 @@ class AVDUnitTest:
 		self.args = dotdict(kwargs)
 		if (self.args.debug_mode):
 			self.dec.stfu = False
-			self.dec.hal.stfu = False
 
 	def log(self, x, verbose=False):
 		if ((not self.args.stfu) and ((not verbose) or (verbose and self.args.verbose))):
@@ -39,7 +38,7 @@ class AVDUnitTest:
 
 	def diff_fp_field(self, sl, x0, x1, name):
 		if (x1 == 0): return # they fill out N/A fields
-		if (x0 != x1):
+		if (x0 != x1) and (not (self.args.debug_mode)):
 			print(sl)
 		cassert(x0, x1, name)
 
@@ -54,7 +53,6 @@ class AVDUnitTest:
 			if (isinstance(x0, ListContainer)):
 				num = len(x0) if not count else count
 				for n in range(num):
-					if (x1[n] == 0): continue  # they fill out N/A fields
 					self.diff_fp_field(sl, x0[n], x1[n],  "%s[%d]" % (name, n))
 			else:
 				self.diff_fp_field(sl, x0, x1,  name)
@@ -84,10 +82,19 @@ class AVDUnitTest:
 				print(sl.show_slice_header().strip())
 			if (self.args.show_headers):
 				print(sl)
-			#if (self.args.debug_mode):
-			#	print(fp0)
+			if (self.args.show_fp):
+				print(fp0)
 
 			inst = self.dec.decode(sl)
+			if (self.args.debug_mode):
+				for x in inst:
+					if (x.name in self.fp_keys):
+						c = ANSI_GREEN
+					elif ("cm3" in x.name):
+						c = None
+					else:
+						c = ANSI_RED
+					self.log(x.rep(clr=c))
 			fp1 = self.dec.ffp
 			res = self.diff_fp(sl, fp0, fp1, args)
 
@@ -337,6 +344,7 @@ if __name__ == "__main__":
 	parser.add_argument('--show-headers', action='store_true')
 	parser.add_argument('--show-index', action='store_true')
 	parser.add_argument('--show-paths', action='store_true')
+	parser.add_argument('--show-fp', action='store_true')
 
 	args = parser.parse_args()
 	args.firmware = resolve_input(args.firmware)

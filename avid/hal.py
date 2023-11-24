@@ -21,11 +21,14 @@ class AVDInst(namedtuple('AVDInst', ['val', 'name', 'pos', 'idx'])):
 			disp_name += f"{c}[\033[0m{self.idx}{c}]\033[0m"
 		return disp_name
 
-	def __repr__(self):
+	def rep(self, clr=ANSI_GREEN):
 		disp_name = self.get_disp_name()
 		disp_val = f"{hex(self.val).rjust(2+8)}"
-		disp_idx = f"[{hl(str(self.pos).rjust(2), ANSI_GREEN)}]"
+		disp_idx = f"[{hl(str(self.pos).rjust(2), clr)}]"
 		return f'{disp_idx} {disp_val} | {disp_name}'
+
+	def __repr__(self):
+		return self.rep(self)
 
 class AVDHal:
 	def __init__(self):
