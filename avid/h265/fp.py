@@ -104,7 +104,7 @@ class AVDH265V3Slice(AVDFrameParams):
 		"slc_b0c_cmd_weights_weights" / Array(24, u32),
 		"slc_b6c_cmd_weights_offsets" / Array(24, u32),
 		"slc_bcc_cmd_slice_qp" / ExprValidator(u32, obj_ & 0x2d900000 == 0x2d900000),
-		"slc_bd0_cmd_da" / ExprValidator(u32, obj_ & 0x2da00000 == 0x2da00000),
+		"slc_bd0_cmd_flags" / ExprValidator(u32, obj_ & 0x2da00000 == 0x2da00000),
 		"slc_bd4_sps_tile_addr2_lsb8" / u32,
 		"slc_bd8_slice_addr" / u32,
 		"slc_bdc_slice_size" / u32,

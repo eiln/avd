@@ -1875,6 +1875,14 @@ static int hevc_decode_slice_header(struct h265_context *s, struct hevc_slice_he
             sh->slice_beta_offset     = pps->pps_beta_offset;
             sh->slice_tc_offset       = pps->pps_tc_offset;
         }
+
+        if (pps->pps_loop_filter_across_slices_enabled_flag &&
+            (sh->slice_sao_luma_flag || sh->slice_sao_chroma_flag ||
+            !sh->slice_deblocking_filter_disabled_flag))
+            sh->slice_loop_filter_across_slices_enabled_flag = get_bits1(gb);
+        else
+            sh->slice_loop_filter_across_slices_enabled_flag =
+                pps->pps_loop_filter_across_slices_enabled_flag;
     }
 
     if (pps->tiles_enabled_flag || pps->entropy_coding_sync_enabled_flag) {

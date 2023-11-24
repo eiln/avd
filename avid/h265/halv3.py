@@ -185,11 +185,14 @@ class AVDH265HalV3(AVDHal):
 
 		avd_set(0x2d900000 | ((26 + self.get_pps(ctx, sl).pic_init_qp_minus26 + sl.slice_qp_delta) * 0x400), "slc_bcc_cmd_slice_qp")
 
-		x = 0xc0
-		x |= 0x50000
-		if (IS_IDR(sl) or (ctx.access_idx & 1)):
-			x |= 0x20000
-		avd_set(0x2da00000 | x, "slc_bd0_cmd_da")
+		x = 0
+		x |= set_bit(6)
+		x |= set_bit(7)
+		x |= set_bit(16)
+		if (sl.slice_loop_filter_across_slices_enabled_flag):
+			x |= set_bit(17)
+		x |= set_bit(18)
+		avd_set(0x2da00000 | x, "slc_bd0_cmd_flags")
 
 		if (sl.slice_type == HEVC_SLICE_P) or (sl.slice_type == HEVC_SLICE_B):
 			lx = 0

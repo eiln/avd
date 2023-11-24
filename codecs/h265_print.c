@@ -506,6 +506,8 @@ void h265_print_nal_slice_header(struct h265_context *s, struct hevc_slice_heade
         h265_field("slice_deblocking_filter_disabled_flag", sh->slice_deblocking_filter_disabled_flag);
         h265_field("slice_beta_offset", sh->slice_beta_offset);
         h265_field("slice_tc_offset", sh->slice_tc_offset);
+
+        h265_field("slice_loop_filter_across_slices_enabled_flag", sh->slice_loop_filter_across_slices_enabled_flag);
     }
 
     if (pps->tiles_enabled_flag || pps->entropy_coding_sync_enabled_flag) {
