@@ -35,14 +35,14 @@ class AVDH265Slice(AVDSlice):
 			new = b'\x00' + dat
 			return new[:2] + b'\x00.' + new[4:]
 		payload = transform(self.payload)
-		if (IS_IDR(self)):
+		if (IS_INTRA(self)):
 			start = 0
 		else:
 			start = 1
 		return payload[start:]
 
 	def get_payload_offset(self):
-		return ceil(self.slice_header_size / 8) + 4
+		return (self.slice_header_size // 8) + 1 + 4
 
 	def get_payload_size(self):
 		return len(self.get_payload()) - self.get_payload_offset()

@@ -1914,8 +1914,6 @@ static int hevc_decode_slice_header(struct h265_context *s, struct hevc_slice_he
             skip_bits(gb, 8);  // slice_header_extension_data_byte
     }
 
-    h2645_rbsp_trailing_bits(gb); /* byte alignment */
-
 	return 0;
 }
 
@@ -2002,8 +2000,9 @@ int h265_decode_nal_unit(struct h265_context *s, uint8_t *buf, int size)
 		err = hevc_decode_slice_header(s, &s->sh);
 		if (err < 0)
 			goto exit;
-        h265_print_nal_slice_header(s, &s->sh);
         end_pos = get_bits_pos(gb);
+        h2645_rbsp_trailing_bits(gb); /* byte alignment */
+        h265_print_nal_slice_header(s, &s->sh);
         h265_fieldl("slice_header_size", end_pos - start_pos);
 		break;
 	case HEVC_NAL_EOS_NUT:

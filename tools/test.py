@@ -251,6 +251,7 @@ class AVDH265UnitTest(AVDUnitTest):
 			"slc_a8c_cmd_ref_type",
 			#"slc_bd4_sps_tile_addr2_lsb8",
 			"slc_be0_unk_100",
+			"slc_bdc_slice_size",
 		]
 
 class AVDVP9UnitTest(AVDUnitTest):
