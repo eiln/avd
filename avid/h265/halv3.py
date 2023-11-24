@@ -61,7 +61,7 @@ class AVDH265HalV3(AVDHal):
 		# ---- FW BP -----
 
 		x = 0x12e0
-		if (IS_IDR(sl)):
+		if (IS_INTRA(sl)):
 			x |= 0x2000
 		avd_set(0x2db00000 | x, "hdr_34_cmd_start_hdr")
 		avd_set(0x00000000, "mode")

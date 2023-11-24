@@ -13,11 +13,14 @@ class AVDH265Slice(AVDSlice):
 	def __init__(self):
 		super().__init__()
 		self._banned_keys = ["payload", "nal_unit_type", "idx"]
-		self._reprwidth = 38
+		self._reprwidth = 39
 		self.mode = "h265"
 
 	def __repr__(self):
-		s = "\n[slice: %d nal_unit_type: %d idr: %d slice_type: %s]\n" % (self.idx, self.nal_unit_type, IS_IDR(self), self.get_slice_str(self.slice_type))
+		s = "\n[slice: %d nal_unit_type: %d intra: %d" % (self.idx, self.nal_unit_type, IS_INTRA(self))
+		if (IS_SLICE(self)):
+			s += " slice_type: %s" % (self.get_slice_str(self.slice_type))
+		s += "]\n"
 		s += self.show_entries()
 		return s
 

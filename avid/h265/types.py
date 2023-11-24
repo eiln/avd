@@ -133,6 +133,13 @@ HEVC_MAX_PALETTE_PREDICTOR_SIZE = 128
 def IS_IDR(s): return s.nal_unit_type == HEVC_NAL_IDR_W_RADL or s.nal_unit_type == HEVC_NAL_IDR_N_LP
 def IS_BLA(s): return s.nal_unit_type == HEVC_NAL_BLA_W_RADL or s.nal_unit_type == HEVC_NAL_BLA_W_LP or s.nal_unit_type == HEVC_NAL_BLA_N_LP
 def IS_IRAP(s): return s.nal_unit_type == HEVC_NAL_BLA_W_LP or s.nal_unit_type <= HEVC_NAL_RSV_IRAP_VCL23
+def IS_SLICE(s): return (s.nal_unit_type in [HEVC_NAL_TRAIL_R, HEVC_NAL_TRAIL_N, HEVC_NAL_TSA_N,HEVC_NAL_TSA_R, HEVC_NAL_STSA_N, HEVC_NAL_STSA_R, HEVC_NAL_BLA_W_LP, HEVC_NAL_BLA_W_RADL, HEVC_NAL_BLA_N_LP, HEVC_NAL_IDR_W_RADL, HEVC_NAL_IDR_N_LP, HEVC_NAL_CRA_NUT, HEVC_NAL_RADL_N, HEVC_NAL_RADL_R, HEVC_NAL_RASL_N, HEVC_NAL_RASL_R])
+def IS_INTRA(s): return IS_IDR(s) or (IS_SLICE(s) and s.slice_type == HEVC_SLICE_I)
 
 HEVC_REF_ST = 0
 HEVC_REF_LT = 1
+
+HEVC_CHROMA_IDC_400 = 0
+HEVC_CHROMA_IDC_420 = 1
+HEVC_CHROMA_IDC_422 = 2
+HEVC_CHROMA_IDC_444 = 3

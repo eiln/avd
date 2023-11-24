@@ -20,7 +20,7 @@ class AVDH265Picture(dotdict):
 class AVDH265Decoder(AVDDecoder):
 	def __init__(self):
 		super().__init__(AVDH265Parser, AVDH265HalV3, AVDH265V3FrameParams)
-		self.mode = "h264"
+		self.mode = "h265"
 
 	def get_pps(self, sl):
 		return self.ctx.pps_list[sl.slice_pic_parameter_set_id]
@@ -97,6 +97,8 @@ class AVDH265Decoder(AVDDecoder):
 		hs = round_up(ctx.height, 32)
 		ctx.rvra_size0 = (ws * hs) + ((ws * hs) // 4) # 1. luma padded to stride 32, 4x4
 		ctx.rvra_size2 = ctx.rvra_size0  # 2. chroma, 422
+		if (sps.chroma_format_idc == HEVC_CHROMA_IDC_420):
+			ctx.rvra_size2 //= 2
 
 		# 3. luma weights, likely
 		ctx.rvra_size1 = ((nextpow2(ctx.height) // 32) * nextpow2(ctx.width))
