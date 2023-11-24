@@ -225,6 +225,33 @@ class AVDH265UnitTest(AVDUnitTest):
 	def __init__(self, **kwargs):
 		super().__init__(AVDH265Decoder, **kwargs)
 		self.name = hl("H265", ANSI_PURPLE)
+		self.fp_keys = [
+			"hdr_4c_cmd_start_hdr",
+			"hdr_50_mode",
+			"hdr_54_height_width",
+			"hdr_58_pixfmt_zero",
+
+			"hdr_28_height_width_shift3",
+			"hdr_2c_sps_param",
+			"hdr_30_flag_pt1",
+			"hdr_34_flag_pt2",
+			"hdr_5c_flag_pt3",
+			"hdr_98_const_30",
+
+			"hdr_1b4_y_addr_lsb8",
+			"hdr_1b8_uv_addr_lsb8",
+			"hdr_1bc_width_align",
+			"hdr_1c0_width_align",
+
+			"slc_bcc_cmd_slice_qp",
+			"slc_bd0_cmd_flags",
+			"slc_b08_cmd_weights_denom",
+			"slc_b0c_cmd_weights_weights",
+			"slc_b6c_cmd_weights_offsets",
+			"slc_a8c_cmd_ref_type",
+			#"slc_bd4_sps_tile_addr2_lsb8",
+			"slc_be0_unk_100",
+		]
 
 class AVDVP9UnitTest(AVDUnitTest):
 	def __init__(self, **kwargs):
