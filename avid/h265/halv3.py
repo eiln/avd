@@ -72,9 +72,23 @@ class AVDH265HalV3(AVDHal):
 		x = 0x1000000 * self.get_sps(ctx, sl).chroma_format_idc | 0x1980
 		avd_set(x, "hdr_2c_sps_param")
 
-		avd_set(0x0)
-		avd_set(0x208)
-		avd_set(0x130018)
+		x = 0
+		avd_set(x, "hdr_30_flag_pt1")
+
+		x = 0
+		x |= set_bit(3)
+		x |= set_bit(9)
+		avd_set(x, "hdr_34_flag_pt2")
+
+		x = 0
+		x |= set_bit(3)
+		x |= set_bit(4)
+		x |= set_bit(16)
+		x |= set_bit(17)
+		x |= set_bit(20)
+		if (not IS_INTRA(sl)):
+			x |= set_bit(21)
+		avd_set(x, "hdr_5c_flag_pt3")
 
 		for n in range(7):
 			avd_set(0x0)

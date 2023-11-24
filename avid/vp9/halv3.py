@@ -8,8 +8,6 @@ from .fp import *
 from .types import *
 from copy import deepcopy
 
-def set_bit(n, x=1): return ((x != 0) << n)
-
 class AVDVP9HalV3(AVDHal):
 	def __init__(self):
 		super().__init__()

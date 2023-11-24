@@ -38,6 +38,8 @@ def flog2(x):
 		raise ValueError("domain error")
 	return x.bit_length() - 1
 
+def set_bit(n, x=1): return ((x != 0) << n)
+
 ANSI_RED    = 31
 ANSI_GREEN  = 32
 ANSI_YELLOW = 33
