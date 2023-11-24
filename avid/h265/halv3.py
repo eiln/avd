@@ -47,11 +47,11 @@ class AVDH265HalV3(AVDHal):
 			delta = delta_base - rvra.poc
 			pred = pred + delta
 			x = ((len(ctx.dpb_list) - 1) * 0x10000000) | 0x1000000 | swrap(pred, 0x20000)
-			avd_set(x, "hdr_d0_ref_hdr", n)
-			avd_set((rvra.addr + self.rvra_offset(ctx, 0)) >> 7, "hdr_110_ref0_addr_lsb7", n)
-			avd_set((rvra.addr + self.rvra_offset(ctx, 1)) >> 7, "hdr_150_ref1_addr_lsb7", n)
-			avd_set((rvra.addr + self.rvra_offset(ctx, 2)) >> 7, "hdr_190_ref2_addr_lsb7", n)
-			avd_set((rvra.addr + self.rvra_offset(ctx, 3)) >> 7, "hdr_1d0_ref3_addr_lsb7", n)
+			avd_set(x, "hdr_114_ref_hdr", n)
+			avd_set((rvra.addr + self.rvra_offset(ctx, 0)) >> 7, "hdr_134_ref0_addr_lsb7", n)
+			avd_set((rvra.addr + self.rvra_offset(ctx, 1)) >> 7, "hdr_154_ref1_addr_lsb7", n)
+			avd_set((rvra.addr + self.rvra_offset(ctx, 2)) >> 7, "hdr_174_ref2_addr_lsb7", n)
+			avd_set((rvra.addr + self.rvra_offset(ctx, 3)) >> 7, "hdr_194_ref3_addr_lsb7", n)
 
 	def set_header(self, ctx, sl):
 		avd_set = self.avd_set
@@ -63,10 +63,10 @@ class AVDH265HalV3(AVDHal):
 		x = 0x12e0
 		if (IS_INTRA(sl)):
 			x |= 0x2000
-		avd_set(0x2db00000 | x, "hdr_34_cmd_start_hdr")
-		avd_set(0x00000000, "mode")
-		avd_set((((ctx.height - 1) & 0xffff) << 16) | ((ctx.width - 1) & 0xffff), "hdr_3c_height_width")
-		avd_set(0x0, "hdr_38_pixfmt")
+		avd_set(0x2db00000 | x, "hdr_4c_cmd_start_hdr")
+		avd_set(0x00000000, "hdr_50_mode")
+		avd_set((((ctx.height - 1) & 0xffff) << 16) | ((ctx.width - 1) & 0xffff), "hdr_54_height_width")
+		avd_set(0x0, "hdr_58_pixfmt_zero")
 		avd_set((((ctx.height - 1) >> 3) << 16) | ((ctx.width - 1) >> 3), "hdr_28_height_width_shift3")
 
 		x = 0x1000000 * self.get_sps(ctx, sl).chroma_format_idc | 0x1980
@@ -79,13 +79,10 @@ class AVDH265HalV3(AVDHal):
 		for n in range(7):
 			avd_set(0x0)
 
-		x = 0x100000
-		x |= 0x200000
-		avd_set(x, "hdr_44_is_idr_mask")
-
+		avd_set(0x300000, "hdr_98_const_30")
 		avd_set(0x4020002, "cm3_dma_config_1")
 		avd_set(0x20002, "cm3_dma_config_2")
-		avd_set(0x0)
+		avd_set(0x0, "cm3_mark_end_section")
 		# ---- FW BP -----
 
 		avd_set(0x4020002, "cm3_dma_config_3")
@@ -102,24 +99,23 @@ class AVDH265HalV3(AVDHal):
 		avd_set(0x70007, "cm3_dma_config_5")
 
 		x = sl.pic.addr
-		avd_set((x + self.rvra_offset(ctx, 0)) >> 7, "hdr_c0_curr_ref_addr_lsb7", 0)
-		avd_set((x + self.rvra_offset(ctx, 1)) >> 7, "hdr_c0_curr_ref_addr_lsb7", 1)
-		avd_set((x + self.rvra_offset(ctx, 2)) >> 7, "hdr_c0_curr_ref_addr_lsb7", 2)
-		avd_set((x + self.rvra_offset(ctx, 3)) >> 7, "hdr_c0_curr_ref_addr_lsb7", 3)
+		avd_set((x + self.rvra_offset(ctx, 0)) >> 7, "hdr_104_curr_ref_addr_lsb7", 0)
+		avd_set((x + self.rvra_offset(ctx, 1)) >> 7, "hdr_104_curr_ref_addr_lsb7", 1)
+		avd_set((x + self.rvra_offset(ctx, 2)) >> 7, "hdr_104_curr_ref_addr_lsb7", 2)
+		avd_set((x + self.rvra_offset(ctx, 3)) >> 7, "hdr_104_curr_ref_addr_lsb7", 3)
+		avd_set(0x0, "cm3_mark_end_section")
 
-		avd_set(0x0)
-
-		avd_set(ctx.y_addr >> 8, "hdr_210_y_addr_lsb8")
-		avd_set((round_up(ctx.width, 64) >> 6) << 2, "hdr_218_width_align")
-		avd_set(ctx.uv_addr >> 8, "hdr_214_uv_addr_lsb8")
-		avd_set((round_up(ctx.width, 64) >> 6) << 2, "hdr_21c_width_align")
-		avd_set(0x0)
+		avd_set(ctx.y_addr >> 8, "hdr_1b4_y_addr_lsb8")
+		avd_set((round_up(ctx.width, 64) >> 6) << 2, "hdr_1bc_width_align")
+		avd_set(ctx.uv_addr >> 8, "hdr_1b8_uv_addr_lsb8")
+		avd_set((round_up(ctx.width, 64) >> 6) << 2, "hdr_1c0_width_align")
+		avd_set(0x0, "cm3_mark_end_section")
 		avd_set((((ctx.height - 1) & 0xffff) << 16) | ((ctx.width - 1) & 0xffff), "hdr_54_height_width")
 
 		if not (IS_IDR(sl)):
 			self.set_refs(ctx, sl)
 
-		avd_set(0x0)
+		avd_set(0x0, "cm3_mark_end_section")
 		# ---- FW BP -----
 
 	def set_weights(self, ctx, sl):
@@ -127,76 +123,76 @@ class AVDH265HalV3(AVDHal):
 
 		x = 0x2dd00000
 		if (sl.has_luma_weights == 0):
-			avd_set(x, "slc_76c_cmd_weights_denom")
+			avd_set(x, "slc_b08_cmd_weights_denom")
 			return
 		if (sl.slice_type == HEVC_SLICE_P):
 			x |= 0x40
 		else:
 			x |= 0xad
 		x |= (sl.luma_log2_weight_denom << 3) | sl.chroma_log2_weight_denom
-		avd_set(x, "slc_76c_cmd_weights_denom")
+		avd_set(x, "slc_b08_cmd_weights_denom")
 
 		def get_wbase(i, j): return 0x2de00000 | ((j + 1) * 0x4000) | (i * 0x200)
 		num = 0
 		for i in range(sl.num_ref_idx_l0_active_minus1 + 1):
 			if (sl.luma_weight_l0_flag[i]):
-				avd_set(get_wbase(i, 0) | sl.luma_weight_l0[i], "slc_770_cmd_weights_weights", num)
-				avd_set(0x2df00000 | swrap(sl.luma_offset_l0[i], 0x10000), "slc_8f0_cmd_weights_offsets", num)
+				avd_set(get_wbase(i, 0) | sl.luma_weight_l0[i], "slc_b0c_cmd_weights_weights", num)
+				avd_set(0x2df00000 | swrap(sl.luma_offset_l0[i], 0x10000), "slc_b6c_cmd_weights_offsets", num)
 				num += 1
 			if (sl.chroma_weight_l0_flag[i]):
-				avd_set(get_wbase(i, 1) | sl.chroma_weight_l0[i][0], "slc_770_cmd_weights_weights", num)
-				avd_set(0x2df00000 | swrap(sl.chroma_offset_l0[i][0], 0x10000), "slc_8f0_cmd_weights_offsets", num)
+				avd_set(get_wbase(i, 1) | sl.chroma_weight_l0[i][0], "slc_b0c_cmd_weights_weights", num)
+				avd_set(0x2df00000 | swrap(sl.chroma_offset_l0[i][0], 0x10000), "slc_b6c_cmd_weights_offsets", num)
 				num += 1
-				avd_set(get_wbase(i, 2) | sl.chroma_weight_l0[i][1], "slc_770_cmd_weights_weights", num)
-				avd_set(0x2df00000 | swrap(sl.chroma_offset_l0[i][1], 0x10000), "slc_8f0_cmd_weights_offsets", num)
+				avd_set(get_wbase(i, 2) | sl.chroma_weight_l0[i][1], "slc_b0c_cmd_weights_weights", num)
+				avd_set(0x2df00000 | swrap(sl.chroma_offset_l0[i][1], 0x10000), "slc_b6c_cmd_weights_offsets", num)
 				num += 1
 
 		if (sl.slice_type == HEVC_SLICE_B):
 			for i in range(sl.num_ref_idx_l1_active_minus1 + 1):
 				if (sl.luma_weight_l1_flag[i]):
-					avd_set(get_wbase(i, 0) | sl.luma_weight_l1[i], "slc_770_cmd_weights_weights", num)
-					avd_set(0x2df00000 | swrap(sl.luma_offset_l1[i], 0x10000), "slc_8f0_cmd_weights_offsets", num)
+					avd_set(get_wbase(i, 0) | sl.luma_weight_l1[i], "slc_b0c_cmd_weights_weights", num)
+					avd_set(0x2df00000 | swrap(sl.luma_offset_l1[i], 0x10000), "slc_b6c_cmd_weights_offsets", num)
 					num += 1
 				if (sl.chroma_weight_l1_flag[i]):
-					avd_set(get_wbase(i, 1) | sl.chroma_weight_l1[i][0], "slc_770_cmd_weights_weights", num)
-					avd_set(0x2df00000 | swrap(sl.chroma_offset_l1[i][0], 0x10000), "slc_8f0_cmd_weights_offsets", num)
+					avd_set(get_wbase(i, 1) | sl.chroma_weight_l1[i][0], "slc_b0c_cmd_weights_weights", num)
+					avd_set(0x2df00000 | swrap(sl.chroma_offset_l1[i][0], 0x10000), "slc_b6c_cmd_weights_offsets", num)
 					num += 1
 					avd_set(get_wbase(i, 2) | sl.chroma_weight_l1[i][1], num)
-					avd_set(0x2df00000 | swrap(sl.chroma_offset_l1[i][1], 0x10000), "slc_8f0_cmd_weights_offsets", num)
+					avd_set(0x2df00000 | swrap(sl.chroma_offset_l1[i][1], 0x10000), "slc_b6c_cmd_weights_offsets", num)
 					num += 1
 
 	def set_slice(self, ctx, sl):
 		avd_set = self.avd_set
-		avd_set(0x2d800000 | 0x6000, "slc_a7c_cmd_d8")
-		avd_set(ctx.slice_data_addr + sl.get_payload_offset(), "inp_8b4d4_slice_addr_low")
-		avd_set(sl.get_payload_size(), "inp_8b4d8_slice_hdr_size")
-		avd_set(0x2c000000)
+		avd_set(0x2d800000 | 0x6000, "cm3_cmd_set_coded_slice")
+		avd_set(ctx.slice_data_addr + sl.get_payload_offset(), "slc_bd8_slice_addr")
+		avd_set(sl.get_payload_size(), "slc_bdc_slice_size")
+		avd_set(0x2c000000, "cm3_cmd_exec_mb_vp")
 		# ---- FW BP -----
 
-		avd_set(0x2d900000 | ((26 + self.get_pps(ctx, sl).pic_init_qp_minus26 + sl.slice_qp_delta) * 0x400), "slc_a70_cmd_slice_qpy")
+		avd_set(0x2d900000 | ((26 + self.get_pps(ctx, sl).pic_init_qp_minus26 + sl.slice_qp_delta) * 0x400), "slc_bcc_cmd_slice_qp")
 
 		x = 0xc0
 		x |= 0x50000
 		if (IS_IDR(sl) or (ctx.access_idx & 1)):
 			x |= 0x20000
-		avd_set(0x2da00000 | x, "slc_a74_cmd_a3")
+		avd_set(0x2da00000 | x, "slc_bd0_cmd_da")
 
 		if (sl.slice_type == HEVC_SLICE_P) or (sl.slice_type == HEVC_SLICE_B):
 			lx = 0
 			for i,lst in enumerate(sl.pic.list0):
 				pos = list([x.pic_num for x in ctx.dpb_list]).index(lst.pic_num)
-				avd_set(0x2dc00000 | (lx << 8) | (i << 4) | pos, "slc_6e8_cmd_ref_list_0", i)
+				avd_set(0x2dc00000 | (lx << 8) | (i << 4) | pos, "slc_a90_cmd_ref_list", i)
 			if (sl.slice_type == HEVC_SLICE_B):
 				lx = 1
 				for i,lst in enumerate(sl.pic.list1):
 					pos = list([x.pic_num for x in ctx.dpb_list]).index(lst.pic_num)
 					avd_set(0x2dc00000 | (lx << 8) | (i << 4) | pos,
-					"slc_6e8_cmd_ref_list_0", i + len(sl.pic.list0))
+					"slc_a90_cmd_ref_list", i + len(sl.pic.list0))
 		if (sl.slice_type == HEVC_SLICE_P) or (sl.slice_type == HEVC_SLICE_B):
 			self.set_weights(ctx, sl)
 
-		avd_set(0x2a000000)
-		avd_set(0x1)
+		avd_set(0x2a000000, "cm3_cmd_set_one")
+		avd_set(0x1, "cm3_set_one")
 
 		x = 0x2d000000
 		if   (sl.slice_type == HEVC_SLICE_I):
@@ -216,12 +212,12 @@ class AVDH265HalV3(AVDHal):
 					if (not sl.collocated_from_l0_flag):
 						x |= 0x50
 					x |= sl.num_ref_idx_l1_active_minus1 << 7
-		avd_set(x, "slc_6e4_cmd_ref_type")
+		avd_set(x, "slc_a8c_cmd_ref_type")
 
 		if (sl.slice_type == HEVC_SLICE_P) or (sl.slice_type == HEVC_SLICE_B):
 			n = 0
-			avd_set(self.get_sps_tile_iova(ctx, n) >> 8, "sps_tile_addr_b")
-		avd_set(0x1000000)
+			avd_set(self.get_sps_tile_iova(ctx, n) >> 8, "slc_bd4_sps_tile_addr2_lsb8")
+		avd_set(0x1000000, "slc_be0_unk_100")
 
 		avd_set(0x2b000000 | 0x400, "cm3_cmd_inst_fifo_end")
 
