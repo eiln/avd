@@ -403,7 +403,6 @@ static void h265_print_pred_weight_table(struct hevc_slice_header *sh)
     for (i = 0; i < sh->num_ref_idx_l0_active; i++) {
         h265_field("luma_weight_l0_flag[%d]", i, sh->luma_weight_l0_flag[i]);
         if (sh->luma_weight_l0_flag[i]) {
-            h265_field("delta_luma_weight_l0[%d]", i, sh->delta_luma_weight_l0[i]);
             h265_field("luma_weight_l0[%d]", i, sh->luma_weight_l0[i]);
             h265_field("luma_offset_l0[%d]", i, sh->luma_offset_l0[i]);
         }
@@ -411,13 +410,8 @@ static void h265_print_pred_weight_table(struct hevc_slice_header *sh)
         h265_field("chroma_weight_l0_flag[%d]", i, sh->chroma_weight_l0_flag[i]);
         if (sh->chroma_weight_l0_flag[i]) {
         // No I can't get the fucking macro to work
-        h265_field("delta_chroma_weight_l0[%d][0]", i, sh->delta_chroma_weight_l0[i][0]);
-        h265_field("delta_chroma_offset_l0[%d][0]", i, sh->delta_chroma_offset_l0[i][0]);
         h265_field("chroma_weight_l0[%d][0]", i, sh->chroma_weight_l0[i][0]);
         h265_field("chroma_offset_l0[%d][0]", i, sh->chroma_offset_l0[i][0]);
-
-        h265_field("delta_chroma_weight_l0[%d][1]", i, sh->delta_chroma_weight_l0[i][1]);
-        h265_field("delta_chroma_offset_l0[%d][1]", i, sh->delta_chroma_offset_l0[i][1]);
         h265_field("chroma_weight_l0[%d][1]", i, sh->chroma_weight_l0[i][1]);
         h265_field("chroma_offset_l0[%d][1]", i, sh->chroma_offset_l0[i][1]);
         }
@@ -427,20 +421,14 @@ static void h265_print_pred_weight_table(struct hevc_slice_header *sh)
         for (i = 0; i < sh->num_ref_idx_l1_active; i++) {
             h265_field("luma_weight_l1_flag[%d]", i, sh->luma_weight_l1_flag[i]);
             if (sh->luma_weight_l1_flag[i]) {
-                h265_field("delta_luma_weight_l1[%d]", i, sh->delta_luma_weight_l1[i]);
                 h265_field("luma_weight_l1[%d]", i, sh->luma_weight_l1[i]);
                 h265_field("luma_offset_l1[%d]", i, sh->luma_offset_l1[i]);
             }
 
             h265_field("chroma_weight_l1_flag[%d]", i, sh->chroma_weight_l1_flag[i]);
             if (sh->chroma_weight_l1_flag[i]) {
-                h265_field("delta_chroma_weight_l1[%d][0]", i, sh->delta_chroma_weight_l1[i][0]);
-                h265_field("delta_chroma_offset_l1[%d][0]", i, sh->delta_chroma_offset_l1[i][0]);
                 h265_field("chroma_weight_l1[%d][0]", i, sh->chroma_weight_l1[i][0]);
                 h265_field("chroma_offset_l1[%d][0]", i, sh->chroma_offset_l1[i][0]);
-
-                h265_field("delta_chroma_weight_l1[%d][1]", i, sh->delta_chroma_weight_l1[i][1]);
-                h265_field("delta_chroma_offset_l1[%d][1]", i, sh->delta_chroma_offset_l1[i][1]);
                 h265_field("chroma_weight_l1[%d][1]", i, sh->chroma_weight_l1[i][1]);
                 h265_field("chroma_offset_l1[%d][1]", i, sh->chroma_offset_l1[i][1]);
             }
