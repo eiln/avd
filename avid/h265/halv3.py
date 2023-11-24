@@ -221,11 +221,10 @@ class AVDH265HalV3(AVDHal):
 			x |= 0x8000
 			if (sl.num_ref_idx_active_override_flag):
 				x |= 0x40000
-				x |= sl.num_ref_idx_l0_active_minus1 << 11
-				if (sl.slice_type == HEVC_SLICE_B):
-					if (not sl.collocated_from_l0_flag):
-						x |= 0x50
-					x |= sl.num_ref_idx_l1_active_minus1 << 7
+			x |= sl.num_ref_idx_l0_active_minus1 << 11
+			if (sl.slice_type == HEVC_SLICE_B):
+				x |= 0x50
+				x |= sl.num_ref_idx_l1_active_minus1 << 7
 		avd_set(x, "slc_a8c_cmd_ref_type")
 
 		if (sl.slice_type == HEVC_SLICE_P) or (sl.slice_type == HEVC_SLICE_B):
