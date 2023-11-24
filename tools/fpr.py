@@ -7,8 +7,10 @@ sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 import argparse
 import os
 import numpy as np
-#np.set_printoptions(formatter={'int':lambda x: "0x%06x" % (x)})
-np.set_printoptions(threshold=sys.maxsize)
+if 1:
+	np.set_printoptions(formatter={'int':lambda x: "0x%06x" % (x)})
+else:
+	np.set_printoptions(threshold=sys.maxsize)
 
 import struct
 from tools.common import resolve_input
@@ -31,23 +33,16 @@ if __name__ == "__main__":
 	else:
 		paths = [args.input]
 
-	# determine mode
-	_, mode = struct.unpack("<II", open(paths[0], "rb").read()[:8])
-	if  (mode == 1):
-		from avid.h264.fp import AVDH264V3FrameParams
-		fpcls = AVDH264V3FrameParams
-	elif (mode == 2):
-		from avid.vp9.fp import AVDVP9V3FrameParams
-		fpcls = AVDVP9V3FrameParams
-	else:
-		raise ValueError("Not supported")
+	assert(len(paths))
+	fpbls = get_fpcls(paths[0])
 
 	addrs = []
 	out = []
 	for i,path in enumerate(paths):
-		print(path)
+		print(i, path)
 		params = open(path, "rb").read()
 		fp = fpcls.parse(params)
+		print(fp)
 
 		#x = addrs.index(fp.hdr.hdr_138_ref_rvra0_addr_lsb7[0])
 		#x = addrs2.index(fp.hdr.hdr_150_ref_rvra2_addr_lsb7[0])
@@ -57,19 +52,24 @@ if __name__ == "__main__":
 		#y = addrs1.index(fp.hdr.hdr_11c_curr_rvra_addr_lsb7[1])
 		#out.append(([addrs.index(x) for x in ]))
 
-		x = fp.hdr.hdr_11c_curr_rvra_addr_lsb7[0]
-		if (x) not in addrs:
-			addrs.append(x)
-		z = addrs.index(x)
-		out.append((i, z))
+		if 0:
+			x = fp.hdr.hdr_11c_curr_rvra_addr_lsb7[0]
+			if (x) not in addrs:
+				addrs.append(x)
+			z = addrs.index(x)
+			out.append((i, z))
 
-		#x = fp.hdr.hdr_40_flags1_pt1
-		#out.append((i, *[int(bool(x & (1 << i))) for i in range(32)]))
-		#out.append((i, *[int(bool(x & (1 << i))) for i in [8, 9]]))
+		if 0:
+			x = fp.hdr.hdr_5c_flag
+			out.append(([int(bool(x & (1 << i))) for i in range(32)]))
+			#out.append((i, *[int(bool(x & (1 << i))) for i in [8, 9]]))
 
-	out = np.array(out) # useful for finding regressions
-	print(out)
-	print(", ".join([hex(x) for x in addrs]))
-	print(np.diff(out[:, 1]))
-	#print(np.where(np.diff(out) > 0))
-	#print(np.unique(out[:, :2]))
+		out.append((fp.slc.slc_a8c_cmd_ref_type, ))
+
+	if 1:
+		out = np.array(out) # useful for finding regressions
+		print(out)
+		#print(", ".join([hex(x) for x in addrs]))
+		#print(np.diff(out[:, 1]))
+		#print(np.where(np.diff(out) > 0))
+		#print(np.unique(out[:, :2]))

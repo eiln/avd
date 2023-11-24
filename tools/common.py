@@ -10,6 +10,8 @@ from pathlib import Path
 
 from avid.utils import *
 
+def nthhex(x, n): return (x & (0xf << (1 << n))) >> n * 4
+
 def hexdump(s, sep=" "): return sep.join(["%02x"%x for x in s])
 def hexdump32(s, sep=" "): return sep.join(["%08x"%x for x in struct.unpack("<%dI" % (len(s)//4), s)])
 def _ascii(s): return "".join(["." if (c < 0x20 or c > 0x7e) else chr(c) for c in s])
@@ -167,3 +169,19 @@ def resolve_input(path, isdir=False):
         ext = getext(mode)
         return path.as_posix() + ext
     return path
+
+def get_fpcls(path):
+    # determine mode
+    _, mode = struct.unpack("<II", open(path, "rb").read()[:8])
+    if   (mode == 0):
+        from avid.h265.fp import AVDH265V3FrameParams
+        fpcls = AVDH265V3FrameParams
+    elif (mode == 1):
+        from avid.h264.fp import AVDH264V3FrameParams
+        fpcls = AVDH264V3FrameParams
+    elif (mode == 2):
+        from avid.vp9.fp import AVDVP9V3FrameParams
+        fpcls = AVDVP9V3FrameParams
+    else:
+        raise ValueError("Not supported")
+    return fpcls
