@@ -59,20 +59,22 @@ class AVDH264HalV3(AVDHal):
 		push = self.push
 
 		assert((ctx.inst_fifo_idx >= 0) and (ctx.inst_fifo_idx <= ctx.inst_fifo_count))
-		push(0x2b000100 + (ctx.inst_fifo_idx * 0x10), "cm3_cmd_inst_fifo_start")
+		push(0x2b000000 | 0x100 | (ctx.inst_fifo_idx * 0x10), "cm3_cmd_inst_fifo_start")
 		# ---- FW BP -----
 
-		x = 0x2db012e0
+		x = 0x1000
 		if (sl.nal_unit_type == H264_NAL_SLICE_IDR):
 			x |= 0x2000
-		push(x, "hdr_34_cmd_start_hdr")
+		x |= 0x2e0
+		push(0x2db00000 | x, "hdr_34_cmd_start_hdr")
 
-		push(0x1000000, "hdr_38_pixfmt")
+		push(0x1000000, "hdr_38_mode")
 		push((((ctx.height - 1) & 0xffff) << 16) | ((ctx.width - 1) & 0xffff), "hdr_3c_height_width")
-		push(0x0, "cm3_dma_config_0")
+		push(0x0, "hdr_40_zero")
 		push((((ctx.height - 1) >> 3) << 16) | ((ctx.width - 1) >> 3), "hdr_28_height_width_shift3")
 
-		x = 0x1000000 * self.get_sps(ctx, sl).chroma_format_idc | 0x2881
+		x = 0x1000000 * self.get_sps(ctx, sl).chroma_format_idc | 0x2000 | 0x800
+		x |= (1 << 7) | 1  # 264 is always 8x8 txfm | txfm always specified for each block
 		push(x, "hdr_2c_sps_param")
 
 		x = 0x100000
@@ -84,7 +86,7 @@ class AVDH264HalV3(AVDHal):
 		push(0x30000a, "hdr_58_const_3a")
 		push(0x4020002, "cm3_dma_config_1")
 		push(0x20002, "cm3_dma_config_2")
-		push(0x0)
+		push(0x0, "cm3_mark_end_section")
 		push(ctx.pps_tile_addrs[0] >> 8, "hdr_9c_pps_tile_addr_lsb8", 0)
 		# ---- FW BP -----
 
@@ -111,16 +113,17 @@ class AVDH264HalV3(AVDHal):
 		if (sl.nal_unit_type != H264_NAL_SLICE_IDR):
 			self.set_refs(ctx, sl)
 
-		push(0x0)
+		push(0x0, "cm3_mark_end_section")
 		# ---- FW BP -----
 
 	def set_weights(self, ctx, sl):
 		push = self.push
 
+		x = 0x2dd00000
 		if (sl.slice_type == H264_SLICE_TYPE_P):
-			x = 0x2dd00040
+			x |= 0x40
 		else:
-			x = 0x2dd000ad
+			x |= 0xad
 		if (sl.has_luma_weights == 0):
 			push(x, "slc_76c_cmd_weights_denom")
 			return
@@ -165,7 +168,10 @@ class AVDH264HalV3(AVDHal):
 		# ---- FW BP -----
 
 		push(0x2d900000 | ((26 + self.get_pps(ctx, sl).pic_init_qp_minus26 + sl.slice_qp_delta) * 0x400), "slc_a70_cmd_slice_qpy")
-		push(0x2da30000, "slc_a74_cmd_a3")
+		x = 0
+		x |= set_bit(16)
+		x |= set_bit(17)
+		push(0x2da00000 | x, "slc_a74_cmd_flags")
 
 		if (sl.slice_type == H264_SLICE_TYPE_P) or (sl.slice_type == H264_SLICE_TYPE_B):
 			lx = 0
@@ -181,8 +187,8 @@ class AVDH264HalV3(AVDHal):
 
 			self.set_weights(ctx, sl)
 
-		push(0x2a000000)
-		push((((ctx.height - 1) >> 4) << 12) | ((ctx.width - 1) >> 4), "cm3_height_width_shift_4")
+		push(0x2a000000, "cm3_cmd_set_mb_dims")
+		push((((ctx.height - 1) >> 4) << 12) | ((ctx.width - 1) >> 4), "cm3_set_mb_dims")
 
 		x = 0x2d000000
 		if   (sl.slice_type == H264_SLICE_TYPE_I):
@@ -191,9 +197,8 @@ class AVDH264HalV3(AVDHal):
 			x |= 0x10000
 		elif (sl.slice_type == H264_SLICE_TYPE_B):
 			x |= 0x40000
-
 		if ((sl.slice_type == H264_SLICE_TYPE_P) or (sl.slice_type == H264_SLICE_TYPE_B)):
-			if (sl.num_ref_idx_active_override_flag != 0):
+			if (sl.num_ref_idx_active_override_flag):
 				x |= sl.num_ref_idx_l0_active_minus1 << 11
 				if (sl.slice_type == H264_SLICE_TYPE_B):
 					x |= sl.num_ref_idx_l1_active_minus1 << 7
@@ -205,7 +210,7 @@ class AVDH264HalV3(AVDHal):
 			n = ctx.last_p_sps_tile_idx + sl.num_ref_idx_l1_active_minus1
 			push(self.get_sps_tile_iova(ctx, n) >> 8, "sps_tile_addr_b")
 
-		push(0x2b000400, "cm3_cmd_inst_fifo_end")
+		push(0x2b000000 | 0x400, "cm3_cmd_inst_fifo_end")
 
 	def set_insn(self, ctx, sl):
 		self.set_header(ctx, sl)

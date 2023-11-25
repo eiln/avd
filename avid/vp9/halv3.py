@@ -80,22 +80,23 @@ class AVDVP9HalV3(AVDHal):
 		ctx = deepcopy(ctx) # RO
 
 		assert((ctx.inst_fifo_idx >= 0) and (ctx.inst_fifo_idx <= ctx.inst_fifo_count))
-		push(0x2bfff100 + (ctx.inst_fifo_idx * 0x10), "cm3_cmd_inst_fifo_start")
+		push(0x2b000000 | 0xfff000 | 0x100 | (ctx.inst_fifo_idx * 0x10), "cm3_cmd_inst_fifo_start")
 		# ---- FW BP ----
 
-		x = 0x2db012e0
+		x = 0x1000
 		if (sl.frame_type == VP9_FRAME_TYPE_KEY):
 			x |= 0x2000
-		push(x, "hdr_30_cmd_start_hdr")
+		x |= 0x2e0
+		push(0x2db00000 | x, "hdr_30_cmd_start_hdr")
 
 		push(0x2000000, "hdr_34_const_20")
 		push((((sl.frame_height - 1) & 0xffff) << 16) | ((sl.frame_width - 1) & 0xffff), "hdr_28_height_width_shift3")
 		push(0x0, "cm3_dma_config_0")
 		push((((sl.frame_height - 1) & 0xffff) << 16) | ((sl.frame_width - 1) & 0xffff), "hdr_38_height_width_shift3")
 
-		x = 0x1000000
-		x |= 0x1800 | (min(sl.txfm_mode, 3) << 7)
-		push(x | (sl.txfm_mode == 4), "hdr_2c_txfm_mode")
+		x = 0x1000000 | 0x1000 | 0x800  # chroma | TODO I think 0x1000 is colorspace
+		x |= (min(sl.txfm_mode, 3) << 7) | (sl.txfm_mode == 4)  # 8x8,16x16,32x32 | TX_MODE_SELECT
+		push(x, "hdr_2c_txfm_mode")
 
 		push(self.make_flags1(ctx, sl), "hdr_40_flags1_pt1")
 
@@ -179,9 +180,10 @@ class AVDVP9HalV3(AVDHal):
 				dims = i << 24 | ((tile.row + 1) * 8 - 1) << 12 | ((tile.col + 1) * 4 - 1)
 			push(dims, "til_ac0_tile_dims")
 			if (i < len(sl.tiles) - 1):
-				push(0x2bfff000, "cm3_cmd_inst_fifo_end")
+				x = 0xfff000
 			else:
-				push(0x2b000400, "cm3_cmd_inst_fifo_end")
+				x = 0x000400
+			push(0x2b000000 | x, "cm3_cmd_inst_fifo_end")
 
 	def set_insn(self, ctx, sl):
 		self.set_header(ctx, sl)

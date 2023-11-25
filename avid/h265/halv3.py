@@ -60,11 +60,12 @@ class AVDH265HalV3(AVDHal):
 		push(0x2b000000 | 0x100 | (ctx.inst_fifo_idx * 0x10), "cm3_cmd_inst_fifo_start")
 		# ---- FW BP -----
 
-		x = 0x12e0
+		x = 0x1000
 		if (IS_INTRA(sl)):
 			x |= 0x2000
+		x |= 0x2e0
 		push(0x2db00000 | x, "hdr_4c_cmd_start_hdr")
-		push(0x00000000, "hdr_50_mode")
+		push(0x0000000, "hdr_50_mode")
 		push((((ctx.height - 1) & 0xffff) << 16) | ((ctx.width - 1) & 0xffff), "hdr_54_height_width")
 		push(0x0, "hdr_58_pixfmt_zero")
 		push((((ctx.height - 1) >> 3) << 16) | ((ctx.width - 1) >> 3), "hdr_28_height_width_shift3")
@@ -205,11 +206,11 @@ class AVDH265HalV3(AVDHal):
 					pos = list([x.pic_num for x in ctx.dpb_list]).index(lst.pic_num)
 					push(0x2dc00000 | (lx << 8) | (i << 4) | pos,
 					"slc_a90_cmd_ref_list", i + len(sl.pic.list0))
-		if (sl.slice_type == HEVC_SLICE_P) or (sl.slice_type == HEVC_SLICE_B):
+
 			self.set_weights(ctx, sl)
 
-		push(0x2a000000, "cm3_cmd_set_one")
-		push(0x1, "cm3_set_one")
+		push(0x2a000000, "cm3_cmd_set_mb_dims")
+		push(0x1, "cm3_set_mb_dims") # ?
 
 		x = 0x2d000000
 		if   (sl.slice_type == HEVC_SLICE_I):
