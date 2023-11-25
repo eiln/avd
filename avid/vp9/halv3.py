@@ -24,24 +24,24 @@ class AVDVP9HalV3(AVDHal):
 		return rvra_addrs
 
 	def set_refs(self, ctx, sl):
-		avd_set = self.avd_set
+		push = self.push
 
-		avd_set(0x70007, "cm3_dma_config_7")
-		avd_set(0x70007, "cm3_dma_config_8")
-		avd_set(0x70007, "cm3_dma_config_9")
+		push(0x70007, "cm3_dma_config_7")
+		push(0x70007, "cm3_dma_config_8")
+		push(0x70007, "cm3_dma_config_9")
 
 		hw = (((sl.frame_height - 1) & 0xffff) << 16) | ((sl.frame_width - 1) & 0xffff)
 		for n in range(VP9_REFS_PER_FRAME):
-			avd_set(0x1000000, "hdr_9c_ref_100", n)
-			avd_set(hw, "hdr_70_ref_height_width", n)
-			avd_set(0x40004000, "hdr_7c_ref_align", n)
+			push(0x1000000, "hdr_9c_ref_100", n)
+			push(hw, "hdr_70_ref_height_width", n)
+			push(0x40004000, "hdr_7c_ref_align", n)
 
 			x = ctx.ref_frame_map[n]
 			rvra_addrs = self.get_rvra_addrs(ctx, sl, x)
-			avd_set(rvra_addrs[0], "hdr_138_ref_rvra0_addr_lsb7", n)
-			avd_set(rvra_addrs[1], "hdr_144_ref_rvra1_addr_lsb7", n)
-			avd_set(rvra_addrs[2], "hdr_150_ref_rvra2_addr_lsb7", n)
-			avd_set(rvra_addrs[3], "hdr_15c_ref_rvra3_addr_lsb7", n)
+			push(rvra_addrs[0], "hdr_138_ref_rvra0_addr_lsb7", n)
+			push(rvra_addrs[1], "hdr_144_ref_rvra1_addr_lsb7", n)
+			push(rvra_addrs[2], "hdr_150_ref_rvra2_addr_lsb7", n)
+			push(rvra_addrs[3], "hdr_15c_ref_rvra3_addr_lsb7", n)
 
 	def make_flags1(self, ctx, sl):
 		x = 0
@@ -76,42 +76,42 @@ class AVDVP9HalV3(AVDHal):
 		return x
 
 	def set_header(self, ctx, sl):
-		avd_set = self.avd_set
+		push = self.push
 		ctx = deepcopy(ctx) # RO
 
 		assert((ctx.inst_fifo_idx >= 0) and (ctx.inst_fifo_idx <= ctx.inst_fifo_count))
-		avd_set(0x2bfff100 + (ctx.inst_fifo_idx * 0x10), "cm3_cmd_inst_fifo_start")
+		push(0x2bfff100 + (ctx.inst_fifo_idx * 0x10), "cm3_cmd_inst_fifo_start")
 		# ---- FW BP ----
 
 		x = 0x2db012e0
 		if (sl.frame_type == VP9_FRAME_TYPE_KEY):
 			x |= 0x2000
-		avd_set(x, "hdr_30_cmd_start_hdr")
+		push(x, "hdr_30_cmd_start_hdr")
 
-		avd_set(0x2000000, "hdr_34_const_20")
-		avd_set((((sl.frame_height - 1) & 0xffff) << 16) | ((sl.frame_width - 1) & 0xffff), "hdr_28_height_width_shift3")
-		avd_set(0x0, "cm3_dma_config_0")
-		avd_set((((sl.frame_height - 1) & 0xffff) << 16) | ((sl.frame_width - 1) & 0xffff), "hdr_38_height_width_shift3")
+		push(0x2000000, "hdr_34_const_20")
+		push((((sl.frame_height - 1) & 0xffff) << 16) | ((sl.frame_width - 1) & 0xffff), "hdr_28_height_width_shift3")
+		push(0x0, "cm3_dma_config_0")
+		push((((sl.frame_height - 1) & 0xffff) << 16) | ((sl.frame_width - 1) & 0xffff), "hdr_38_height_width_shift3")
 
 		x = 0x1000000
 		x |= 0x1800 | (min(sl.txfm_mode, 3) << 7)
-		avd_set(x | (sl.txfm_mode == 4), "hdr_2c_txfm_mode")
+		push(x | (sl.txfm_mode == 4), "hdr_2c_txfm_mode")
 
-		avd_set(self.make_flags1(ctx, sl), "hdr_40_flags1_pt1")
+		push(self.make_flags1(ctx, sl), "hdr_40_flags1_pt1")
 
 		for n in range(8):
-			avd_set(0x0)
+			push(0x0)
 
-		avd_set(0x20000, "cm3_dma_config_1")
-		avd_set(0x4020002, "cm3_dma_config_2")
-		avd_set(0x2020202, "cm3_dma_config_3")
-		avd_set(0x240, "hdr_e0_const_240")
-		avd_set(ctx.probs_addr >> 8, "hdr_104_probs_addr_lsb8")
+		push(0x20000, "cm3_dma_config_1")
+		push(0x4020002, "cm3_dma_config_2")
+		push(0x2020202, "cm3_dma_config_3")
+		push(0x240, "hdr_e0_const_240")
+		push(ctx.probs_addr >> 8, "hdr_104_probs_addr_lsb8")
 
-		avd_set(ctx.pps0_tile_addr, "hdr_118_pps0_tile_addr_lsb8")
+		push(ctx.pps0_tile_addr, "hdr_118_pps0_tile_addr_lsb8")
 		n = ((ctx.access_idx // 128) + 1) % 8
-		avd_set(ctx.pps1_tile_addrs[n], "hdr_108_pps1_tile_addr_lsb8", 0)
-		avd_set(ctx.pps1_tile_addrs[n], "hdr_108_pps1_tile_addr_lsb8", 1)
+		push(ctx.pps1_tile_addrs[n], "hdr_108_pps1_tile_addr_lsb8", 0)
+		push(ctx.pps1_tile_addrs[n], "hdr_108_pps1_tile_addr_lsb8", 1)
 
 		if (sl.frame_type == VP9_FRAME_TYPE_KEY):
 			n = not (ctx.num_kf) & 1
@@ -122,43 +122,43 @@ class AVDVP9HalV3(AVDHal):
 		else:
 			n = (ctx.kidx + ctx.num_kf) & 1
 			m = not (ctx.kidx + ctx.num_kf) & 1
-		avd_set(ctx.pps2_tile_addrs[n], "hdr_110_pps2_tile_addr_lsb8", 0)
-		avd_set(ctx.pps2_tile_addrs[m], "hdr_110_pps2_tile_addr_lsb8", 1)
+		push(ctx.pps2_tile_addrs[n], "hdr_110_pps2_tile_addr_lsb8", 0)
+		push(ctx.pps2_tile_addrs[m], "hdr_110_pps2_tile_addr_lsb8", 1)
 		# ---- FW BP ----
 
-		avd_set(sl.base_q_idx * 0x8000, "hdr_4c_base_q_idx")
-		avd_set(0b1000000011111111111111, "hdr_44_flags1_pt2")
-		avd_set(sl.loop_filter_level * 0x4000, "hdr_48_loop_filter_level")
+		push(sl.base_q_idx * 0x8000, "hdr_4c_base_q_idx")
+		push(0b1000000011111111111111, "hdr_44_flags1_pt2")
+		push(sl.loop_filter_level * 0x4000, "hdr_48_loop_filter_level")
 
-		avd_set(0x4020002, "cm3_dma_config_4")
-		avd_set(0x4020002, "cm3_dma_config_5")
-		avd_set(0x0, "cm3_dma_config_6")
+		push(0x4020002, "cm3_dma_config_4")
+		push(0x4020002, "cm3_dma_config_5")
+		push(0x0, "cm3_dma_config_6")
 
 		sps_size = 0x8000 >> 8
-		avd_set((ctx.sps_tile_base_addr + (0 * sps_size)), "hdr_e8_sps0_tile_addr_lsb8", 0)
-		avd_set((ctx.sps_tile_base_addr + (1 * sps_size)), "hdr_e8_sps0_tile_addr_lsb8", 1)
-		avd_set((ctx.sps_tile_base_addr + (2 * sps_size)) * 0, "hdr_e8_sps0_tile_addr_lsb8", 2) # zeroed
-		avd_set((ctx.sps_tile_base_addr + (3 * sps_size)), "hdr_f4_sps1_tile_addr_lsb8", 0)
-		avd_set((ctx.sps_tile_base_addr + (4 * sps_size)), "hdr_f4_sps1_tile_addr_lsb8", 1)
-		avd_set((ctx.sps_tile_base_addr + (6 * sps_size)), "hdr_f4_sps1_tile_addr_lsb8", 3) # not 5, that's later
+		push((ctx.sps_tile_base_addr + (0 * sps_size)), "hdr_e8_sps0_tile_addr_lsb8", 0)
+		push((ctx.sps_tile_base_addr + (1 * sps_size)), "hdr_e8_sps0_tile_addr_lsb8", 1)
+		push((ctx.sps_tile_base_addr + (2 * sps_size)) * 0, "hdr_e8_sps0_tile_addr_lsb8", 2) # zeroed
+		push((ctx.sps_tile_base_addr + (3 * sps_size)), "hdr_f4_sps1_tile_addr_lsb8", 0)
+		push((ctx.sps_tile_base_addr + (4 * sps_size)), "hdr_f4_sps1_tile_addr_lsb8", 1)
+		push((ctx.sps_tile_base_addr + (6 * sps_size)), "hdr_f4_sps1_tile_addr_lsb8", 3) # not 5, that's later
 
-		avd_set(0x70007, "cm3_dma_config_7")
+		push(0x70007, "cm3_dma_config_7")
 
 		x = ctx.new_fb_idx
 		rvra_addrs = self.get_rvra_addrs(ctx, sl, x)
-		avd_set(rvra_addrs[0], "hdr_11c_curr_rvra_addr_lsb7", 0)
-		avd_set(rvra_addrs[1], "hdr_11c_curr_rvra_addr_lsb7", 1)
-		avd_set(rvra_addrs[2], "hdr_11c_curr_rvra_addr_lsb7", 2)
-		avd_set(rvra_addrs[3], "hdr_11c_curr_rvra_addr_lsb7", 3)
+		push(rvra_addrs[0], "hdr_11c_curr_rvra_addr_lsb7", 0)
+		push(rvra_addrs[1], "hdr_11c_curr_rvra_addr_lsb7", 1)
+		push(rvra_addrs[2], "hdr_11c_curr_rvra_addr_lsb7", 2)
+		push(rvra_addrs[3], "hdr_11c_curr_rvra_addr_lsb7", 3)
 
-		avd_set((ctx.sps_tile_base_addr + (5 * sps_size)), "hdr_f4_sps1_tile_addr_lsb8", 2)
+		push((ctx.sps_tile_base_addr + (5 * sps_size)), "hdr_f4_sps1_tile_addr_lsb8", 2)
 
-		avd_set(ctx.y_addr >> 8, "hdr_168_y_addr_lsb8")
-		avd_set(ctx.height_width_align, "hdr_170_width_align")
-		avd_set(ctx.uv_addr >> 8, "hdr_16c_uv_addr_lsb8")
-		avd_set(ctx.height_width_align, "hdr_174_width_align")
-		avd_set(0x0)
-		avd_set((((sl.frame_height - 1) & 0xffff) << 16) | ((sl.frame_width - 1) & 0xffff), "cm3_height_width")
+		push(ctx.y_addr >> 8, "hdr_168_y_addr_lsb8")
+		push(ctx.height_width_align, "hdr_170_width_align")
+		push(ctx.uv_addr >> 8, "hdr_16c_uv_addr_lsb8")
+		push(ctx.height_width_align, "hdr_174_width_align")
+		push(0x0)
+		push((((sl.frame_height - 1) & 0xffff) << 16) | ((sl.frame_width - 1) & 0xffff), "cm3_height_width")
 
 		if (sl.frame_type != VP9_FRAME_TYPE_KEY):
 			self.set_refs(ctx, sl)
@@ -166,22 +166,22 @@ class AVDVP9HalV3(AVDHal):
 		# ---- FW BP ----
 
 	def set_tiles(self, ctx, sl):
-		avd_set = self.avd_set
+		push = self.push
 		# tiles instead of slice for VP9
 		for i,tile in enumerate(sl.tiles):
-			avd_set(0x2d800000, "cm3_cmd_set_slice_data")
-			avd_set(ctx.slice_data_addr + tile.offset, "til_ab4_tile_addr_low")
-			avd_set(tile.size, "til_ab8_tile_size")
-			avd_set(0x2a000000 | i * 4)
+			push(0x2d800000, "cm3_cmd_set_slice_data")
+			push(ctx.slice_data_addr + tile.offset, "til_ab4_tile_addr_low")
+			push(tile.size, "til_ab8_tile_size")
+			push(0x2a000000 | i * 4)
 			if (len(sl.tiles) == 1):
 				dims = 1
 			else:
 				dims = i << 24 | ((tile.row + 1) * 8 - 1) << 12 | ((tile.col + 1) * 4 - 1)
-			avd_set(dims, "til_ac0_tile_dims")
+			push(dims, "til_ac0_tile_dims")
 			if (i < len(sl.tiles) - 1):
-				avd_set(0x2bfff000, "cm3_cmd_inst_fifo_end")
+				push(0x2bfff000, "cm3_cmd_inst_fifo_end")
 			else:
-				avd_set(0x2b000400, "cm3_cmd_inst_fifo_end")
+				push(0x2b000400, "cm3_cmd_inst_fifo_end")
 
 	def set_insn(self, ctx, sl):
 		self.set_header(ctx, sl)

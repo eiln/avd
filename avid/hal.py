@@ -39,7 +39,7 @@ class AVDHal:
 		if (not self.stfu):
 			print(f"[AVD] {x}")
 
-	def avd_set(self, val, name="", idx=None):
+	def push(self, val, name="", idx=None):
 		if not name:
 			name = f"unk_{str(len(self.inst_stream))}"
 		inst = AVDInst(val, name, len(self.inst_stream), idx)
