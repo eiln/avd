@@ -36,18 +36,37 @@ if __name__ == "__main__":
 
     fpcls = get_fpcls(paths[0])
     headers, _ = parse_headers(args.input, len(paths))
+    last = 0
+    addrs = [0x0]
     out = []
     for i,path in enumerate(paths):
+        #if (i < 2): continue
         if (args.verbose):
             print(i, path)
-        hdr = headers[i]
+        sl = headers[i]
         if (args.verbose):
-            print(hdr)
+            print(sl)
         params = open(path, "rb").read()
         fp = fpcls.parse(params)
-        #if (args.verbose):
-        #    print(fp)
-        out.append((fp.slc.slc_a8c_cmd_ref_type & 0x00ffffff, hdr.slice_type))
+        if (args.verbose):
+            print(fp)
+        if 1:
+            x = fp.hdr.hdr_dc_pps_tile_addr_lsb8[7]
+            if (x) not in addrs:
+                addrs.append(x)
+            y = addrs.index(x)
+        if 1:
+            x = fp.slc.slc_bd4_sps_tile_addr2_lsb8
+            if (x) not in addrs:
+                addrs.append(x)
+            z = addrs.index(x)
+        #k = getattr(sl, "pic_order_cnt", 0)
+        #h = getattr(sl, "slice_temporal_mvp_enabled_flag", 0)
+        out.append((i, y - 1, z - 1, sl.slice_type))
+        #last = k
 
     out = np.array(out)
     print(out)
+    if (len(addrs)):
+        print(", ".join([hex(x) for x in addrs]))
+    #print((out[:, 2] - 1).tolist())

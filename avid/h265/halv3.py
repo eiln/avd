@@ -16,9 +16,6 @@ class AVDH265HalV3(AVDHal):
 	def get_sps(self, ctx, sl):
 		return ctx.sps_list[self.get_pps(ctx, sl).pps_seq_parameter_set_id]
 
-	def get_sps_tile_iova(self, ctx, n):
-		return ctx.sps_tile_addr + (ctx.sps_tile_size * (n % ctx.sps_tile_count))
-
 	def rvra_offset(self, ctx, idx):
 		if   (idx == 0): return ctx.rvra_size0
 		elif (idx == 1): return 0
@@ -30,8 +27,11 @@ class AVDH265HalV3(AVDHal):
 		push = self.push
 
 		push(0x4020002, "cm3_dma_config_6")
-		push(ctx.pps_tile_addrs[4] >> 8, "hdr_9c_pps_tile_addr_lsb8", 7)
-		push(self.get_sps_tile_iova(ctx, ctx.access_idx) >> 8, "hdr_bc_sps_tile_addr_lsb8")
+		push(ctx.pps_tile_addrs[1] >> 8, "hdr_dc_pps_tile_addr_lsb8", 6)
+
+		n = (ctx.access_idx + 2) % 16
+		push(ctx.sps_tile_addrs[n] >> 8, "hdr_bc_sps_tile_addr_lsb8")
+		#push(0xdead, "hdr_bc_sps_tile_addr_lsb8")
 
 		push(0x70007, "cm3_dma_config_7")
 		push(0x70007, "cm3_dma_config_8")
@@ -53,25 +53,8 @@ class AVDH265HalV3(AVDHal):
 			push((rvra.addr + self.rvra_offset(ctx, 2)) >> 7, "hdr_174_ref2_addr_lsb7", n)
 			push((rvra.addr + self.rvra_offset(ctx, 3)) >> 7, "hdr_194_ref3_addr_lsb7", n)
 
-	def set_header(self, ctx, sl):
+	def set_flags(self, ctx, sl):
 		push = self.push
-
-		assert((ctx.inst_fifo_idx >= 0) and (ctx.inst_fifo_idx <= ctx.inst_fifo_count))
-		push(0x2b000000 | 0x100 | (ctx.inst_fifo_idx * 0x10), "cm3_cmd_inst_fifo_start")
-		# ---- FW BP -----
-
-		x = 0x1000
-		if (IS_INTRA(sl)):
-			x |= 0x2000
-		x |= 0x2e0
-		push(0x2db00000 | x, "hdr_4c_cmd_start_hdr")
-		push(0x0000000, "hdr_50_mode")
-		push((((ctx.height - 1) & 0xffff) << 16) | ((ctx.width - 1) & 0xffff), "hdr_54_height_width")
-		push(0x0, "hdr_58_pixfmt_zero")
-		push((((ctx.height - 1) >> 3) << 16) | ((ctx.width - 1) >> 3), "hdr_28_height_width_shift3")
-
-		x = 0x1000000 * self.get_sps(ctx, sl).chroma_format_idc | 0x1980
-		push(x, "hdr_2c_sps_param")
 
 		x = 0
 		push(x, "hdr_30_flag_pt1")
@@ -91,9 +74,37 @@ class AVDH265HalV3(AVDHal):
 			x |= set_bit(21)
 		push(x, "hdr_5c_flag_pt3")
 
-		for n in range(7):
-			push(0x0)
+		push(0, "hdr_60_zero")
+		push(0, "hdr_64_zero")
+		push(0, "hdr_68_zero")
+		push(0, "hdr_6c_zero")
+		push(0, "hdr_70_zero")
+		push(0, "hdr_74_zero")
+		push(0, "hdr_78_zero")
 
+	def set_header(self, ctx, sl):
+		push = self.push
+
+		assert((ctx.inst_fifo_idx >= 0) and (ctx.inst_fifo_idx <= ctx.inst_fifo_count))
+		push(0x2b000000 | 0x100 | (ctx.inst_fifo_idx * 0x10), "cm3_cmd_inst_fifo_start")
+		# ---- FW BP -----
+
+		x = 0x1000
+		if (IS_INTRA(sl)):
+			x |= 0x2000
+		x |= 0x2e0
+		push(0x2db00000 | x, "hdr_4c_cmd_start_hdr")
+
+		push(0x0000000, "hdr_50_mode")
+		push((((ctx.height - 1) & 0xffff) << 16) | ((ctx.width - 1) & 0xffff), "hdr_54_height_width")
+		push(0x0, "hdr_58_pixfmt_zero")
+		push((((ctx.height - 1) >> 3) << 16) | ((ctx.width - 1) >> 3), "hdr_28_height_width_shift3")
+
+		x = 0x1000000 * self.get_sps(ctx, sl).chroma_format_idc | 0x1000 | 0x800
+		x |= (3 << 7) | 0  # 265 is always up to 32x32 txfm | txfm !specified for each block
+		push(x, "hdr_2c_sps_param")
+
+		self.set_flags(ctx, sl)
 		push(0x300000, "hdr_98_const_30")
 		push(0x4020002, "cm3_dma_config_1")
 		push(0x20002, "cm3_dma_config_2")
@@ -103,12 +114,12 @@ class AVDH265HalV3(AVDHal):
 		push(0x4020002, "cm3_dma_config_3")
 		push(0x4020002, "cm3_dma_config_4")
 		push(0x0)
-		push(ctx.pps_tile_addrs[1] >> 8, "hdr_9c_pps_tile_addr_lsb8", 1)
-		push(ctx.pps_tile_addrs[2] >> 8, "hdr_9c_pps_tile_addr_lsb8", 2)
-		push(ctx.pps_tile_addrs[3] >> 8, "hdr_9c_pps_tile_addr_lsb8", 3)
+		push(ctx.pps_tile_addrs[0] >> 8, "hdr_dc_pps_tile_addr_lsb8", 0)
+		push(ctx.pps_tile_addrs[2] >> 8, "hdr_dc_pps_tile_addr_lsb8", 1)
+		push(ctx.pps_tile_addrs[3] >> 8, "hdr_dc_pps_tile_addr_lsb8", 2)
 		push(0x0)
 		push(0x0)
-		push(ctx.pps_tile_addrs[4] >> 8, "hdr_9c_pps_tile_addr_lsb8", 4)
+		push(ctx.pps_tile_addrs[4] >> 8, "hdr_dc_pps_tile_addr_lsb8", 8)
 		push(0x0)
 
 		push(0x70007, "cm3_dma_config_5")
@@ -127,7 +138,7 @@ class AVDH265HalV3(AVDHal):
 		push(0x0, "cm3_mark_end_section")
 		push((((ctx.height - 1) & 0xffff) << 16) | ((ctx.width - 1) & 0xffff), "hdr_54_height_width")
 
-		if not (IS_IDR(sl)):
+		if (not IS_INTRA(sl)):
 			self.set_refs(ctx, sl)
 
 		push(0x0, "cm3_mark_end_section")
@@ -196,16 +207,18 @@ class AVDH265HalV3(AVDHal):
 		push(0x2da00000 | x, "slc_bd0_cmd_flags")
 
 		if (sl.slice_type == HEVC_SLICE_P) or (sl.slice_type == HEVC_SLICE_B):
+			num = 0
 			lx = 0
-			for i,lst in enumerate(sl.pic.list0):
-				pos = list([x.pic_num for x in ctx.dpb_list]).index(lst.pic_num)
+			for i,lst in enumerate(sl.reflist[0]):
+				pos = list([x.poc for x in ctx.dpb_list]).index(lst.poc)
 				push(0x2dc00000 | (lx << 8) | (i << 4) | pos, "slc_a90_cmd_ref_list", i)
+				num += 1
 			if (sl.slice_type == HEVC_SLICE_B):
 				lx = 1
-				for i,lst in enumerate(sl.pic.list1):
-					pos = list([x.pic_num for x in ctx.dpb_list]).index(lst.pic_num)
+				for i,lst in enumerate(sl.reflist[1]):
+					pos = list([x.poc for x in ctx.dpb_list]).index(lst.poc)
 					push(0x2dc00000 | (lx << 8) | (i << 4) | pos,
-					"slc_a90_cmd_ref_list", i + len(sl.pic.list0))
+					"slc_a90_cmd_ref_list", num + i)
 
 			self.set_weights(ctx, sl)
 
@@ -231,9 +244,10 @@ class AVDH265HalV3(AVDHal):
 				x |= sl.num_ref_idx_l1_active_minus1 << 7
 		push(x, "slc_a8c_cmd_ref_type")
 
-		if (sl.slice_type == HEVC_SLICE_P) or (sl.slice_type == HEVC_SLICE_B):
-			n = 0
-			push(self.get_sps_tile_iova(ctx, n) >> 8, "slc_bd4_sps_tile_addr2_lsb8")
+		if ((sl.slice_type == HEVC_SLICE_P) and not ctx.last_intra) or (sl.slice_type == HEVC_SLICE_B):
+			n = ctx.access_idx % 16
+			push(ctx.sps_tile_addrs[n] >> 8, "slc_bd4_sps_tile_addr2_lsb8")
+			#push(0xbeef, "slc_bd4_sps_tile_addr2_lsb8")
 		push(0x1000000, "slc_be0_unk_100")
 
 		push(0x2b000000 | 0x400, "cm3_cmd_inst_fifo_end")

@@ -37,7 +37,16 @@ class AVDH265V3InstHeader(AVDFrameParams):
 		"hdr_54_height_width" / u32,
 		"hdr_58_pixfmt_zero" / ExprValidator(u32, obj_ == 0),
 		"hdr_5c_flag_pt3" / u32,
-		"hdr_60_pad" / ZPadding(0x30),
+		"hdr_60_zero" / ExprValidator(u32, obj_ == 0),
+		"hdr_64_zero" / ExprValidator(u32, obj_ == 0),
+		"hdr_68_zero" / ExprValidator(u32, obj_ == 0),
+		"hdr_6c_zero" / ExprValidator(u32, obj_ == 0),
+		"hdr_70_zero" / ExprValidator(u32, obj_ == 0),
+		"hdr_74_zero" / ExprValidator(u32, obj_ == 0),
+		"hdr_78_zero" / ExprValidator(u32, obj_ == 0),
+		"hdr_7c_zero" / ExprValidator(u32, obj_ == 0),
+		"hdr_80_zero" / ZPadding(0x10),
+
 		"hdr_90_zero" / ExprValidator(u32, obj_ == 0),
 		"hdr_94_height_width" / u32,
 		"hdr_98_const_30" / ExprValidator(u32, obj_ == 0x300000),
@@ -137,7 +146,7 @@ class AVDH265V3FakeFrameParams(AVDFakeFrameParams):
 		obj["slc_b6c_cmd_weights_offsets"] = [0] * 96
 
 		obj["slc_bd4_sps_tile_addr2_lsb8"] = 0
-		obj["hdr_9c_pps_tile_addr_lsb8"] = [0] * 8
+		obj["hdr_dc_pps_tile_addr_lsb8"] = [0] * 12
 		obj["hdr_bc_sps_tile_addr_lsb8"] = 0
 		return obj
 

@@ -40,7 +40,7 @@ class AVDUnitTest:
 		if (x1 == 0): return # they fill out N/A fields
 		if (x0 != x1) and (not (self.args.debug_mode)):
 			print(sl)
-		cassert(x0, x1, name)
+		cassert(x0, x1, name, fatal=not self.args.nonfatal)
 
 	def diff_fp(self, sl, fp0, fp1, args):
 		for cand in self.fp_keys:
@@ -115,7 +115,10 @@ class AVDUnitTest:
 			s = ""
 			if (self.args.show_index):
 				s += f'[{hl(str(sl.idx).rjust(2), ANSI_CYAN)}]'
-			s += f'[{hl(str(n).rjust(2), ANSI_GREEN)}] '
+			if (x0 != x1.val):
+				s += f'[{hl(str(n).rjust(2), ANSI_RED)}] '
+			else:
+				s += f'[{hl(str(n).rjust(2), ANSI_GREEN)}] '
 
 			if (self.args.show_bits):
 				x0r = bitrepr32(x0)
@@ -138,7 +141,7 @@ class AVDUnitTest:
 				s = ""
 				if (self.args.show_index):
 					s += f'[{hl(str(sl.idx).rjust(2), ANSI_CYAN)}]'
-				s += f'[{hl(str(n + l1).rjust(2), ANSI_GREEN)}] '
+				s += f'[{hl(str(n + l1).rjust(2), ANSI_RED)}] '
 				x0r = f'{hex(x0).rjust(2+8)}'
 				x1r = f'{hex(x1).rjust(2+8)}'
 				if (x0 != x1):
@@ -231,13 +234,24 @@ class AVDH265UnitTest(AVDUnitTest):
 			"hdr_50_mode",
 			"hdr_54_height_width",
 			"hdr_58_pixfmt_zero",
-
 			"hdr_28_height_width_shift3",
 			"hdr_2c_sps_param",
+
 			"hdr_30_flag_pt1",
 			"hdr_34_flag_pt2",
 			"hdr_5c_flag_pt3",
+			"hdr_60_zero",
+			"hdr_64_zero",
+			"hdr_68_zero",
+			"hdr_6c_zero",
+			"hdr_70_zero",
+			"hdr_74_zero",
+			"hdr_78_zero",
 			"hdr_98_const_30",
+
+			"hdr_114_ref_hdr",
+			"hdr_dc_pps_tile_addr_lsb8",
+			#"slc_bd4_sps_tile_addr2_lsb8",
 
 			"hdr_1b4_y_addr_lsb8",
 			"hdr_1b8_uv_addr_lsb8",
@@ -250,7 +264,7 @@ class AVDH265UnitTest(AVDUnitTest):
 			"slc_b0c_cmd_weights_weights",
 			"slc_b6c_cmd_weights_offsets",
 			"slc_a8c_cmd_ref_type",
-			#"slc_bd4_sps_tile_addr2_lsb8",
+			"slc_a90_cmd_ref_list",
 			"slc_be0_unk_100",
 			"slc_bdc_slice_size",
 		]
@@ -374,6 +388,7 @@ if __name__ == "__main__":
 	parser.add_argument('--show-index', action='store_true')
 	parser.add_argument('--show-paths', action='store_true')
 	parser.add_argument('--show-fp', action='store_true')
+	parser.add_argument('--nonfatal', action='store_true')
 
 	args = parser.parse_args()
 	args.firmware = resolve_input(args.firmware)

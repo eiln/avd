@@ -131,8 +131,9 @@ struct hevc_short_term_rps {
     uint32_t delta_idx; /* delta_idx_minus1 */
     uint8_t use_delta_flag;
     uint8_t delta_rps_sign;
-    unsigned int abs_delta_rps;
-    unsigned int num_negative_pics;
+    uint32_t abs_delta_rps;
+    uint32_t num_negative_pics;
+    uint32_t num_positive_pics;
     int num_delta_pocs;
     int rps_idx_num_delta_pocs;
     int32_t delta_poc_s0[32];
@@ -386,8 +387,6 @@ struct hevc_pps {
     uint8_t pps_3d_extension_flag;
     uint8_t pps_scc_extension_flag;
     uint8_t pps_extension_4bits;
-
-    //H265RawExtensionData extension_data;
 
     // Range extension.
     uint32_t log2_max_transform_skip_block_size; /* log2_max_transform_skip_block_size_minus2 */

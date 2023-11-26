@@ -7,13 +7,8 @@ sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 import argparse
 import os
 import numpy as np
-if 1:
-	np.set_printoptions(formatter={'int':lambda x: "0x%06x" % (x)})
-else:
-	np.set_printoptions(threshold=sys.maxsize)
 
-import struct
-from tools.common import resolve_input
+from tools.common import *
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(prog='macOS frame_params parser')
@@ -23,7 +18,13 @@ if __name__ == "__main__":
 	parser.add_argument('-s', '--start', type=int, default=0, help="starting index")
 	parser.add_argument('-n', '--num', type=int, default=1, help="count from start")
 	parser.add_argument('-a', '--all', action='store_true', help="run all")
+	parser.add_argument('--decimal', action='store_true', help="run all")
 	args = parser.parse_args()
+
+	if (not args.decimal):
+		np.set_printoptions(formatter={'int':lambda x: "0x%06x" % (x)})
+	else:
+		np.set_printoptions(threshold=sys.maxsize)
 
 	if (args.dir):
 		dirname = resolve_input(args.dir, isdir=True)
@@ -34,7 +35,7 @@ if __name__ == "__main__":
 		paths = [args.input]
 
 	assert(len(paths))
-	fpbls = get_fpcls(paths[0])
+	fpcls = get_fpcls(paths[0])
 
 	addrs = []
 	out = []
@@ -52,24 +53,25 @@ if __name__ == "__main__":
 		#y = addrs1.index(fp.hdr.hdr_11c_curr_rvra_addr_lsb7[1])
 		#out.append(([addrs.index(x) for x in ]))
 
-		if 0:
-			x = fp.hdr.hdr_11c_curr_rvra_addr_lsb7[0]
+		if 1:
+			x = fp.slc.slc_bd4_sps_tile_addr2_lsb8
 			if (x) not in addrs:
 				addrs.append(x)
+			y = fp.hdr.
 			z = addrs.index(x)
-			out.append((i, z))
+			out.append((i, y, z))
 
 		if 0:
 			x = fp.hdr.hdr_5c_flag
 			out.append(([int(bool(x & (1 << i))) for i in range(32)]))
 			#out.append((i, *[int(bool(x & (1 << i))) for i in [8, 9]]))
 
-		out.append((fp.slc.slc_a8c_cmd_ref_type, ))
+		#out.append((fp.slc.slc_a8c_cmd_ref_type, ))
 
 	if 1:
 		out = np.array(out) # useful for finding regressions
 		print(out)
-		#print(", ".join([hex(x) for x in addrs]))
+		print(", ".join([hex(x) for x in addrs]))
 		#print(np.diff(out[:, 1]))
 		#print(np.where(np.diff(out) > 0))
 		#print(np.unique(out[:, :2]))

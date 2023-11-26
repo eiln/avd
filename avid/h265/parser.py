@@ -7,7 +7,6 @@ from .types import *
 
 import ctypes
 import subprocess
-from math import ceil
 
 class AVDH265Slice(AVDSlice):
 	def __init__(self):
@@ -17,11 +16,15 @@ class AVDH265Slice(AVDSlice):
 		self.mode = "h265"
 
 	def __repr__(self):
+		s = self.show_slice_header()
+		s += self.show_entries()
+		return s
+
+	def show_slice_header(self):
 		s = "\n[slice: %d nal_unit_type: %d intra: %d" % (self.idx, self.nal_unit_type, IS_INTRA(self))
 		if (IS_SLICE(self)):
 			s += " slice_type: %s" % (self.get_slice_str(self.slice_type))
 		s += "]\n"
-		s += self.show_entries()
 		return s
 
 	def get_slice_str(self, t):
@@ -68,6 +71,9 @@ class AVDH265Parser(AVDParser):
 			("chroma_weight_l1_flag", HEVC_MAX_REFS),
 			("chroma_weight_l1", (HEVC_MAX_REFS, 2)),
 			("chroma_offset_l1", (HEVC_MAX_REFS, 2)),
+
+			("st_rps_poc", HEVC_MAX_SHORT_TERM_REF_PIC_SETS),
+			("st_rps_used", HEVC_MAX_SHORT_TERM_REF_PIC_SETS),
 		]
 		self.slccls = AVDH265Slice
 

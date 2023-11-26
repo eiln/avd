@@ -174,9 +174,17 @@ static void h265_print_scaling_list(ScalingList *sl)
     (void)sl;
 }
 
-static void h265_print_st_rps(struct hevc_short_term_rps *rps)
+static void h265_print_st_rps(struct h265_context *s, struct hevc_short_term_rps *rps)
 {
-    (void)rps;
+    int i;
+    h265_fieldt("inter_ref_pic_set_prediction_flag", rps->inter_ref_pic_set_prediction_flag);
+    h265_fieldt("st_rps_num_negative_pics", rps->num_negative_pics);
+    h265_fieldt("st_rps_num_positive_pics", rps->num_positive_pics);
+    h265_fieldt("st_rps_num_delta_pocs", rps->num_delta_pocs);
+    for (i = 0; i < rps->num_delta_pocs; i++) {
+        h265_fieldt("st_rps_poc[%d]", i, s->poc + rps->delta_poc[i]);
+        h265_fieldt("st_rps_used[%d]", i, rps->used[i]);
+    }
 }
 
 static void h265_print_lt_rps(struct hevc_long_term_rps *rps)
@@ -306,7 +314,6 @@ void h265_print_nal_sps(struct hevc_sps *sps)
 
     h265_field("num_short_term_ref_pic_sets", sps->num_short_term_ref_pic_sets);
     for (i = 0; i < sps->num_short_term_ref_pic_sets; i++) {
-        h265_print_st_rps(&sps->st_rps[i]);
     }
     h265_field("long_term_ref_pics_present_flag", sps->long_term_ref_pics_present_flag);
     if (sps->long_term_ref_pics_present_flag) {
@@ -457,14 +464,13 @@ void h265_print_nal_slice_header(struct h265_context *s, struct hevc_slice_heade
             h265_field("colour_plane_id", sh->colour_plane_id);
 
         h265_field("pic_order_cnt_lsb", sh->pic_order_cnt_lsb);
+        h265_field("pic_order_cnt", s->poc);
         h265_field("short_term_ref_pic_set_sps_flag", sh->short_term_ref_pic_set_sps_flag);
         h265_field("short_term_ref_pic_set_idx", sh->short_term_ref_pic_set_idx);
         if (!IS_IDR(s))
-            h265_print_st_rps((struct hevc_short_term_rps *)sh->short_term_rps);
-        h265_field("short_term_ref_pic_set_size", sh->short_term_ref_pic_set_size);
+            h265_print_st_rps(s, (struct hevc_short_term_rps *)sh->short_term_rps);
         if (!IS_IDR(s))
             h265_print_lt_rps(&sh->long_term_rps);
-        h265_field("long_term_ref_pic_set_size", sh->long_term_ref_pic_set_size);
         h265_field("slice_temporal_mvp_enabled_flag", sh->slice_temporal_mvp_enabled_flag);
 
         h265_field("slice_sao_luma_flag", sh->slice_sao_luma_flag);

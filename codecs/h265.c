@@ -414,17 +414,17 @@ static int hevc_decode_st_rps(struct bitstream *gb, struct hevc_short_term_rps *
             }
         }
     } else {
-        unsigned int prev, nb_positive_pics;
+        unsigned int prev;
         rps->num_negative_pics = get_ue_golomb_long(gb);
-        nb_positive_pics       = get_ue_golomb_long(gb);
+        rps->num_positive_pics = get_ue_golomb_long(gb);
 
         if (rps->num_negative_pics >= HEVC_MAX_REFS ||
-            nb_positive_pics >= HEVC_MAX_REFS) {
+            rps->num_positive_pics >= HEVC_MAX_REFS) {
             h265_err("Too many refs in a short term RPS.\n");
             return -EINVALDATA;
         }
 
-        rps->num_delta_pocs = rps->num_negative_pics + nb_positive_pics;
+        rps->num_delta_pocs = rps->num_negative_pics + rps->num_positive_pics;
         if (rps->num_delta_pocs) {
             prev = 0;
             for (i = 0; i < rps->num_negative_pics; i++) {
@@ -438,7 +438,7 @@ static int hevc_decode_st_rps(struct bitstream *gb, struct hevc_short_term_rps *
                 rps->used[i]      = get_bits1(gb);
             }
             prev = 0;
-            for (i = 0; i < nb_positive_pics; i++) {
+            for (i = 0; i < rps->num_positive_pics; i++) {
                 delta_poc = rps->delta_poc_s1[i] = get_ue_golomb_long(gb) + 1;
                 if (delta_poc < 1 || delta_poc > 32768) {
                     h265_err("Invalid value of delta_poc: %d\n", delta_poc);

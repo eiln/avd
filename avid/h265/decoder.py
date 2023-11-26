@@ -8,14 +8,21 @@ from .fp import AVDH265V3FrameParams
 from .halv3 import AVDH265HalV3
 from .parser import AVDH265Parser
 from .types import *
-from math import sqrt
+from copy import deepcopy
 
 class AVDH265Ctx(dotdict):
 	pass
 
 class AVDH265Picture(dotdict):
 	def __repr__(self):
-		return f"[addr: {hex(self.addr >> 7).ljust(2+5)} poc: {str(self.poc).rjust(3)} idx: {str(self.idx).rjust(2)}]"
+		x = self.addr >> 7 if self.lsb7 else self.addr >> 8
+		return f"[addr: {hex(x).ljust(2+5)} poc: {str(self.poc).ljust(3)} idx: {str(self.idx).ljust(1)} flags: {str(self.flags).ljust(1)}, ref:{str(self.ref).ljust(1)}]"
+
+	def mark_ref(self):
+		self.ref = 1
+
+	def unref(self):
+		self.ref = 0
 
 class AVDH265Decoder(AVDDecoder):
 	def __init__(self):
@@ -31,6 +38,17 @@ class AVDH265Decoder(AVDDecoder):
 	def get_sps(self, sl):
 		return self.ctx.sps_list[self.get_sps_id(sl)]
 
+	def allocate_fifo(self):
+		ctx = self.ctx
+		self.reset_allocator()
+		ctx.inst_fifo_count = 7
+		ctx.inst_fifo_idx = 0
+		ctx.inst_fifo_addrs = [0 for n in range(ctx.inst_fifo_count)]
+		self.allocator_move_up(0x18000)
+		for n in range(ctx.inst_fifo_count):
+			ctx.inst_fifo_addrs[n] = self.allocate(0x100000, pad=0x4000, name="inst_fifo%d" % n)
+		ctx.inst_fifo_iova = ctx.inst_fifo_addrs[ctx.inst_fifo_idx]
+
 	def new_context(self, vps_list, sps_list, pps_list):
 		self.ctx = AVDH265Ctx()
 		ctx = self.ctx
@@ -44,24 +62,19 @@ class AVDH265Decoder(AVDDecoder):
 		ctx.active_sl = None
 		ctx.cur_sps_id = -1
 
+		ctx.last_intra = 0
 		ctx.last_p_sps_tile_idx = 0
-		ctx.prev_poc_lsb = 0
-		ctx.prev_poc_msb = 0
 		ctx.dpb_list = []
-		ctx.unused_refs = []
-		ctx.drain_list = []
-		ctx.rvra_pool_count = 0
+		ctx.ref_lst = [[None for n in range(64)] for n in range(5)]
+		ctx.ref_lst_cnt = [0, 0, 0, 0, 0]
+		ctx.poc = -1
+		self.allocate_fifo()
 
-		ctx.inst_fifo_count = 6
-		ctx.inst_fifo_idx = 0
-
-	def refresh(self, sl):
+	def refresh_sps(self, sps_id):
 		ctx = self.ctx
-		sps_id = self.get_sps_id(sl)
 		if (sps_id == ctx.cur_sps_id):
 			return
 		sps = ctx.sps_list[sps_id]
-
 		width = sps.pic_width_in_luma_samples
 		height = sps.pic_height_in_luma_samples
 
@@ -79,19 +92,12 @@ class AVDH265Decoder(AVDDecoder):
 		assert((64 <= width and width <= 4096) and (64 <= height and height <= 4096)) # hardware caps
 		assert(not(width & 15) and not(height & 15)) # hardware caps
 		ctx.cur_sps_id = sps_id
-		self.allocate()
 
-	def allocate(self):
+		self.allocate_buffers()
+
+	def allocate_buffers(self):
 		ctx = self.ctx
 		sps = ctx.sps_list[ctx.cur_sps_id]
-
-		# constants
-		ctx.inst_fifo_iova = 0x4000
-		ctx.inst_fifo_size = 0x100000
-		ctx.pps_tile_count = 5  # just random work buffers; they call it sps/pps for non-mpeg codecs too
-		ctx.pps_tile_size = 0x8000
-		ctx.sps_tile_count = 24  # again, nothing to do with sps; just a name for work buf group 2
-		ctx.rvra0_addr = 0x734000
 
 		ws = round_up(ctx.width, 32)
 		hs = round_up(ctx.height, 32)
@@ -115,31 +121,57 @@ class AVDH265Decoder(AVDDecoder):
 			ctx.rvra_size3 = 0x40000
 
 		ctx.rvra_total_size = ctx.rvra_size0 + ctx.rvra_size1 + ctx.rvra_size2 + ctx.rvra_size3
-		ctx.rvra_count = 8 + 1 + 1  # all refs + IDR + current
-
-		ctx.y_addr = ctx.rvra0_addr + ctx.rvra_total_size + 0x100
+		self.allocator_move_up(0x734000)
+		ctx.rvra_count = 6
+		ctx.rvra_base_addrs = [0 for n in range(ctx.rvra_count)]
+		ctx.rvra_base_addrs[0] = self.allocate(ctx.rvra_total_size, pad=0x100, name="rvra0")
 
 		if (not(isdiv(ctx.width, 32))):
 			wr = round_up(ctx.width, 64)
 		else:
 			wr = ctx.width
 		luma_size = wr * ctx.height
-		ctx.uv_addr = ctx.y_addr + luma_size
+		ctx.y_addr = self.allocate(luma_size, name="disp_y")
 		chroma_size = wr * ctx.height
-		ctx.slice_data_addr = round_up(ctx.uv_addr + chroma_size, 0x4000)
+		ctx.uv_addr = self.allocate(chroma_size, name="disp_uv")
 
-		ctx.slice_data_size = min((((ws - 1) * (hs - 1) // 0x8000) + 2), 0xff) * 0x4000
-		ctx.sps_tile_addr = ctx.slice_data_addr + ctx.slice_data_size
-		ctx.sps_tile_size = (((ctx.width - 1) * (ctx.height - 1) // 0x10000) + 2) * 0x4000
+		slice_data_size = min((((ws - 1) * (hs - 1) // 0x8000) + 2), 0xff) * 0x4000
+		ctx.slice_data_addr = self.allocate(slice_data_size, align=0x4000, name="slice_data")
 
-		pps_tile_addrs = [0] * ctx.pps_tile_count
-		pps_tile_base_addr = ctx.sps_tile_addr + (ctx.sps_tile_size * ctx.sps_tile_count)
-		addr = pps_tile_base_addr
-		for n in range(ctx.pps_tile_count):
-			pps_tile_addrs[n] = addr
-			addr += 0x8000
-		ctx.pps_tile_addrs = pps_tile_addrs
-		ctx.rvra1_addr = addr
+		sps_tile_count = 16
+		ctx.sps_tile_addrs = [0 for n in range(sps_tile_count)]
+		sps_tile_size = (((ctx.width - 1) * (ctx.height - 1) // 0x10000) + 2) * 0x4000
+		for n in range(sps_tile_count):
+			ctx.sps_tile_addrs[n] = self.allocate(0x8000, name="sps_tile%d" % n)
+
+		pps_tile_count = 5
+		ctx.pps_tile_addrs = []
+		for n in range(pps_tile_count):
+			x = self.allocate(0x8000, name="pps_tile%d" % n)
+			ctx.pps_tile_addrs.append(x)
+
+		#self.allocator_move_up(0x7f4000)
+		#ctx.rvra_base_addrs = [0xe680, 0xfe80, 0xff80, 0x10080, 0x10180, 0x10280]
+		for n in range(ctx.rvra_count - 1):
+			ctx.rvra_base_addrs[n + 1] = self.allocate(ctx.rvra_total_size, name="rvra1_%d" % n)
+		self.dump_ranges()
+
+		ctx.dpb_pool = []
+		for i in range(ctx.rvra_count):
+			pic = AVDH265Picture(addr=ctx.rvra_base_addrs[i], idx=i, poc=-1, flags=0, ref=0, type=-1, lsb7=True)
+			ctx.dpb_pool.append(pic)
+			self.log(f"DPB Pool: {pic}")
+
+		ctx.sps_pool = []
+		for i in range(sps_tile_count):
+			pic = AVDH265Picture(addr=ctx.sps_tile_addrs[i], idx=i, poc=-1, flags=0, ref=0, type=-1, lsb7=False)
+			ctx.sps_pool.append(pic)
+			self.log(f"SPS Pool: {pic}")
+
+	def refresh(self, sl):
+		ctx = self.ctx
+		sps_id = self.get_sps_id(sl)
+		self.refresh_sps(sps_id)
 
 	def setup(self, path, num=0, **kwargs):
 		vps_list, sps_list, pps_list, slices = self.parser.parse(path, num=num)
@@ -148,79 +180,128 @@ class AVDH265Decoder(AVDDecoder):
 		self.refresh(slices[0])
 		return slices
 
-	def get_next_rvra(self):
-		return self.ctx.access_idx
-
-	def get_rvra_addr(self, idx):
-		ctx = self.ctx
-		if (idx % ctx.rvra_count == 0): return ctx.rvra0_addr
-		else: return ctx.rvra1_addr + (((idx % ctx.rvra_count) - 1) * ctx.rvra_total_size)
-
-	def construct_ref_list_p(self):
+	def get_free_pic(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
-		short_refs = [pic for pic in ctx.dpb_list if pic.type == HEVC_REF_ST]
-		short_refs = sorted(short_refs, key=lambda pic: pic.frame_num_wrap, reverse=True)
-		for ref in short_refs:
-			self.log(f"P: ST Refs: {ref}")
-		sl.pic.short_refs = short_refs
-		list0 = short_refs
-		if (sl.ref_pic_list_modification_flag_l0):
-			list0 = self.modify_ref_list(list0, 0)
-		sl.pic.list0 = list0
-
-	def construct_ref_list_b(self):
-		ctx = self.ctx; sl = self.ctx.active_sl
-		short_refs = [pic for pic in ctx.dpb_list if pic.type == HEVC_REF_ST]
-		short_refs = sorted(short_refs, key=lambda pic: pic.poc, reverse=True)
-		for ref in short_refs:
-			self.log(f"B: ST Refs: {ref}")
-		sl.pic.short_refs = short_refs
-		list0 = sorted([pic for pic in short_refs if pic.poc < sl.pic.poc], key=lambda pic: pic.poc, reverse=True)
-		list1 = sorted([pic for pic in short_refs if pic.poc > sl.pic.poc], key=lambda pic: pic.poc)
-		if (sl.ref_pic_list_modification_flag_l0):
-			list0 = self.modify_ref_list(list0, 0)
-		if (sl.ref_pic_list_modification_flag_l1):
-			list1 = self.modify_ref_list(list1, 1)
-		sl.pic.list0 = list0
-		sl.pic.list1 = list1
+		cands = [pic for pic in ctx.dpb_pool if (pic.ref == 0)]
+		cand = cands[0]
+		cand.mark_ref()
+		return cand
 
 	def construct_ref_list(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
 		if (sl.slice_type == HEVC_SLICE_P):
-			self.construct_ref_list_p()
-		elif (sl.slice_type == HEVC_SLICE_B):
-			self.construct_ref_list_b()
+			lx_count = 1
+		else:
+			lx_count = 2
+		reflist = [None, None]
+		for lx in range(lx_count):
+			num_ref_idx_lx_active = sl[f"num_ref_idx_l{lx}_active_minus1"] + 1
+			nb_refs = 0
+			rpl_tmp = [None for n in range(HEVC_MAX_REFS)]
+			cand_lists = [ST_CURR_AFT if lx else ST_CURR_BEF,
+                          ST_CURR_BEF if lx else ST_CURR_AFT,
+                          LT_CURR]
+			while (nb_refs < num_ref_idx_lx_active):
+				for i in range(len(cand_lists)):
+					lst = ctx.ref_lst[cand_lists[i]]
+					for j in range(min(ctx.ref_lst_cnt[cand_lists[i]], HEVC_MAX_REFS)):
+						if (nb_refs >= num_ref_idx_lx_active): break
+						rpl_tmp[nb_refs] = lst[j]
+						nb_refs += 1
+			reflist[lx] = rpl_tmp[:nb_refs]
+			for x in reflist[lx]:
+				self.log(f"List{lx}: {x}")
+		sl.reflist = reflist
+		dpb_list = deepcopy(sl.reflist[0])
+		if (sl.reflist[1]):
+			dpb_list += sl.reflist[1]
+		ctx.dpb_list = dpb_list
+
+	def bump_frame(self):
+		ctx = self.ctx; sl = self.ctx.active_sl
+		dpb = 0
+		for frame in ctx.dpb_list:
+			if (frame.flags and frame.poc != sl.poc):
+				dpb += 1
+		print(self.get_sps(sl))
+		raise ValueError("uh")
+
+	def find_ref_idx(self, poc):
+		ctx = self.ctx; sl = self.ctx.active_sl
+		cands = [pic for pic in ctx.dpb_pool if pic.poc == poc]
+		assert(len(cands) <= 1)
+		if (len(cands) == 0):
+			return None
+		return cands[0]
+
+	def generate_missing_ref(self, poc, t):
+		ctx = self.ctx; sl = self.ctx.active_sl
+		pic = self.get_free_pic()
+		pic.flags = 0
+		return pic
+
+	def add_candidate_ref(self, t, poc, flags):
+		ctx = self.ctx; sl = self.ctx.active_sl
+		# add a reference with the given poc to the list and mark it as used in DPB
+		ref = self.find_ref_idx(poc)
+		if (ref == None):
+			ref = self.generate_missing_ref(poc, t)
+		lst = ctx.ref_lst[t]
+		lst[ctx.ref_lst_cnt[t]] = ref
+		ref.mark_ref()
+		ref.flags &= ~(HEVC_FRAME_FLAG_LONG_REF | HEVC_FRAME_FLAG_SHORT_REF)
+		ref.flags |= flags
+		ctx.ref_lst_cnt[t] += 1
+
+	def do_frame_rps(self):
+		ctx = self.ctx; sl = self.ctx.active_sl
+
+		for x in ctx.dpb_pool:
+			if (x.idx == sl.pic.idx): continue
+			x.unref()
+
+		for t in range(NB_RPS_TYPE):
+			ctx.ref_lst_cnt[t] = 0
+
+		for i in range(sl.st_rps_num_delta_pocs):
+			poc = sl.st_rps_poc[i]
+			if (not sl.st_rps_used[i]):
+				t = ST_FOLL
+			elif (i < sl.st_rps_num_negative_pics):
+				t = ST_CURR_BEF
+			else:
+				t = ST_CURR_AFT
+			self.add_candidate_ref(t, poc, HEVC_FRAME_FLAG_SHORT_REF)
+		if (not IS_IRAP(sl)):
+			self.bump_frame()
+
+	def set_new_ref(self):
+		ctx = self.ctx; sl = self.ctx.active_sl
+		ref = self.get_free_pic()
+		ref.type = HEVC_REF_ST
+		ref.poc = ctx.poc
+		if (sl.pic_output_flag):
+		    ref.flags = HEVC_FRAME_FLAG_OUTPUT | HEVC_FRAME_FLAG_SHORT_REF
+		else:
+		    ref.flags = HEVC_FRAME_FLAG_SHORT_REF
+		sl.pic = ref
+		self.log(f"INDEX: {ref.idx}")
 
 	def init_slice(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
+		ctx.poc = sl.pic_order_cnt
 		self.refresh(sl)
+		for x in ctx.dpb_pool:
+			self.log(f"DPB Pool: {x}")
+		self.set_new_ref()
+		if (not IS_IDR(sl)):
+			self.do_frame_rps()
 
-		sl.pic = AVDH265Picture()
-		sl.pic.type = HEVC_REF_ST
-		sl.pic.poc = sl.pic_order_cnt_lsb
-		sl.pic.idx = self.get_next_rvra()
-		sl.pic.addr = self.get_rvra_addr(sl.pic.idx)
-		sl.pic.access_idx = ctx.access_idx
-		sl.pic.frame_num_wrap = sl.pic_order_cnt_lsb
-		sl.pic.pic_num = sl.pic_order_cnt_lsb
-		self.construct_ref_list()
+		if ((not sl.dependent_slice_segment_flag) and (sl.slice_type != HEVC_SLICE_I)):
+			self.construct_ref_list()
 
 	def finish_slice(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
 
-		if (IS_IDR(sl) or 1):
-			self.log(f"Adding pic to dpb {sl.pic}")
-			ctx.dpb_list.append(sl.pic)
-			ctx.unused_refs = [i for i in ctx.unused_refs if i.addr != sl.pic.addr]
-
-		if (IS_IDR(sl) or 1):
-			max_num_ref_frames = 3
-			if (len(ctx.dpb_list) > max_num_ref_frames):
-				oldest = sorted(ctx.dpb_list, key=lambda pic: pic.access_idx)[0]
-				self.log(f"ADPT: removing oldest ref {oldest}")
-				ctx.dpb_list = [x for x in ctx.dpb_list if x != oldest]
-				ctx.unused_refs.append(oldest)
-
-		if (sl.slice_type == HEVC_SLICE_P):
-			ctx.last_p_sps_tile_idx = ctx.access_idx % ctx.sps_tile_count
-		self.ctx.access_idx += 1
+		ctx.last_intra = IS_INTRA(sl)
+		ctx.access_idx += 1

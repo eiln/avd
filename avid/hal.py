@@ -28,7 +28,7 @@ class AVDInst(namedtuple('AVDInst', ['val', 'name', 'pos', 'idx'])):
 		return f'{disp_idx} {disp_val} | {disp_name}'
 
 	def __repr__(self):
-		return self.rep(self)
+		return self.rep()
 
 class AVDHal:
 	def __init__(self):
