@@ -227,11 +227,12 @@ struct h264_sps {
 	uint32_t bit_depth_luma_minus8;
 	uint32_t bit_depth_chroma_minus8;
 	uint32_t qpprime_y_zero_transform_bypass_flag;
-	uint32_t seq_scaling_matrix_present_flag;
+	int seq_scaling_matrix_present_flag;
 	uint32_t seq_scaling_list_present_flag[12];
 	uint32_t use_default_scaling_matrix_flag[12];
-	uint32_t seq_scaling_list_4x4[6][16];
-	uint32_t seq_scaling_list_8x8[6][64];
+	uint8_t seq_scaling_list_4x4[6][16];
+	uint8_t seq_scaling_list_8x8[6][64];
+	uint16_t scaling_matrix_present_mask;
 
 	uint32_t log2_max_frame_num;
 	uint32_t pic_order_cnt_type;
@@ -342,8 +343,9 @@ struct h264_pps {
 	uint32_t pic_scaling_matrix_present_flag;
 	uint32_t pic_scaling_list_present_flag[12];
 	uint32_t use_default_scaling_matrix_flag[12];
-	uint32_t pic_scaling_list_4x4[6][16];
-	uint32_t pic_scaling_list_8x8[6][64];
+	uint8_t pic_scaling_list_4x4[6][16];
+	uint8_t pic_scaling_list_8x8[6][64];
+	uint16_t pic_scaling_matrix_present_mask;
 	int32_t second_chroma_qp_index_offset;
 	uint32_t ref_count[2];
 };

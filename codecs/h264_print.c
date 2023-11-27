@@ -29,6 +29,7 @@
 #include "h264.h"
 
 #define h264_field(a, ...)     printf("\t" a " = %d\n", ##__VA_ARGS__)
+#define h264_fieldt(a, ...)    printf("\t\t" a " = %d\n", ##__VA_ARGS__)
 #define h264_field2(a, b, ...) printf("\t" a " = %d [%s]\n", b, ##__VA_ARGS__)
 
 static void h264_print_hrd(struct h264_hrd_parameters *hrd)
@@ -337,7 +338,7 @@ void h264_print_sps_ext(struct h264_sps *sps)
 
 void h264_print_pps(struct h264_pps *pps)
 {
-	uint32_t i;
+	int i, j;
 
 	h264_field("pic_parameter_set_id", pps->pic_parameter_set_id);
 	h264_field("seq_parameter_set_id", pps->seq_parameter_set_id);
@@ -399,33 +400,26 @@ void h264_print_pps(struct h264_pps *pps)
 	       pps->redundant_pic_cnt_present_flag);
 
 	h264_field("transform_8x8_mode_flag", pps->transform_8x8_mode_flag);
-	h264_field("pic_scaling_matrix_present_flag",
-	       pps->pic_scaling_matrix_present_flag);
+	h264_field("pic_scaling_matrix_present_flag", pps->pic_scaling_matrix_present_flag);
 	if (pps->pic_scaling_matrix_present_flag) {
-		int i, j;
-		for (i = 0; i < (pps->chroma_format_idc == 3 ? 12 : 8); i++) {
-			h264_field("pic_scaling_list_present_flag[%d]", i,
-			       pps->pic_scaling_list_present_flag[i]);
-			if (pps->pic_scaling_list_present_flag[i]) {
-				h264_field("use_default_scaling_matrix_flag[%d]", i,
-				       pps->use_default_scaling_matrix_flag[i]);
-				if (!pps->use_default_scaling_matrix_flag[i]) {
-					for (j = 0; j < (i < 6 ? 16 : 64); j++) {
-						if (i < 6)
-							h264_field("pic_scaling_list[%d][%d]",
-							       i, j,
-							       pps->pic_scaling_list_4x4[i][j]);
-						else
-							h264_field("pic_scaling_list[%d][%d]",
-							       i, j,
-							       pps->pic_scaling_list_8x8[i - 6][j]);
-					}
-				}
-			}
+		h264_fieldt("pic_scaling_matrix_present_mask", pps->pic_scaling_matrix_present_mask);
+		for (i = 0; i < 6; i++) {
+			h264_fieldt("pic_scaling_list_present_flag[%d]", i,
+						pps->pic_scaling_matrix_present_mask & (1 << i));
+			for (j = 0; j < 16; j++)
+				h264_fieldt("pic_scaling_list_4x4[%d][%d]",
+						    i, j, pps->pic_scaling_list_4x4[i][j]);
 		}
+		if (pps->transform_8x8_mode_flag)
+			for (i = 0; i < 6; i++) {
+				h264_fieldt("pic_scaling_list_present_flag[%d]", i + 6,
+					pps->pic_scaling_matrix_present_mask & (1 << (i + 6)));
+				for (j = 0; j < 64; j++)
+					h264_fieldt("pic_scaling_list_8x8[%d][%d]",
+							    i, j, pps->pic_scaling_list_8x8[i][j]);
+			}
 	}
-	h264_field("second_chroma_qp_index_offset",
-	       pps->second_chroma_qp_index_offset);
+	h264_field("second_chroma_qp_index_offset", pps->second_chroma_qp_index_offset);
 }
 
 static void h264_print_ref_pic_list_modification(struct h264_ref_pic_list_modification *list,

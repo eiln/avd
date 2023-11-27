@@ -37,24 +37,131 @@
 #define h264_log(a, ...)  printf("[H264] " a, ##__VA_ARGS__)
 #define h264_err(a, ...)  fprintf(stderr, "[H264] " a, ##__VA_ARGS__)
 
-static void h264_parse_scaling_list(struct bitstream *gb, uint32_t *scaling_list,
-				   int size, uint32_t *use_default_flag)
+static const uint8_t h264_avd_zigzag_scan4x4[16+1] = {
+	0 + 0 * 4, 1 + 0 * 4, 0 + 1 * 4, 0 + 2 * 4,
+	1 + 1 * 4, 2 + 0 * 4, 3 + 0 * 4, 2 + 1 * 4,
+	1 + 2 * 4, 0 + 3 * 4, 1 + 3 * 4, 2 + 2 * 4,
+	3 + 1 * 4, 3 + 2 * 4, 2 + 3 * 4, 3 + 3 * 4,
+};
+
+static const uint8_t h264_avd_zigzag_scan8x8[64+1] = {
+	0 +  0 * 4,  1 +  0 * 4,  0 +  1 * 4,  0 +  2 * 4,
+	1 +  1 * 4,  2 +  0 * 4,  3 +  0 * 4,  2 +  1 * 4,
+	1 +  2 * 4,  0 +  3 * 4,  0 +  8 * 4,  1 +  3 * 4,
+	2 +  2 * 4,  3 +  1 * 4,  0 +  4 * 4,  1 +  4 * 4,
+	0 +  5 * 4,  3 +  2 * 4,  2 +  3 * 4,  1 +  8 * 4,
+	0 +  9 * 4,  0 + 10 * 4,  1 +  9 * 4,  2 +  8 * 4,
+	3 +  3 * 4,  0 +  6 * 4,  1 +  5 * 4,  2 +  4 * 4,
+	3 +  4 * 4,  2 +  5 * 4,  1 +  6 * 4,  0 +  7 * 4,
+	3 +  8 * 4,  2 +  9 * 4,  1 + 10 * 4,  0 + 11 * 4,
+	1 + 11 * 4,  2 + 10 * 4,  3 +  9 * 4,  0 + 12 * 4,
+	1 +  7 * 4,  2 +  6 * 4,  3 +  5 * 4,  3 +  6 * 4,
+	2 +  7 * 4,  1 + 12 * 4,  0 + 13 * 4,  3 + 10 * 4,
+	2 + 11 * 4,  3 + 11 * 4,  0 + 14 * 4,  1 + 13 * 4,
+	2 + 12 * 4,  3 +  7 * 4,  3 + 12 * 4,  2 + 13 * 4,
+	1 + 14 * 4,  0 + 15 * 4,  1 + 15 * 4,  2 + 14 * 4,
+	3 + 13 * 4,  3 + 14 * 4,  2 + 15 * 4,  3 + 15 * 4,
+};
+
+static const uint8_t default_scaling4[2][16] = {
+	{  6, 13, 20, 28, 13, 20, 28, 32,
+	  20, 28, 32, 37, 28, 32, 37, 42 },
+	{ 10, 14, 20, 24, 14, 20, 24, 27,
+	  20, 24, 27, 30, 24, 27, 30, 34 }
+};
+
+static const uint8_t default_scaling8[2][64] = {
+	{  6, 10, 13, 16, 18, 23, 25, 27,
+	  10, 11, 16, 18, 23, 25, 27, 29,
+	  13, 16, 18, 23, 25, 27, 29, 31,
+	  16, 18, 23, 25, 27, 29, 31, 33,
+	  18, 23, 25, 27, 29, 31, 33, 36,
+	  23, 25, 27, 29, 31, 33, 36, 38,
+	  25, 27, 29, 31, 33, 36, 38, 40,
+	  27, 29, 31, 33, 36, 38, 40, 42 },
+	{  9, 13, 15, 17, 19, 21, 22, 24,
+	  13, 13, 17, 19, 21, 22, 24, 25,
+	  15, 17, 19, 21, 22, 24, 25, 27,
+	  17, 19, 21, 22, 24, 25, 27, 28,
+	  19, 21, 22, 24, 25, 27, 28, 30,
+	  21, 22, 24, 25, 27, 28, 30, 32,
+	  22, 24, 25, 27, 28, 30, 32, 33,
+	  24, 25, 27, 28, 30, 32, 33, 35 }
+};
+
+static int decode_scaling_list(struct bitstream *gb, uint8_t *factors, int size,
+                               const uint8_t *jvt_list, const uint8_t *fallback_list,
+                               uint16_t *mask, int pos)
 {
-	uint32_t lastScale = 8;
-	uint32_t nextScale = 8;
-	for (int i = 0; i < size; i++) {
-		if (nextScale != 0) {
-			int32_t delta_scale = get_se_golomb(gb);
-			nextScale = (lastScale + delta_scale + 256) % 256;
-			*use_default_flag = (i == 0 && nextScale == 0);
+	int i, last = 8, next = 8;
+	const uint8_t *scan = size == 16 ? h264_avd_zigzag_scan4x4 : h264_avd_zigzag_scan8x8;
+	uint16_t seq_scaling_list_present_flag = get_bits1(gb);
+	*mask |= (seq_scaling_list_present_flag << pos);
+	if (!seq_scaling_list_present_flag) /* matrix not written, we use the predicted one */
+		memcpy(factors, fallback_list, size * sizeof(uint8_t));
+	else
+		for (i = 0; i < size; i++) {
+			if (next) {
+				int32_t delta_scale = get_se_golomb(gb);
+				if (delta_scale < -128 || delta_scale > 127) {
+					h264_err("delta scale %d is invalid\n", delta_scale);
+					return -EINVALDATA;
+				}
+				next = (last + delta_scale + 256) % 256;
+			}
+			if (!i && !next) { /* matrix not written, we use the preset one */
+				memcpy(factors, jvt_list, size * sizeof(uint8_t));
+				break;
+			}
+			last = factors[scan[i]] = next ? next : last;
 		}
-		lastScale = scaling_list[i] = (nextScale ? nextScale : lastScale);
+	return 0;
+}
+
+/* returns non zero if the provided SPS scaling matrix has been filled */
+static int h264_parse_scaling_list(struct bitstream *gb, struct h264_sps *sps,
+                                    struct h264_pps *pps, int is_sps,
+                                    int present_flag, uint16_t *mask,
+                                    uint8_t(*scaling_matrix4)[16],
+                                    uint8_t(*scaling_matrix8)[64])
+{
+	int fallback_sps = !is_sps && sps->seq_scaling_matrix_present_flag;
+	const uint8_t *fallback[4] = {
+		fallback_sps ? sps->seq_scaling_list_4x4[0] : default_scaling4[0],
+		fallback_sps ? sps->seq_scaling_list_4x4[3] : default_scaling4[1],
+		fallback_sps ? sps->seq_scaling_list_8x8[0] : default_scaling8[0],
+		fallback_sps ? sps->seq_scaling_list_8x8[3] : default_scaling8[1]
+	};
+	int ret = 0;
+	*mask = 0x0;
+	if (present_flag) {
+		ret |= decode_scaling_list(gb, scaling_matrix4[0], 16, default_scaling4[0], fallback[0], mask, 0);        // Intra, Y
+		ret |= decode_scaling_list(gb, scaling_matrix4[1], 16, default_scaling4[0], scaling_matrix4[0], mask, 1); // Intra, Cr
+		ret |= decode_scaling_list(gb, scaling_matrix4[2], 16, default_scaling4[0], scaling_matrix4[1], mask, 2); // Intra, Cb
+		ret |= decode_scaling_list(gb, scaling_matrix4[3], 16, default_scaling4[1], fallback[1], mask, 3);        // Inter, Y
+		ret |= decode_scaling_list(gb, scaling_matrix4[4], 16, default_scaling4[1], scaling_matrix4[3], mask, 4); // Inter, Cr
+		ret |= decode_scaling_list(gb, scaling_matrix4[5], 16, default_scaling4[1], scaling_matrix4[4], mask, 5); // Inter, Cb
+		if (is_sps || pps->transform_8x8_mode_flag) {
+			ret |= decode_scaling_list(gb, scaling_matrix8[0], 64, default_scaling8[0], fallback[2], mask, 6); // Intra, Y
+			ret |= decode_scaling_list(gb, scaling_matrix8[3], 64, default_scaling8[1], fallback[3], mask, 6+3); // Inter, Y
+			if (sps->chroma_format_idc == 3) {
+				ret |= decode_scaling_list(gb, scaling_matrix8[1], 64, default_scaling8[0], scaling_matrix8[0], mask,  6+1); // Intra, Cr
+				ret |= decode_scaling_list(gb, scaling_matrix8[4], 64, default_scaling8[1], scaling_matrix8[3], mask,  6+4); // Inter, Cr
+				ret |= decode_scaling_list(gb, scaling_matrix8[2], 64, default_scaling8[0], scaling_matrix8[1], mask,  6+2); // Intra, Cb
+				ret |= decode_scaling_list(gb, scaling_matrix8[5], 64, default_scaling8[1], scaling_matrix8[4], mask,  6+5); // Inter, Cb
+			}
+		}
+		if (!ret)
+			ret = is_sps;
 	}
+
+	return ret;
 }
 
 static int h264_parse_hrd_parameters(struct bitstream *gb, struct h264_hrd_parameters *hrd)
 {
-	uint32_t i;
+	int i;
+
 	hrd->cpb_cnt = get_ue_golomb_31(gb) + 1;
 	if (hrd->cpb_cnt >= 32) {
 		h264_err("cpb_cnt (%d) out of bounds\n", hrd->cpb_cnt);
@@ -181,6 +288,7 @@ static int h264_parse_vui_parameters(struct bitstream *gb, struct h264_vui *vui)
 static int h264_parse_sps(struct bitstream *gb, struct h264_sps *sps)
 {
 	uint32_t i, constraint_set_flags = 0;
+	int ret;
 
 	sps->is_svc = 0;
 	sps->is_mvc = 0;
@@ -200,6 +308,10 @@ static int h264_parse_sps(struct bitstream *gb, struct h264_sps *sps)
 		h264_err("SPS id %u out of range\n", sps->seq_parameter_set_id);
 		return -1;
 	}
+
+	sps->seq_scaling_matrix_present_flag = 0;
+	memset(sps->seq_scaling_list_4x4, 16, sizeof(sps->seq_scaling_list_4x4));
+	memset(sps->seq_scaling_list_8x8, 16, sizeof(sps->seq_scaling_list_8x8));
 
 	switch (sps->profile_idc) {
 	case H264_PROFILE_BASELINE:
@@ -230,22 +342,12 @@ static int h264_parse_sps(struct bitstream *gb, struct h264_sps *sps)
 		sps->bit_depth_chroma_minus8 = get_ue_golomb_31(gb);
 		sps->qpprime_y_zero_transform_bypass_flag = get_bits1(gb);
 		sps->seq_scaling_matrix_present_flag = get_bits1(gb);
-		if (sps->seq_scaling_matrix_present_flag) {
-			for (int i = 0; i < (sps->chroma_format_idc == 3 ? 12 : 8); i++) {
-				sps->seq_scaling_list_present_flag[i] = get_bits1(gb);
-				if (sps->seq_scaling_list_present_flag[i]) {
-					if (i < 6) {
-						h264_parse_scaling_list(
-							    gb, sps->seq_scaling_list_4x4[i], 16,
-							    &sps->use_default_scaling_matrix_flag[i]);
-					} else {
-						h264_parse_scaling_list(
-							    gb, sps->seq_scaling_list_8x8[i - 6], 64,
-							    &sps->use_default_scaling_matrix_flag[i]);
-					}
-				}
-			}
-		}
+		ret = h264_parse_scaling_list(gb, sps, NULL, 1, sps->seq_scaling_matrix_present_flag,
+									  &sps->scaling_matrix_present_mask,
+									  sps->seq_scaling_list_4x4, sps->seq_scaling_list_8x8);
+		if (ret < 0)
+			h264_err("failed to decode scaling list (%d)\n", ret);
+		sps->seq_scaling_matrix_present_flag |= ret;
 		break;
 	default:
 		h264_err("unknown profile (%d)\n", sps->profile_idc);
@@ -519,7 +621,8 @@ static int h264_parse_sps_ext(struct h264_context *ctx, uint32_t *pseq_parameter
 static int h264_parse_pps(struct h264_context *ctx, struct h264_pps *pps)
 {
 	struct bitstream *gb = &ctx->gb;
-	uint32_t i;
+	struct h264_sps *sps = NULL;
+	int i, ret;
 
 	pps->pic_parameter_set_id = get_ue_golomb(gb);
 	pps->seq_parameter_set_id = get_ue_golomb_31(gb);
@@ -527,6 +630,8 @@ static int h264_parse_pps(struct h264_context *ctx, struct h264_pps *pps)
 		h264_err("SPS id (%d) out of bounds\n", pps->seq_parameter_set_id);
 		return -1;
 	}
+	sps = &ctx->sps_list[pps->seq_parameter_set_id];
+	pps->chroma_format_idc = sps->chroma_format_idc;
 
 	pps->entropy_coding_mode_flag = get_bits1(gb);
 	pps->bottom_field_pic_order_in_frame_present_flag = get_bits1(gb);
@@ -582,45 +687,19 @@ static int h264_parse_pps(struct h264_context *ctx, struct h264_pps *pps)
 	pps->constrained_intra_pred_flag = get_bits1(gb);
 	pps->redundant_pic_cnt_present_flag = get_bits1(gb);
 
+	memcpy(pps->pic_scaling_list_4x4, sps->seq_scaling_list_4x4,
+		   sizeof(pps->pic_scaling_list_4x4));
+	memcpy(pps->pic_scaling_list_8x8, sps->seq_scaling_list_8x8,
+		   sizeof(pps->pic_scaling_list_8x8));
 	if (h2645_more_rbsp_data(gb)) {
 		pps->transform_8x8_mode_flag = get_bits1(gb);
 		pps->pic_scaling_matrix_present_flag = get_bits1(gb);
-		if (pps->pic_scaling_matrix_present_flag) {
-			/* brain damage workaround start */
-			struct h264_sps *sps = h264_get_sps(ctx, pps->pic_parameter_set_id);
-			struct h264_sps *subsps = h264_get_sub_sps(ctx, pps->pic_parameter_set_id);
-			if (sps) {
-				pps->chroma_format_idc = sps->chroma_format_idc;
-				if (subsps) {
-					if (subsps->chroma_format_idc !=
-					    pps->chroma_format_idc) {
-						fprintf(stderr,
-							"conflicting chroma_format_idc between sps and subsps, please complain to ITU/ISO about retarded spec and to bitstream source about retarded bitstream.\n");
-						return -1;
-					}
-				}
-			} else if (subsps) {
-				pps->chroma_format_idc = subsps->chroma_format_idc;
-			} else {
-				h264_err("pps for nonexistent sps/subsps!\n");
-				return -1;
-			}
-			/* brain damage workaround end */
-
-			for (int i = 0; i < (pps->chroma_format_idc == 3 ? 12 : 8); i++) {
-				pps->pic_scaling_list_present_flag[i] = get_bits1(gb);
-				if (pps->pic_scaling_list_present_flag[i]) {
-					if (i < 6) {
-						h264_parse_scaling_list(
-							    gb, pps->pic_scaling_list_4x4[i], 16,
-							    &pps->use_default_scaling_matrix_flag[i]);
-					} else {
-						h264_parse_scaling_list(
-							    gb, pps->pic_scaling_list_8x8[i - 6], 64,
-							    &pps->use_default_scaling_matrix_flag[i]);
-					}
-				}
-			}
+		ret = h264_parse_scaling_list(gb, sps, pps, 0,
+								pps->pic_scaling_matrix_present_flag,
+								&pps->pic_scaling_matrix_present_mask,
+								pps->pic_scaling_list_4x4, pps->pic_scaling_list_8x8);
+		if (ret < 0) {
+			h264_err("failed to parse scaling list\n");
 		}
 		pps->second_chroma_qp_index_offset = get_se_golomb(gb);
 	} else {
