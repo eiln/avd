@@ -29,9 +29,8 @@ class AVDH265HalV3(AVDHal):
 		push(0x4020002, "cm3_dma_config_6")
 		push(ctx.pps_tile_addrs[1] >> 8, "hdr_dc_pps_tile_addr_lsb8", 6)
 
-		n = (ctx.access_idx + 2) % 16
+		n = sl.pic.idx
 		push(ctx.sps_tile_addrs[n] >> 8, "hdr_bc_sps_tile_addr_lsb8")
-		#push(0xdead, "hdr_bc_sps_tile_addr_lsb8")
 
 		push(0x70007, "cm3_dma_config_7")
 		push(0x70007, "cm3_dma_config_8")
@@ -232,31 +231,39 @@ class AVDH265HalV3(AVDHal):
 		ctb_height = (ctx.height + (1 << log2_ctb_size) - 1) >> log2_ctb_size
 		push(((ctb_height - 1) << 12) | (ctb_width - 1), "cm3_set_mb_dims")
 
-		x = 0x2d000000
+		x = 0
 		if   (sl.slice_type == HEVC_SLICE_I):
 			x |= 0x20000
 		elif (sl.slice_type == HEVC_SLICE_P):
 			x |= 0x10000
-		elif (sl.slice_type == HEVC_SLICE_B):
-			x |= 0x40000
 
 		if ((sl.slice_type == HEVC_SLICE_P) or (sl.slice_type == HEVC_SLICE_B)):
 			x |= 0x6
 			x |= 0x8000
-			if (sl.num_ref_idx_active_override_flag):
+
+			if (sl.slice_type == HEVC_SLICE_P):
+				ref = sl.reflist[0][0]
+			else:
+				ref = sl.reflist[1][0]
+			if (not ref.rasl) and (not ctx.last_intra):
 				x |= 0x40000
+
 			x |= sl.num_ref_idx_l0_active_minus1 << 11
 			if (sl.slice_type == HEVC_SLICE_B):
 				x |= 0x50
 				x |= sl.num_ref_idx_l1_active_minus1 << 7
-		push(x, "slc_a8c_cmd_ref_type")
+		push(0x2d000000 | x, "slc_a8c_cmd_ref_type")
 
 		if ((sl.slice_type == HEVC_SLICE_P) and not ctx.last_intra) or (sl.slice_type == HEVC_SLICE_B):
-			n = ctx.access_idx % 16
-			push(ctx.sps_tile_addrs[n] >> 8, "slc_bd4_sps_tile_addr2_lsb8")
-			#push(0xbeef, "slc_bd4_sps_tile_addr2_lsb8")
-		push(0x1000000, "slc_be0_unk_100")
+			if (sl.slice_type == HEVC_SLICE_P):
+				ref = sl.reflist[0][0]
+			else:
+				ref = sl.reflist[1][0]
+			if (not ref.rasl):
+				n = ref.idx
+				push(ctx.sps_tile_addrs[n] >> 8, "slc_bd4_sps_tile_addr2_lsb8")
 
+		push(0x1000000, "slc_be0_unk_100")
 		push(0x2b000000 | 0x400, "cm3_cmd_inst_fifo_end")
 
 	def set_insn(self, ctx, sl):
