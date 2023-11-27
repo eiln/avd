@@ -55,6 +55,7 @@ class AVDH265HalV3(AVDHal):
 
 	def set_flags(self, ctx, sl):
 		push = self.push
+		pps = self.get_pps(ctx, sl)
 
 		x = 0
 		push(x, "hdr_30_flag_pt1")
@@ -67,6 +68,8 @@ class AVDH265HalV3(AVDHal):
 		x = 0
 		x |= set_bit(3)
 		x |= set_bit(4)
+		if (pps.tiles_enabled_flag or pps.entropy_coding_sync_enabled_flag):
+			x |= set_bit(12)
 		x |= set_bit(16)
 		x |= set_bit(17)
 		x |= set_bit(20)
