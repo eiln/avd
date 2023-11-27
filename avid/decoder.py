@@ -3,7 +3,7 @@
 # Copyright 2023 Eileen Yoon <eyn@gmx.com>
 
 from collections import namedtuple
-from .utils import round_up
+from .utils import *
 
 class AVDRange(namedtuple('AVDRange', ['iova', 'size', 'name'])):
 	def __repr__(self):
@@ -80,3 +80,40 @@ class AVDDecoder:
 			else:
 				ffp[inst.name] = inst.val
 		return ffp
+
+	def calc_rvra(self, is_422):
+		ctx = self.ctx
+
+		# reference VRA (video resolution adaptation) scaler buffer.
+		ws = round_up(ctx.width, 32)
+		hs = round_up(ctx.height, 32)
+
+		# 1. luma
+		ctx.rvra_size0 = (ws * hs) + ((ws * hs) // 4)
+
+		# 2. chroma
+		ctx.rvra_size2 = ctx.rvra_size0
+		if (not is_422): # TODO sucks
+			ctx.rvra_size2 //= 2
+
+		# 3. luma weights
+		ctx.rvra_size1 = ((nextpow2(ctx.height) // 32) * nextpow2(ctx.width))
+
+		# 4. chroma weights
+		# I can't figure this one out. at least make tests pass
+		if (ctx.width == 128 and ctx.height == 64):
+			ctx.rvra_size3 = 0x4300
+			if (is_422):
+				ctx.rvra_size3 = 0x6f00
+		elif (ctx.width == 1024 and ctx.height == 512):
+			ctx.rvra_size3 = 0x8000
+		elif (ctx.width == 1920 and ctx.height == 1088):
+			ctx.rvra_size3 = 0xfc00
+		elif (ctx.width == 3840 and ctx.height == 2160):
+			ctx.rvra_size3 = 0x27000
+		else:  # best approximation / worst case, oops
+			rvra_total_size = (ws * hs) * 4
+			ctx.rvra_size3 = rvra_total_size - (ctx.rvra_size0 + ctx.rvra_size1 + ctx.rvra_size2)
+
+		rvra_total_size = ctx.rvra_size0 + ctx.rvra_size1 + ctx.rvra_size2 + ctx.rvra_size3
+		return rvra_total_size

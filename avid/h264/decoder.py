@@ -105,28 +105,7 @@ class AVDH264Decoder(AVDDecoder):
 			ctx.inst_fifo_addrs[n] = self.allocate(0x100000, pad=0x4000, name="inst_fifo%d" % n)
 		ctx.inst_fifo_iova = ctx.inst_fifo_addrs[ctx.inst_fifo_idx]
 
-		ws = round_up(ctx.width, 32)
-		hs = round_up(ctx.height, 32)
-		ctx.rvra_size0 = (ws * hs) + ((ws * hs) // 4)
-		ctx.rvra_size2 = ctx.rvra_size0
-		if (sps.chroma_format_idc == H264_CHROMA_IDC_420):
-			ctx.rvra_size2 //= 2
-
-		ctx.rvra_size1 = ((nextpow2(ctx.height) // 32) * nextpow2(ctx.width))
-		if (ctx.width == 128 and ctx.height == 64):
-			ctx.rvra_size3 = 0x4300
-			if (sps.chroma_format_idc == H264_CHROMA_IDC_422):
-				ctx.rvra_size3 = 0x6f00
-		elif (ctx.width == 1024 and ctx.height == 512):
-			ctx.rvra_size3 = 0x8000
-		elif (ctx.width == 1920 and ctx.height == 1088):
-			ctx.rvra_size3 = 0xfc00
-		elif (ctx.width == 3840 and ctx.height == 2160):
-			ctx.rvra_size3 = 0x27000
-		else: # worst case, oops
-			ctx.rvra_size3 = 0x40000
-
-		rvra_total_size = ctx.rvra_size0 + ctx.rvra_size1 + ctx.rvra_size2 + ctx.rvra_size3
+		rvra_total_size = self.calc_rvra(is_422=sps.chroma_format_idc == H264_CHROMA_IDC_422)
 		ctx.rvra_count = ctx.max_dpb_frames + 1 + 1  # all refs + IDR + current
 		self.allocator_move_up(0x734000)
 		ctx.rvra_base_addrs = [0 for n in range(ctx.rvra_count)]
@@ -143,7 +122,7 @@ class AVDH264Decoder(AVDDecoder):
 			chroma_size //= 2
 		ctx.uv_addr = self.allocate(chroma_size, name="disp_uv")
 
-		slice_data_size = min((((ws - 1) * (hs - 1) // 0x8000) + 2), 0xff) * 0x4000
+		slice_data_size = min((((round_up(ctx.width, 32) - 1) * (round_up(ctx.height, 32) - 1) // 0x8000) + 2), 0xff) * 0x4000
 		ctx.slice_data_addr = self.allocate(slice_data_size, align=0x4000, padb4=0x4000, name="slice_data")
 
 		ctx.sps_tile_count = 24
