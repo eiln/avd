@@ -223,7 +223,11 @@ class AVDH265HalV3(AVDHal):
 			self.set_weights(ctx, sl)
 
 		push(0x2a000000, "cm3_cmd_set_mb_dims")
-		push(0x1, "cm3_set_mb_dims") # ?
+		sps = self.get_sps(ctx, sl)
+		log2_ctb_size = sps.log2_min_cb_size + sps.log2_diff_max_min_coding_block_size
+		ctb_width = ctx.width + ((1 << log2_ctb_size) - 1) >> log2_ctb_size
+		ctb_height = (ctx.height + (1 << log2_ctb_size) - 1) >> log2_ctb_size
+		push(((ctb_height - 1) << 12) | (ctb_width - 1), "cm3_set_mb_dims")
 
 		x = 0x2d000000
 		if   (sl.slice_type == HEVC_SLICE_I):
