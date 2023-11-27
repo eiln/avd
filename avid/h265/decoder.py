@@ -120,11 +120,11 @@ class AVDH265Decoder(AVDDecoder):
 		else:   # worst case, oops
 			ctx.rvra_size3 = 0x40000
 
-		ctx.rvra_total_size = ctx.rvra_size0 + ctx.rvra_size1 + ctx.rvra_size2 + ctx.rvra_size3
+		rvra_total_size = ctx.rvra_size0 + ctx.rvra_size1 + ctx.rvra_size2 + ctx.rvra_size3
 		self.allocator_move_up(0x734000)
 		ctx.rvra_count = 6
 		ctx.rvra_base_addrs = [0 for n in range(ctx.rvra_count)]
-		ctx.rvra_base_addrs[0] = self.allocate(ctx.rvra_total_size, pad=0x100, name="rvra0")
+		ctx.rvra_base_addrs[0] = self.allocate(rvra_total_size, pad=0x100, name="rvra0")
 
 		if (not(isdiv(ctx.width, 32))):
 			wr = round_up(ctx.width, 64)
@@ -133,27 +133,26 @@ class AVDH265Decoder(AVDDecoder):
 		luma_size = wr * ctx.height
 		ctx.y_addr = self.allocate(luma_size, name="disp_y")
 		chroma_size = wr * ctx.height
+		if (sps.chroma_format_idc == HEVC_CHROMA_IDC_420):
+			chroma_size //= 2
 		ctx.uv_addr = self.allocate(chroma_size, name="disp_uv")
 
 		slice_data_size = min((((ws - 1) * (hs - 1) // 0x8000) + 2), 0xff) * 0x4000
-		ctx.slice_data_addr = self.allocate(slice_data_size, align=0x4000, name="slice_data")
+		ctx.slice_data_addr = self.allocate(slice_data_size, align=0x4000, padb4=0x4000,name="slice_data")
 
-		sps_tile_count = 16
-		ctx.sps_tile_addrs = [0 for n in range(sps_tile_count)]
+		ctx.sps_tile_count = 16
+		ctx.sps_tile_addrs = [0 for n in range(ctx.sps_tile_count)]
 		sps_tile_size = (((ctx.width - 1) * (ctx.height - 1) // 0x10000) + 2) * 0x4000
-		for n in range(sps_tile_count):
-			ctx.sps_tile_addrs[n] = self.allocate(0x8000, name="sps_tile%d" % n)
+		for n in range(ctx.sps_tile_count):
+			ctx.sps_tile_addrs[n] = self.allocate(sps_tile_size, name="sps_tile%d" % n)
 
 		pps_tile_count = 5
-		ctx.pps_tile_addrs = []
+		ctx.pps_tile_addrs = [0 for n in range(pps_tile_count)]
 		for n in range(pps_tile_count):
-			x = self.allocate(0x8000, name="pps_tile%d" % n)
-			ctx.pps_tile_addrs.append(x)
+			ctx.pps_tile_addrs[n] = self.allocate(0x8000, name="pps_tile%d" % n)
 
-		#self.allocator_move_up(0x7f4000)
-		#ctx.rvra_base_addrs = [0xe680, 0xfe80, 0xff80, 0x10080, 0x10180, 0x10280]
 		for n in range(ctx.rvra_count - 1):
-			ctx.rvra_base_addrs[n + 1] = self.allocate(ctx.rvra_total_size, name="rvra1_%d" % n)
+			ctx.rvra_base_addrs[n + 1] = self.allocate(rvra_total_size, name="rvra1_%d" % n)
 		self.dump_ranges()
 
 		ctx.dpb_pool = []
@@ -163,7 +162,7 @@ class AVDH265Decoder(AVDDecoder):
 			self.log(f"DPB Pool: {pic}")
 
 		ctx.sps_pool = []
-		for i in range(sps_tile_count):
+		for i in range(ctx.sps_tile_count):
 			pic = AVDH265Picture(addr=ctx.sps_tile_addrs[i], idx=i, poc=-1, flags=0, ref=0, type=-1, lsb7=False)
 			ctx.sps_pool.append(pic)
 			self.log(f"SPS Pool: {pic}")

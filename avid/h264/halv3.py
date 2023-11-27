@@ -19,7 +19,7 @@ class AVDH264HalV3(AVDHal):
 		return ctx.sps_list[self.get_pps(ctx, sl).seq_parameter_set_id]
 
 	def get_sps_tile_iova(self, ctx, n):
-		return ctx.sps_tile_addr + (ctx.sps_tile_size * (n % ctx.sps_tile_count))
+		return ctx.sps_tile_addrs[n % ctx.sps_tile_count]
 
 	def rvra_offset(self, ctx, idx):
 		if   (idx == 0): return ctx.rvra_size0

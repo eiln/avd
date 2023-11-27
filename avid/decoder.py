@@ -28,10 +28,12 @@ class AVDDecoder:
 		self.last_iova = 0x0
 		self.used = []
 
-	def allocate(self, size, pad=0x0, align=0x0, name=""):
+	def allocate(self, size, pad=0x0, padb4=0x0, align=0x0, name=""):
 		iova = self.last_iova
 		if (align):
 			iova = round_up(iova, align)
+		if (padb4):
+			iova += padb4
 		if (not name):
 			name = "range_%d" % len(self.used)
 		self.used.append(AVDRange(iova, size, name))

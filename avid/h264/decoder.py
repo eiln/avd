@@ -51,9 +51,6 @@ class AVDH264Decoder(AVDDecoder):
 		ctx.drain_list = []
 		ctx.rvra_pool_count = 0
 
-		ctx.inst_fifo_count = 6
-		ctx.inst_fifo_idx = 0
-
 	def refresh(self, sl):
 		ctx = self.ctx
 		sps_id = self.get_sps_id(sl)
@@ -90,9 +87,9 @@ class AVDH264Decoder(AVDDecoder):
 		assert(width_mbs <= sqrt(level[4] * 8))
 		assert(height_mbs <= sqrt(level[4] * 8))
 		ctx.cur_sps_id = sps_id
-		self.allocate()
+		self.allocate_buffers()
 
-	def allocate(self):
+	def allocate_buffers(self):
 		ctx = self.ctx
 		# matching macOS allocations makes for easy diffs
 		# see tools/dims264.py experiment
@@ -100,24 +97,22 @@ class AVDH264Decoder(AVDDecoder):
 		assert((sps.chroma_format_idc == H264_CHROMA_IDC_420) or
 		       (sps.chroma_format_idc == H264_CHROMA_IDC_422))
 
-		# constants
-		ctx.inst_fifo_iova = 0x4000
-		ctx.inst_fifo_size = 0x100000
-		ctx.pps_tile_count = 5  # just random work buffers; they call it sps/pps for non-mpeg codecs too
-		ctx.pps_tile_size = 0x8000
-		ctx.sps_tile_count = 24  # again, nothing to do with sps; just a name for work buf group 2
-		ctx.rvra0_addr = 0x734000
+		ctx.inst_fifo_count = 7
+		ctx.inst_fifo_idx = 0
+		ctx.inst_fifo_addrs = [0 for n in range(ctx.inst_fifo_count)]
+		self.allocator_move_up(0x4000)
+		for n in range(ctx.inst_fifo_count):
+			ctx.inst_fifo_addrs[n] = self.allocate(0x100000, pad=0x4000, name="inst_fifo%d" % n)
+		ctx.inst_fifo_iova = ctx.inst_fifo_addrs[ctx.inst_fifo_idx]
 
 		ws = round_up(ctx.width, 32)
 		hs = round_up(ctx.height, 32)
-		ctx.rvra_size0 = (ws * hs) + ((ws * hs) // 4) # 1. luma padded to stride 32, 4x4
-		ctx.rvra_size2 = ctx.rvra_size0  # 2. chroma, 422
+		ctx.rvra_size0 = (ws * hs) + ((ws * hs) // 4)
+		ctx.rvra_size2 = ctx.rvra_size0
 		if (sps.chroma_format_idc == H264_CHROMA_IDC_420):
 			ctx.rvra_size2 //= 2
 
-		# 3. luma weights, likely
 		ctx.rvra_size1 = ((nextpow2(ctx.height) // 32) * nextpow2(ctx.width))
-		# 4. chroma weights, likely. can't figure this one out, sorry guys
 		if (ctx.width == 128 and ctx.height == 64):
 			ctx.rvra_size3 = 0x4300
 			if (sps.chroma_format_idc == H264_CHROMA_IDC_422):
@@ -128,42 +123,47 @@ class AVDH264Decoder(AVDDecoder):
 			ctx.rvra_size3 = 0xfc00
 		elif (ctx.width == 3840 and ctx.height == 2160):
 			ctx.rvra_size3 = 0x27000
-		else:   # worst case, oops
+		else: # worst case, oops
 			ctx.rvra_size3 = 0x40000
 
-		ctx.rvra_total_size = ctx.rvra_size0 + ctx.rvra_size1 + ctx.rvra_size2 + ctx.rvra_size3
+		rvra_total_size = ctx.rvra_size0 + ctx.rvra_size1 + ctx.rvra_size2 + ctx.rvra_size3
 		ctx.rvra_count = ctx.max_dpb_frames + 1 + 1  # all refs + IDR + current
-
-		ctx.y_addr = ctx.rvra0_addr + ctx.rvra_total_size + 0x100
+		self.allocator_move_up(0x734000)
+		ctx.rvra_base_addrs = [0 for n in range(ctx.rvra_count)]
+		ctx.rvra_base_addrs[0] = self.allocate(rvra_total_size, pad=0x100, name="rvra0")
 
 		if (not(isdiv(ctx.width, 32))):
 			wr = round_up(ctx.width, 64)
 		else:
 			wr = ctx.width
 		luma_size = wr * ctx.height
-		ctx.uv_addr = ctx.y_addr + luma_size
-
+		ctx.y_addr = self.allocate(luma_size, name="disp_y")
 		chroma_size = wr * ctx.height
 		if (sps.chroma_format_idc == H264_CHROMA_IDC_420):
 			chroma_size //= 2
-		ctx.slice_data_addr = round_up(ctx.uv_addr + chroma_size, 0x4000) + 0x4000
+		ctx.uv_addr = self.allocate(chroma_size, name="disp_uv")
 
-		ctx.slice_data_size = min((((ws - 1) * (hs - 1) // 0x8000) + 2), 0xff) * 0x4000
-		ctx.sps_tile_addr = ctx.slice_data_addr + ctx.slice_data_size
-		ctx.sps_tile_size = (((ctx.width - 1) * (ctx.height - 1) // 0x10000) + 2) * 0x4000
+		slice_data_size = min((((ws - 1) * (hs - 1) // 0x8000) + 2), 0xff) * 0x4000
+		ctx.slice_data_addr = self.allocate(slice_data_size, align=0x4000, padb4=0x4000, name="slice_data")
 
-		pps_tile_addrs = [0] * ctx.pps_tile_count
-		pps_tile_base_addr = ctx.sps_tile_addr + (ctx.sps_tile_size * ctx.sps_tile_count)
-		addr = pps_tile_base_addr
-		for n in range(ctx.pps_tile_count):
-			pps_tile_addrs[n] = addr
+		ctx.sps_tile_count = 24
+		ctx.sps_tile_addrs = [0 for n in range(ctx.sps_tile_count)]
+		sps_tile_size = (((ctx.width - 1) * (ctx.height - 1) // 0x10000) + 2) * 0x4000
+		for n in range(ctx.sps_tile_count):
+			ctx.sps_tile_addrs[n] = self.allocate(sps_tile_size, name="sps_tile%d" % n)
+
+		pps_tile_count = 5
+		ctx.pps_tile_addrs = [0 for n in range(pps_tile_count)]
+		for n in range(pps_tile_count):
 			if (n == 2) and (sps.level_idc >= 50): # literally fuck OFF
-				offset = 0xc000
+				sz = 0xc000
 			else:
-				offset = 0x8000
-			addr += offset
-		ctx.pps_tile_addrs = pps_tile_addrs
-		ctx.rvra1_addr = addr
+				sz = 0x8000
+			ctx.pps_tile_addrs[n] = self.allocate(sz, name="pps_tile%d" % n)
+
+		for n in range(ctx.rvra_count - 1):
+			ctx.rvra_base_addrs[n + 1] = self.allocate(rvra_total_size, name="rvra1_%d" % n)
+		self.dump_ranges()
 
 	def setup(self, path, num=0, **kwargs):
 		sps_list, pps_list, slices = self.parser.parse(path, num=num)
@@ -250,8 +250,7 @@ class AVDH264Decoder(AVDDecoder):
 
 	def get_rvra_addr(self, idx):
 		ctx = self.ctx
-		if (idx % ctx.rvra_count == 0): return ctx.rvra0_addr
-		else: return ctx.rvra1_addr + (((idx % ctx.rvra_count) - 1) * ctx.rvra_total_size)
+		return ctx.rvra_base_addrs[idx % ctx.rvra_count]
 
 	def get_next_rvra(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
