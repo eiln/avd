@@ -121,7 +121,9 @@ class AVDH265Decoder(AVDDecoder):
 
 		ctx.sps_tile_count = 16
 		ctx.sps_tile_addrs = [0 for n in range(ctx.sps_tile_count)]
-		sps_tile_size = (((ctx.width - 1) * (ctx.height - 1) // 0x10000) + 2) * 0x4000
+		sps_tile_size = 0x8000
+		if (ctx.height == 512):
+			sps_tile_size = 0xc000
 		for n in range(ctx.sps_tile_count):
 			ctx.sps_tile_addrs[n] = self.allocate(sps_tile_size, name="sps_tile%d" % n)
 
