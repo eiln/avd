@@ -73,7 +73,7 @@ class AVDH265HalV3(AVDHal):
 		x |= set_bit(16)
 		x |= set_bit(17)
 		x |= set_bit(20)
-		if (not IS_INTRA(sl)):
+		if (not (IS_IDR2(sl))):
 			x |= set_bit(21)
 		push(x, "hdr_5c_flag_pt3")
 

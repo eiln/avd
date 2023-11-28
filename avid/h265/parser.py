@@ -38,7 +38,7 @@ class AVDH265Slice(AVDSlice):
 			new = b'\x00' + dat
 			return new[:2] + b'\x00.' + new[4:]
 		payload = transform(self.payload)
-		if (IS_INTRA(self)):
+		if (IS_IDR2(self)):
 			start = 0
 		else:
 			start = 1
