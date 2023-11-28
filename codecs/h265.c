@@ -1885,22 +1885,13 @@ static int hevc_decode_slice_header(struct h265_context *s, struct hevc_slice_he
                 pps->pps_loop_filter_across_slices_enabled_flag;
     }
 
+    sh->num_entry_point_offsets = 0;
     if (pps->tiles_enabled_flag || pps->entropy_coding_sync_enabled_flag) {
-        unsigned int num_entry_point_offsets_limit;
-        unsigned int pic_height_in_ctbs_y = sps->ctb_width * sps->ctb_height;
-        if (!pps->tiles_enabled_flag && pps->entropy_coding_sync_enabled_flag)
-            num_entry_point_offsets_limit = pic_height_in_ctbs_y - 1;
-        else if (pps->tiles_enabled_flag && !pps->entropy_coding_sync_enabled_flag)
-            num_entry_point_offsets_limit = pps->num_tile_columns * pps->num_tile_rows;
-        else
-            num_entry_point_offsets_limit = pps->num_tile_columns * pic_height_in_ctbs_y - 1;
-        sh->num_entry_point_offsets = get_bits_long(gb, num_entry_point_offsets_limit);
-
+        sh->num_entry_point_offsets = get_ue_golomb_long(gb);
         if (sh->num_entry_point_offsets > HEVC_MAX_ENTRY_POINT_OFFSETS) {
             h265_err("Too many entry points: " "%"PRIu16".\n", sh->num_entry_point_offsets);
             return -EINVALDATA;
         }
-
         if (sh->num_entry_point_offsets > 0) {
             sh->offset_len = get_ue_golomb_long(gb) + 1;
             for (i = 0; i < sh->num_entry_point_offsets; i++)

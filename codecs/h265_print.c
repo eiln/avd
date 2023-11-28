@@ -467,10 +467,12 @@ void h265_print_nal_slice_header(struct h265_context *s, struct hevc_slice_heade
         h265_field("pic_order_cnt", s->poc);
         h265_field("short_term_ref_pic_set_sps_flag", sh->short_term_ref_pic_set_sps_flag);
         h265_field("short_term_ref_pic_set_idx", sh->short_term_ref_pic_set_idx);
-        if (!IS_IDR(s))
+        if (!IS_IDR(s)) {
             h265_print_st_rps(s, (struct hevc_short_term_rps *)sh->short_term_rps);
-        if (!IS_IDR(s))
+            h265_field("short_term_ref_pic_set_size", sh->short_term_ref_pic_set_size);
             h265_print_lt_rps(&sh->long_term_rps);
+            h265_field("long_term_ref_pic_set_size", sh->long_term_ref_pic_set_size);
+        }
         h265_field("slice_temporal_mvp_enabled_flag", sh->slice_temporal_mvp_enabled_flag);
 
         h265_field("slice_sao_luma_flag", sh->slice_sao_luma_flag);
@@ -519,6 +521,6 @@ void h265_print_nal_slice_header(struct h265_context *s, struct hevc_slice_heade
     if (pps->tiles_enabled_flag || pps->entropy_coding_sync_enabled_flag) {
         h265_field("num_entry_point_offsets", sh->num_entry_point_offsets);
         for (i = 0; i < sh->num_entry_point_offsets; i++)
-            h265_field("sh->entry_point_offset[%d]", i, sh->entry_point_offset[i]);
+            h265_field("entry_point_offset[%d]", i, sh->entry_point_offset[i]);
     }
 }
