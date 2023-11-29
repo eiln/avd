@@ -82,7 +82,7 @@ class AVDH264V3Slice(AVDFrameParams):
 		"slc_a70_cmd_slice_qpy" / u32,
 		"slc_a74_cmd_flags" / u32,
 		"slc_a78_sps_tile_addr2_lsb8" / u32,
-		"slc_a7c_cmd_d8" / u32,
+		"slc_a7c_cmd_set_coded_slice" / u32,
 		"slc_a80_slice_addr_high_notused" / ExprValidator(u32, obj_ == 0),
 		"slc_a84_slice_addr_low_notused" / u32,
 		"slc_a88_slice_hdr_size_notused" / u32,
@@ -120,7 +120,7 @@ class AVDH264V3FakeFrameParams(AVDFakeFrameParams):
 		obj["hdr_c0_curr_ref_addr_lsb7"] = [0] * 4
 		obj["hdr_d0_ref_hdr"] = [0] * 16
 		obj["hdr_bc_sps_tile_addr_lsb8"] = 0
-
+		obj["slc_a78_sps_tile_addr2_lsb8"] = 0
 
 		obj["hdr_110_ref0_addr_lsb7"] = [0] * 16
 		obj["hdr_150_ref1_addr_lsb7"] = [0] * 16

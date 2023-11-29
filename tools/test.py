@@ -86,7 +86,7 @@ class AVDUnitTest:
 				print(fp0)
 
 			inst = self.dec.decode(sl)
-			if (self.args.debug_mode):
+			if (self.args.debug_mode) and 0:
 				for x in inst:
 					if (x.name in self.fp_keys):
 						c = ANSI_GREEN
@@ -218,7 +218,8 @@ class AVDH264UnitTest(AVDUnitTest):
 			"slc_8f0_cmd_weights_offsets",
 			"slc_a70_cmd_slice_qpy",
 			"slc_a74_cmd_flags",
-			"slc_a7c_cmd_d8",
+			"slc_a7c_cmd_set_coded_slice",
+			"slc_a78_sps_tile_addr2_lsb8",
 
 			#"inp_8b4d4_slice_addr_low",
 			#"inp_8b4d8_slice_hdr_size",

@@ -18,9 +18,6 @@ class AVDH264HalV3(AVDHal):
 	def get_sps(self, ctx, sl):
 		return ctx.sps_list[self.get_pps(ctx, sl).seq_parameter_set_id]
 
-	def get_sps_tile_iova(self, ctx, n):
-		return ctx.sps_tile_addrs[n % ctx.sps_tile_count]
-
 	def rvra_offset(self, ctx, idx):
 		if   (idx == 0): return ctx.rvra_size0
 		elif (idx == 1): return 0
@@ -33,7 +30,8 @@ class AVDH264HalV3(AVDHal):
 
 		push(0x4020002, "cm3_dma_config_6")
 		push(ctx.pps_tile_addrs[4] >> 8, "hdr_9c_pps_tile_addr_lsb8", 7)
-		push(self.get_sps_tile_iova(ctx, ctx.access_idx) >> 8, "hdr_bc_sps_tile_addr_lsb8")
+		n = ctx.access_idx % ctx.sps_tile_count  # new space to output current mv
+		push(ctx.sps_tile_addrs[n] >> 8, "hdr_bc_sps_tile_addr_lsb8")
 
 		push(0x70007, "cm3_dma_config_7")
 		push(0x70007, "cm3_dma_config_8")
@@ -161,10 +159,10 @@ class AVDH264HalV3(AVDHal):
 
 	def set_slice(self, ctx, sl):
 		push = self.push
-		push(0x2d800000, "slc_a7c_cmd_d8")
+		push(0x2d800000, "slc_a7c_cmd_set_coded_slice")
 		push(ctx.slice_data_addr + sl.get_payload_offset(), "inp_8b4d4_slice_addr_low")
 		push(sl.get_payload_size(), "inp_8b4d8_slice_hdr_size")
-		push(0x2c000000)
+		push(0x2c000000, "cm3_cmd_exec_mb_vp")
 		# ---- FW BP -----
 
 		push(0x2d900000 | ((26 + self.get_pps(ctx, sl).pic_init_qp_minus26 + sl.slice_qp_delta) * 0x400), "slc_a70_cmd_slice_qpy")
@@ -207,8 +205,10 @@ class AVDH264HalV3(AVDHal):
 		push(x, "slc_6e4_cmd_ref_type")
 
 		if (sl.slice_type == H264_SLICE_TYPE_B):
+			# bidirectional reference of previous mv
 			n = ctx.last_p_sps_tile_idx + sl.num_ref_idx_l1_active_minus1
-			push(self.get_sps_tile_iova(ctx, n) >> 8, "sps_tile_addr_b")
+			n %= ctx.sps_tile_count
+			push(ctx.sps_tile_addrs[n] >> 8, "slc_a78_sps_tile_addr2_lsb8")
 
 		push(0x2b000000 | 0x400, "cm3_cmd_inst_fifo_end")
 
