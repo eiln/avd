@@ -15,7 +15,10 @@ class AVDH264Ctx(dotdict):
 
 class AVDH264Picture(dotdict):
 	def __repr__(self):
-		return f"[addr: {hex(self.addr >> 7).ljust(2+5)} pic_num: {str(self.pic_num).rjust(2)} poc: {str(self.poc).rjust(3)} fn: {str(self.frame_num_wrap).rjust(2)} idx: {str(self.idx).rjust(2)}]"
+		return f"[idx: {str(self.idx).rjust(2)} addr: {hex(self.addr >> 7).ljust(2+5)} pic_num: {str(self.pic_num).rjust(2)} poc: {str(self.poc).rjust(3)} fn: {str(self.frame_num_wrap).rjust(2)} flags: {format(self.flags, '010b')}]"
+
+	def unref(self):
+		self.flags = 0
 
 class AVDH264Decoder(AVDDecoder):
 	def __init__(self):
@@ -47,9 +50,7 @@ class AVDH264Decoder(AVDDecoder):
 		ctx.prev_poc_lsb = 0
 		ctx.prev_poc_msb = 0
 		ctx.dpb_list = []
-		ctx.unused_refs = []
-		ctx.drain_list = []
-		ctx.rvra_pool_count = 0
+		ctx.dpb_pool = []
 
 	def refresh(self, sl):
 		ctx = self.ctx
@@ -97,8 +98,9 @@ class AVDH264Decoder(AVDDecoder):
 		assert((sps.chroma_format_idc == H264_CHROMA_IDC_420) or
 		       (sps.chroma_format_idc == H264_CHROMA_IDC_422))
 
+		self.reset_allocator()
 		ctx.inst_fifo_count = 7
-		ctx.inst_fifo_idx = 0
+		ctx.inst_fifo_idx = 0  # no FIFO scheduling for single-VP revisions
 		ctx.inst_fifo_addrs = [0 for n in range(ctx.inst_fifo_count)]
 		self.allocator_move_up(0x4000)
 		for n in range(ctx.inst_fifo_count):
@@ -143,6 +145,12 @@ class AVDH264Decoder(AVDDecoder):
 		for n in range(ctx.rvra_count - 1):
 			ctx.rvra_base_addrs[n + 1] = self.allocate(rvra_total_size, name="rvra1_%d" % n)
 		self.dump_ranges()
+
+		ctx.dpb_pool = []
+		for i in range(ctx.rvra_count):
+			pic = AVDH264Picture(addr=ctx.rvra_base_addrs[i], idx=i, pic_num=-1, poc=-1, frame_num_wrap=-1, flags=H264_FRAME_FLAG_UNUSED)
+			ctx.dpb_pool.append(pic)
+			self.log(f"DPB Pool: {pic}")
 
 	def setup(self, path, num=0, **kwargs):
 		sps_list, pps_list, slices = self.parser.parse(path, num=num)
@@ -193,8 +201,8 @@ class AVDH264Decoder(AVDDecoder):
 		return lst[:num_ref_idx_lx_active_minus1 + 1]
 
 	def construct_ref_list_p(self):
-		ctx = self.ctx; sl = self.ctx.active_sl # python woes
-		short_refs = [pic for pic in ctx.dpb_list if pic.type == H264_REF_ST]
+		ctx = self.ctx; sl = self.ctx.active_sl
+		short_refs = [pic for pic in ctx.dpb_list if pic.flags & H264_FRAME_FLAG_SHORT_REF]
 		short_refs = sorted(short_refs, key=lambda pic: pic.frame_num_wrap, reverse=True)
 		for ref in short_refs:
 			self.log(f"P: ST Refs: {ref}")
@@ -206,7 +214,7 @@ class AVDH264Decoder(AVDDecoder):
 
 	def construct_ref_list_b(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
-		short_refs = [pic for pic in ctx.dpb_list if pic.type == H264_REF_ST]
+		short_refs = [pic for pic in ctx.dpb_list if pic.flags & H264_FRAME_FLAG_SHORT_REF]
 		short_refs = sorted(short_refs, key=lambda pic: pic.poc, reverse=True)
 		for ref in short_refs:
 			self.log(f"B: ST Refs: {ref}")
@@ -227,57 +235,57 @@ class AVDH264Decoder(AVDDecoder):
 		elif (sl.slice_type == H264_SLICE_TYPE_B):
 			self.construct_ref_list_b()
 
-	def get_rvra_addr(self, idx):
-		ctx = self.ctx
-		return ctx.rvra_base_addrs[idx % ctx.rvra_count]
-
-	def get_next_rvra(self):
+	def get_next_pic(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
-		# rvra pooling algo. took me too long
-		index = 0
-		if (ctx.rvra_pool_count < ctx.rvra_count): # fill pool at init
-			index = ctx.rvra_pool_count
-			ctx.rvra_pool_count += 1
-		elif (sl.nal_unit_type == H264_NAL_SLICE_IDR):
-			pool = ctx.unused_refs + ctx.dpb_list # gather refs
-			cand = sorted(ctx.unused_refs, key=lambda x: x.poc)[0]
-			index = cand.idx
-			pool = [x for x in pool if x != cand]
-			ctx.drain_list = sorted(pool, key=lambda x:x.poc)
-			ctx.dpb_list = [] # clear DPB on IDR
-		elif (len(ctx.drain_list)):
-			cand = ctx.drain_list[0] # drain by initial sorted poc order
-			index = cand.idx
-			ctx.unused_refs = [x for x in ctx.unused_refs if x != cand]
-			ctx.drain_list = ctx.drain_list[1:]
-		else:
-			min_poc = sorted(ctx.unused_refs, key=lambda x: x.poc)[0].poc
-			cand = [x for x in ctx.unused_refs if x.poc == min_poc][0]
-			index = cand.idx
-			ctx.unused_refs = [x for x in ctx.unused_refs if x != cand]
-		return index
+
+		# macOS reference list pooling algo. took me too long
+		cand = None
+
+		for pic in ctx.dpb_pool:
+			if (pic.flags & H264_FRAME_FLAG_UNUSED): # fill pool at init
+				pic.flags &= ~(H264_FRAME_FLAG_UNUSED)
+				return pic
+			if (pic.flags & H264_FRAME_FLAG_DRAIN):  # drain by poc order sorted at IDR
+				pic.flags &= ~(H264_FRAME_FLAG_DRAIN)
+				return pic
+
+		ctx.dpb_pool = sorted(ctx.dpb_pool, key=lambda x:x.poc)
+		for pic in ctx.dpb_pool:
+			if (not (pic.flags & H264_FRAME_FLAG_OUTPUT)):
+				cand = pic  # return lowest poc
+				break
+		if (cand == None):
+			raise RuntimeError("failed to find free pic")
+
+		if (sl.nal_unit_type == H264_NAL_SLICE_IDR):
+			for pic in ctx.dpb_pool:
+				if (not pic.idx == cand.idx):
+					pic.flags |= H264_FRAME_FLAG_DRAIN
+			ctx.dpb_list = []  # clear DPB on IDR
+
+		return cand
 
 	def init_slice(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
 		self.refresh(sl)
 
-		sl.pic = AVDH264Picture()
-		sl.pic.type = H264_REF_ST
+		sl.pic = self.get_next_pic()
+		sl.pic.flags |= H264_FRAME_FLAG_OUTPUT | H264_FRAME_FLAG_SHORT_REF
 		sps = self.get_sps(sl)
 
 		if (sl.field_pic_flag):
 			sl.pic.field = H264_FIELD_BOTTOM if sl.bottom_field_flag else H264_FIELD_BOTTOM
 			sl.pic.pic_num = (2 * sl.frame_num) + 1
 			ctx.max_pic_num = 1 << (sps.log2_max_frame_num_minus4 + 4 + 1)
-			raise NotImplementedError("top/bottom fields not yet supported")
+			raise NotImplementedError("top/bottom fields not supported. pls send sample")
 		else:
 			sl.pic.field = H264_FIELD_FRAME
 			sl.pic.pic_num = sl.frame_num
 			ctx.max_pic_num = 1 << (sps.log2_max_frame_num_minus4 + 4)
 
-		sl.pic.frame_num = sl.frame_num
-		sl.pic.frame_num_wrap = sl.pic.frame_num
-		assert(sps.gaps_in_frame_num_value_allowed_flag == 0) # TODO
+		sl.pic.frame_num_wrap = sl.frame_num  # I think it's the same?
+		if (sps.gaps_in_frame_num_value_allowed_flag):
+			raise NotImplementedError("frame num gaps found. pls send sample.")
 
 		poc_lsb = sl.pic_order_cnt_lsb
 		if (sps.pic_order_cnt_type == 0):
@@ -298,39 +306,33 @@ class AVDH264Decoder(AVDDecoder):
 		sl.pic.poc = poc_msb + poc_lsb
 		sl.pic.access_idx = ctx.access_idx
 
-		sl.pic.idx = self.get_next_rvra()
-		sl.pic.addr = self.get_rvra_addr(sl.pic.idx)
-
 		self.construct_ref_list()
 
 	def finish_slice(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
 
 		if (sl.nal_unit_type == H264_NAL_SLICE_IDR) or (sl.nal_ref_idc != 0):
-			self.log(f"Adding pic to dpb {sl.pic}")
+			self.log(f"Adding pic to DPB {sl.pic}")
 			ctx.dpb_list.append(sl.pic)
-			ctx.unused_refs = [i for i in ctx.unused_refs if i.addr != sl.pic.addr]
 
 		if (sl.nal_unit_type != H264_NAL_SLICE_IDR) and (sl.nal_ref_idc == 0):
-			ctx.unused_refs.append(sl.pic)
+			sl.pic.unref()
 
 		if (sl.nal_unit_type == H264_NAL_SLICE_IDR) or (sl.adaptive_ref_pic_marking_mode_flag == 0):
 			if (len(ctx.dpb_list) > self.get_sps(sl).max_num_ref_frames):
 				oldest = sorted(ctx.dpb_list, key=lambda pic: pic.access_idx)[0]
-				self.log(f"ADPT: removing oldest ref {oldest}")
-				ctx.dpb_list = [x for x in ctx.dpb_list if x != oldest]
-				ctx.unused_refs.append(oldest)
+				self.log(f"Removing oldest ref {oldest}")
+				oldest.unref()
 		else:
 			for pic_num_diff in sl.mmco_forget_short:
 				if (pic_num_diff == None): break
 				pic_num = sl.pic.pic_num - (pic_num_diff + 1)
 				pic_num &= ctx.max_frame_num - 1
-				pic = [x for x in ctx.dpb_list if x.pic_num == pic_num]
-				assert(len(pic) == 1)
-				pic = pic[0]
-				self.log(f"MMCO: removing short {pic}")
-				ctx.dpb_list = [x for x in ctx.dpb_list if x.pic_num != pic_num]
-				ctx.unused_refs.append(pic)
+				for pic in ctx.dpb_list:
+					if (pic.pic_num == pic_num):
+						self.log(f"MMCO: Removing short {pic}")
+						pic.unref()
+		ctx.dpb_list = [pic for pic in ctx.dpb_list if (pic.flags & H264_FRAME_FLAG_OUTPUT)]
 
 		ctx.prev_poc_lsb = sl.pic.poc_lsb
 		ctx.prev_poc_msb = sl.pic.poc_msb

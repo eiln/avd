@@ -121,6 +121,7 @@ class AVDH264V3FakeFrameParams(AVDFakeFrameParams):
 		obj["hdr_d0_ref_hdr"] = [0] * 16
 		obj["hdr_bc_sps_tile_addr_lsb8"] = 0
 
+
 		obj["hdr_110_ref0_addr_lsb7"] = [0] * 16
 		obj["hdr_150_ref1_addr_lsb7"] = [0] * 16
 		obj["hdr_190_ref2_addr_lsb7"] = [0] * 16
@@ -128,6 +129,7 @@ class AVDH264V3FakeFrameParams(AVDFakeFrameParams):
 
 		obj["slc_6e8_cmd_ref_list_0"] = [0] * 16
 		obj["slc_728_cmd_ref_list_1"] = [0] * 16
+		obj["slc_76c_cmd_weights_denom"] = 0
 		obj["slc_770_cmd_weights_weights"] = [0] * 96
 		obj["slc_8f0_cmd_weights_offsets"] = [0] * 96
 		return obj

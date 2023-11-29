@@ -16,10 +16,18 @@ class AVDH264Slice(AVDSlice):
 		self._reprwidth = 38
 		self.mode = "h264"
 
-	def __repr__(self):
-		s = "\n[slice: %d nal_unit_type: %d]\n" % (self.idx, self.nal_unit_type)
-		s += self.show_entries()
+	def show_slice_header(self):
+		s = "\n[slice: %d nal_unit_type: %d" % (self.idx, self.nal_unit_type)
+		if (IS_SLICE(self)):
+			s += " slice_type: %s" % (self.get_slice_str(self.slice_type))
+		s += "]\n"
 		return s
+
+	def get_slice_str(self, t):
+		if (t == H264_SLICE_TYPE_I): return "I"
+		if (t == H264_SLICE_TYPE_P): return "P"
+		if (t == H264_SLICE_TYPE_B): return "B"
+		return "?"
 
 	def get_payload(self):
 		def transform(dat): # match macOS behavior
