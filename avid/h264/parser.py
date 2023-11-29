@@ -60,11 +60,9 @@ class AVDH264Parser(AVDParser):
 				("abs_diff_pic_num_minus1_l0", H264_MAX_REFS),
 				("abs_diff_pic_num_minus1_l1", H264_MAX_REFS),
 
-				("mmco_forget_short", H264_MAX_MMCO_COUNT),
-				("mmco_short_to_long", H264_MAX_MMCO_COUNT),
-				("mmco_forget_long", H264_MAX_MMCO_COUNT),
-				("mmco_this_to_long", H264_MAX_MMCO_COUNT),
-				("mmco_forget_long_max", H264_MAX_MMCO_COUNT),
+				("memory_management_control_operation", H264_MAX_MMCO_COUNT),
+				("mmco_short_args", H264_MAX_MMCO_COUNT),
+				("mmco_long_args", H264_MAX_MMCO_COUNT),
 
 				("luma_weight_l0_flag", H264_MAX_REFS),
 				("luma_weight_l0", H264_MAX_REFS),

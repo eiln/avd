@@ -333,14 +333,18 @@ class AVDH264Decoder(AVDDecoder):
 				self.log(f"Removing oldest ref {oldest}")
 				oldest.unref()
 		else:
-			for pic_num_diff in sl.mmco_forget_short:
-				if (pic_num_diff == None): break
-				pic_num = sl.pic.pic_num - (pic_num_diff + 1)
-				pic_num &= ctx.max_frame_num - 1
-				for pic in ctx.dpb_list:
-					if (pic.pic_num == pic_num):
-						self.log(f"MMCO: Removing short {pic}")
-						pic.unref()
+			for i,opcode in enumerate(sl.memory_management_control_operation):
+				if (opcode == H264_MMCO_END): break
+				if (opcode == H264_MMCO_SHORT2UNUSED):
+					pic_num_diff = sl.mmco_short_args[i] + 1  # abs_diff_pic_num_minus1
+					pic_num = sl.pic.pic_num - pic_num_diff
+					pic_num &= ctx.max_frame_num - 1
+					for pic in ctx.dpb_list:
+						if (pic.pic_num == pic_num):
+							self.log(f"MMCO: Removing short {pic}")
+							pic.unref()
+				else:
+					raise ValueError("opcode %d not implemented. probably LT ref. pls send sample" % (opcode))
 		ctx.dpb_list = [pic for pic in ctx.dpb_list if (pic.flags & H264_FRAME_FLAG_OUTPUT)]
 
 		ctx.prev_poc_lsb = sl.pic.poc_lsb

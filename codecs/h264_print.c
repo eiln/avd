@@ -485,29 +485,20 @@ static void h264_print_dec_ref_pic_marking(struct h264_slice *sl)
 	} else {
 		h264_field("adaptive_ref_pic_marking_mode_flag",
 		       sl->adaptive_ref_pic_marking_mode_flag);
-		for (i = 0; i < sl->num_mmcos; i++) {
+		for (i = 0; i < sl->num_mmcos + 1; i++) {
+			h264_field("memory_management_control_operation[%d]", i, sl->mmcos[i].opcode);
 			switch (sl->mmcos[i].opcode) {
 			case H264_MMCO_END:
 				break;
 			case H264_MMCO_FORGET_SHORT:
-				h264_field("mmco_forget_short[%d]", i,
-					sl->mmcos[i].short_pic_num);
+				h264_field("mmco_short_args[%d]", i, sl->mmcos[i].short_pic_num);
 				break;
-			case H264_MMCO_SHORT_TO_LONG: // TODO long args
-				h264_field("mmco_short_to_long[%d]", i,
-				       sl->mmcos[i].short_pic_num);
-				break;
+			case H264_MMCO_SHORT_TO_LONG:
+				h264_field("mmco_short_args[%d]", i, sl->mmcos[i].short_pic_num); // fall through
 			case H264_MMCO_FORGET_LONG:
-				h264_field("mmco_forget_long[%d]", i,
-				       sl->mmcos[i].long_arg);
-				break;
 			case H264_MMCO_THIS_TO_LONG:
-				h264_field("mmco_this_to_long[%d]", i,
-				       sl->mmcos[i].long_arg);
-				break;
 			case H264_MMCO_FORGET_LONG_MAX:
-				h264_field("mmco_forget_long_max[%d]", i,
-				       sl->mmcos[i].long_arg);
+				h264_field("mmco_long_args[%d]", i, sl->mmcos[i].long_arg);
 				break;
 			case H264_MMCO_FORGET_ALL:
 				break; /* XXX */
