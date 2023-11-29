@@ -9,11 +9,20 @@ from .halv3 import AVDH264HalV3
 from .parser import AVDH264Parser
 from .types import *
 from math import sqrt
+from dataclasses import dataclass
 
 class AVDH264Ctx(dotdict):
 	pass
 
-class AVDH264Picture(dotdict):
+@dataclass
+class AVDH264Picture:
+	idx: int
+	addr: int
+	pic_num: int
+	poc: int
+	frame_num_wrap: int
+	flags: int
+
 	def __repr__(self):
 		return f"[idx: {str(self.idx).rjust(2)} addr: {hex(self.addr >> 7).ljust(2+5)} pic_num: {str(self.pic_num).rjust(2)} poc: {str(self.poc).rjust(3)} fn: {str(self.frame_num_wrap).rjust(2)} flags: {format(self.flags, '010b')}]"
 
