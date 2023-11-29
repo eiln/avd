@@ -121,7 +121,9 @@ class AVDH264Parser(AVDParser):
 				assert(unit.pic_parameter_set_id < H264_MAX_PPS_COUNT)
 				unit.idx = unit.pic_parameter_set_id
 				pps_list[unit.pic_parameter_set_id] = unit
-			else:
+			elif (unit.nal_unit_type in [H264_NAL_SLICE_NONIDR, H264_NAL_SLICE_PART_A, H264_NAL_SLICE_PART_B, H264_NAL_SLICE_PART_C, H264_NAL_SLICE_IDR, H264_NAL_SLICE_AUX, H264_NAL_SLICE_EXT]):
 				slices.append(unit)
 				slice_idx += 1
+			else:
+				self.log("skipping unknown NAL type (%d)" % unit.nal_unit_type)
 		return sps_list, pps_list, slices
