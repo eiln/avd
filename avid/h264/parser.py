@@ -77,6 +77,10 @@ class AVDH264Parser(AVDParser):
 				("chroma_weight_l1_flag", H264_MAX_REFS),
 				("chroma_weight_l1", (H264_MAX_REFS, 2)),
 				("chroma_offset_l1", (H264_MAX_REFS, 2)),
+
+				("pic_scaling_list_present_flag", 12),
+				("pic_scaling_list_4x4", (6, 16)),
+				("pic_scaling_list_8x8", (6, 64)),
 		]
 		self.slccls = AVDH264Slice
 

@@ -97,7 +97,7 @@ class AVDUnitTest:
 				print(fp0)
 
 			inst = self.dec.decode(sl)
-			if (self.args.debug_mode) and 0:
+			if (self.args.debug_mode):
 				for x in inst:
 					if (x.name in self.fp_keys):
 						c = ANSI_GREEN
@@ -203,6 +203,7 @@ class AVDH264UnitTest(AVDUnitTest):
 			"hdr_40_zero",
 			"hdr_44_is_idr_mask",
 			"hdr_48_3de",
+			"hdr_4c_scaling_list_dims",
 			"hdr_54_height_width",
 			"hdr_58_const_3a",
 
@@ -220,6 +221,9 @@ class AVDH264UnitTest(AVDUnitTest):
 			"hdr_214_uv_addr_lsb8",
 			"hdr_218_width_align",
 			"hdr_21c_width_align",
+
+			"scl_46c_scaling_matrix_4x4",
+			"scl_4cc_scaling_matrix_8x8",
 
 			"slc_6e4_cmd_ref_type",
 			"slc_6e8_cmd_ref_list_0",

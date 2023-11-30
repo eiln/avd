@@ -24,7 +24,7 @@ class AVDFrameParams(ConstructClass):
         for key in keys:
             if key in ignore or key.startswith('_'):
                 continue
-            if "pad" in key or "zero" in key: continue
+            if "pad" in key or "zero" in key or "dfw" in key: continue
 
             sk = f"\t\033[0;36m{key.ljust(32)}\033[0m = "
 
@@ -42,10 +42,16 @@ class AVDFrameParams(ConstructClass):
                         t = "-"
                         continue
                     else:
-                    	if ("lsb" in key):
-                    		t = ", ".join(["0x%05x" % x for x in y])
-                    	else:
-                    		t = ", ".join([hex(x) for x in y])
+                        prefix = "0x"
+                        p = 0
+                        if ("lsb" in key):
+                            p = 5
+                        if ("matrix" in key):
+                            p = 8
+                        if (p):
+                            t = ", ".join([f"{prefix}{x:0{p}x}" for x in y])
+                        else:
+                            t = ", ".join([hex(x) for x in y])
                     if (n != 0):
                     	t = "\t".ljust(len("\t") + 32 + 3) + t
                     tmp.append(t)
