@@ -66,10 +66,21 @@ class AVDUnitTest:
 		self.log(args)
 		return paths, num
 
+	def init_hook(self):
+		if (self.args.debug_mode and self.args.show_headers):
+			if (self.dec.mode in ["h264", "h265"]):
+				for x in self.dec.ctx.sps_list:
+					if (x):
+						print(x)
+				for x in self.dec.ctx.pps_list:
+					if (x):
+						print(x)
+
 	def test_fp(self, args):
 		self.log(hl("Testing fp '%s'..." % (args.dir), None))
 		paths, num = self.get_paths("frame", args)
-		slices = self.dec.setup(args.input, **args)
+		slices = self.dec.setup(args.input, **vars(args))
+		self.init_hook()
 		count = 0
 		for i in range(num):
 			path = paths[i]
@@ -157,6 +168,7 @@ class AVDUnitTest:
 		self.log(hl("Testing emu '%s'..." % (args.dir), None))
 		paths, num = self.get_paths("frame", args)
 		slices = self.dec.setup(args.input, do_probs=0, **vars(args))
+		self.init_hook()
 		count = 0
 		for i in range(num):
 			path = paths[i]
