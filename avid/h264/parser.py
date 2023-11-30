@@ -131,5 +131,5 @@ class AVDH264Parser(AVDParser):
 				slices.append(unit)
 				slice_idx += 1
 			else:
-				self.log("skipping unknown NAL type (%d)" % unit.nal_unit_type)
+				print("skipping unknown NAL type (%d)" % unit.nal_unit_type)
 		return sps_list, pps_list, slices
