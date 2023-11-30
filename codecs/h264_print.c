@@ -177,9 +177,12 @@ void h264_print_sps(struct h264_sps *sps)
 		printf("\tVUI parameters:\n");
 		h264_field("\taspect_ratio_info_present_flag",
 		       vui->aspect_ratio_info_present_flag);
-		h264_field("\taspect_ratio_idc", vui->aspect_ratio_idc);
-		h264_field("\tsar_width", vui->sar_width);
-		h264_field("\tsar_height", vui->sar_height);
+		if (vui->aspect_ratio_info_present_flag) {
+			h264_field("\taspect_ratio_idc", vui->aspect_ratio_idc);
+			h264_field("\tsar_width", vui->sar_width);
+			h264_field("\tsar_height", vui->sar_height);
+		}
+
 		h264_field("\toverscan_info_present_flag",
 		       vui->overscan_info_present_flag);
 		if (vui->overscan_info_present_flag) {
