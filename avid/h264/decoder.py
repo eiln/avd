@@ -126,12 +126,12 @@ class AVDH264Decoder(AVDDecoder):
 			wr = round_up(ctx.width, 64)
 		else:
 			wr = ctx.width
-		luma_size = wr * ctx.height
-		ctx.y_addr = self.allocate(luma_size, name="disp_y")
-		chroma_size = wr * ctx.height
+		ctx.luma_size = wr * ctx.height
+		ctx.y_addr = self.allocate(ctx.luma_size, name="disp_y")
+		ctx.chroma_size = wr * ctx.height
 		if (sps.chroma_format_idc == H264_CHROMA_IDC_420):
-			chroma_size //= 2
-		ctx.uv_addr = self.allocate(chroma_size, name="disp_uv")
+			ctx.chroma_size //= 2
+		ctx.uv_addr = self.allocate(ctx.chroma_size, name="disp_uv")
 
 		slice_data_size = min((((round_up(ctx.width, 32) - 1) * (round_up(ctx.height, 32) - 1) // 0x8000) + 2), 0xff) * 0x4000
 		ctx.slice_data_addr = self.allocate(slice_data_size, align=0x4000, padb4=0x4000, name="slice_data")
