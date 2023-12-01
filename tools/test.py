@@ -69,7 +69,7 @@ class AVDUnitTest:
 	def test_fp(self, args):
 		self.log(hl("Testing fp '%s'..." % (args.dir), None))
 		paths, num = self.get_paths("frame", args)
-		slices = self.dec.setup(args.input, num=num, do_probs=0)
+		slices = self.dec.setup(args.input, **args)
 		count = 0
 		for i in range(num):
 			path = paths[i]
@@ -156,7 +156,7 @@ class AVDUnitTest:
 		self.emu.start()
 		self.log(hl("Testing emu '%s'..." % (args.dir), None))
 		paths, num = self.get_paths("frame", args)
-		slices = self.dec.setup(args.input, num=num, do_probs=0)
+		slices = self.dec.setup(args.input, do_probs=0, **vars(args))
 		count = 0
 		for i in range(num):
 			path = paths[i]
@@ -384,12 +384,14 @@ if __name__ == "__main__":
 
 	parser.add_argument('-u', '--debug-mode', action='store_true')
 	parser.add_argument('-b', '--show-bits', action='store_true')
+	parser.add_argument('-nf', '--nonfatal', action='store_true')
+	parser.add_argument('-ns', '--nal-stop', action='store_true')
+
 	parser.add_argument('-sa', '--show-all', action='store_true')
 	parser.add_argument('-sh', '--show-headers', action='store_true')
 	parser.add_argument('-si', '--show-index', action='store_true')
 	parser.add_argument('-sp', '--show-paths', action='store_true')
 	parser.add_argument('-sf', '--show-fp', action='store_true')
-	parser.add_argument('-nf', '--nonfatal', action='store_true')
 
 	args = parser.parse_args()
 	args.firmware = resolve_input(args.firmware)

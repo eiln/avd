@@ -13,12 +13,12 @@ def parse_headers(path, num=0):
 	if (mode == "h264"):
 		from avid.h264.parser import AVDH264Parser
 		parser = AVDH264Parser()
-		sps_list, pps_list, units = parser.parse(path, num=num)
+		sps_list, pps_list, units = parser.parse(path, num=num, nal_stop=1)
 		ed = (sps_list, pps_list)
 	elif (mode == "h265"):
 		from avid.h265.parser import AVDH265Parser
 		parser = AVDH265Parser()
-		vps_list, sps_list, pps_list, units = parser.parse(path, num=num)
+		vps_list, sps_list, pps_list, units = parser.parse(path, num=num, nal_stop=1)
 		ed = (vps_list, sps_list, pps_list)
 	elif (mode == "vp09"):
 		from avid.vp9.parser import AVDVP9Parser
@@ -38,7 +38,7 @@ if __name__ == "__main__":
 
 	path = resolve_input(args.input)
 	mode = ffprobe(path)
-	units, ed = parse_headers(path)
+	units, ed = parse_headers(path, num=args.num)
 	if  (mode == "h264" or mode == "h265"):
 		if (mode == "h264"):
 			sps_list, pps_list = ed

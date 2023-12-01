@@ -77,7 +77,7 @@ class AVDH265Parser(AVDParser):
 		]
 		self.slccls = AVDH265Slice
 
-	def parse_payloads(self, path, num=0):
+	def parse_payloads(self, path, num=0, nal_stop=0, **kwargs):
 		buf = open(path, "rb").read()
 		bufpos = 0
 		bytesnum = len(buf)
@@ -91,7 +91,7 @@ class AVDH265Parser(AVDParser):
 		with pipes() as (out, err):
 			nalus = []
 			while (bytesnum > 0):
-				if ((num) and (len(nalus) >= num)) and 0:
+				if ((num) and (len(nalus) >= num + 20) and nal_stop):
 					break
 				self.lib.libh265_decode(handle, buf[bufpos:], bytesnum, ctypes.byref(nal_start), ctypes.byref(nal_end))
 				payload = buf[bufpos:bufpos+nal_end.value]
@@ -103,8 +103,8 @@ class AVDH265Parser(AVDParser):
 		self.lib.libh265_free(handle)
 		return nalus, stdout
 
-	def parse(self, path, num=0):
-		payloads, stdout = self.parse_payloads(path, num=num)
+	def parse(self, path, num=0, nal_stop=0, **kwargs):
+		payloads, stdout = self.parse_payloads(path, num=num, nal_stop=nal_stop)
 		units = self.parse_headers(stdout)
 
 		slice_idx = 0

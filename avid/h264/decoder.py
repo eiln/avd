@@ -161,8 +161,8 @@ class AVDH264Decoder(AVDDecoder):
 			ctx.dpb_pool.append(pic)
 			self.log(f"DPB Pool: {pic}")
 
-	def setup(self, path, num=0, **kwargs):
-		sps_list, pps_list, slices = self.parser.parse(path, num=num)
+	def setup(self, path, num=0, nal_stop=0, **kwargs):
+		sps_list, pps_list, slices = self.parser.parse(path, num, nal_stop, **kwargs)
 		self.new_context(sps_list, pps_list)
 		# realistically we'd have the height/width as metadata w/o relying on sps
 		self.refresh(slices[0])
