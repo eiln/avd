@@ -135,7 +135,11 @@ class AVDH264HalV3(AVDHal):
 			x |= 0x100000
 		push(x, "hdr_44_is_idr_mask")
 
-		push(0x3de, "hdr_48_3de")
+		if (pps.pic_scaling_matrix_present_flag): # this one I really can't tell
+			x = 0x0
+		else:
+			x = 0x3de
+		push(x, "hdr_48_3de")
 		push(0x30000a, "hdr_58_const_3a")
 		push(0x4020002, "cm3_dma_config_1")
 		push(0x20002, "cm3_dma_config_2")
@@ -171,12 +175,14 @@ class AVDH264HalV3(AVDHal):
 
 	def set_weights(self, ctx, sl):
 		push = self.push
+		pps = self.get_pps(ctx, sl)
 
 		x = 0x2dd00000
-		if (sl.slice_type == H264_SLICE_TYPE_P):
-			x |= 0x40
-		else:
-			x |= 0xad
+		if (pps.weighted_pred_flag or pps.weighted_bipred_idc == 1):
+			if (sl.slice_type == H264_SLICE_TYPE_P):
+				x |= 0x40
+			else:
+				x |= 0xad
 		if (sl.has_luma_weights == 0):
 			push(x, "slc_76c_cmd_weights_denom")
 			return
@@ -229,8 +235,9 @@ class AVDH264HalV3(AVDHal):
 
 		push(0x2d900000 | ((26 + self.get_pps(ctx, sl).pic_init_qp_minus26 + sl.slice_qp_delta) * 0x400), "slc_a70_cmd_slice_qpy")
 		x = 0
-		x |= set_bit(16)
-		x |= set_bit(17)
+		if (not pps.pic_scaling_matrix_present_flag):
+			x |= set_bit(16)
+			x |= set_bit(17)
 		push(0x2da00000 | x, "slc_a74_cmd_flags")
 
 		if (sl.slice_type == H264_SLICE_TYPE_P) or (sl.slice_type == H264_SLICE_TYPE_B):
