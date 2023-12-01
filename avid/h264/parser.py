@@ -12,7 +12,7 @@ from math import ceil
 class AVDH264Slice(AVDSlice):
 	def __init__(self):
 		super().__init__()
-		self._banned_keys = ["payload", "nal_unit_type", "idx"]
+		self._banned_keys = ["payload", "nal_unit_type", "idx", "transform_8x8_mode_flag"]
 		self._reprwidth = 38
 		self.mode = "h264"
 
@@ -34,14 +34,17 @@ class AVDH264Slice(AVDSlice):
 			new = b'\x00' + dat
 			return new[:2] + b'\x00.' + new[4:]
 		payload = transform(self.payload)
-		if (self.nal_unit_type == H264_NAL_SLICE_IDR):
+		if ((self.nal_unit_type == H264_NAL_SLICE_IDR) and not (self.transform_8x8_mode_flag == 0 and self.nal_ref_idc)):
 			start = 0
 		else:
 			start = 1
 		return payload[start:]
 
 	def get_payload_offset(self):
-		return ceil(self.slice_header_size / 8) + 4
+		off = ceil(self.slice_header_size / 8) + 4
+		if ((self.transform_8x8_mode_flag == 0 and self.nal_ref_idc)):
+			off -= 1
+		return off
 
 	def get_payload_size(self):
 		return len(self.get_payload()) - self.get_payload_offset()

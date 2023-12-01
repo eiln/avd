@@ -128,9 +128,11 @@ class AVDH264HalV3(AVDHal):
 		x |= 1  # txfm always specified for each block
 		push(x, "hdr_2c_sps_param")
 
-		x = 0x100000
+		x = 0
 		if (sl.nal_unit_type != H264_NAL_SLICE_IDR):
 			x |= 0x200000
+		if (pps.transform_8x8_mode_flag):
+			x |= 0x100000
 		push(x, "hdr_44_is_idr_mask")
 
 		push(0x3de, "hdr_48_3de")
@@ -212,7 +214,14 @@ class AVDH264HalV3(AVDHal):
 
 	def set_slice(self, ctx, sl):
 		push = self.push
-		push(0x2d800000, "slc_a7c_cmd_set_coded_slice")
+		pps = self.get_pps(ctx, sl)
+
+		x = 0
+		if (not pps.transform_8x8_mode_flag):
+			x = sl.nal_ref_idc
+			if (sl.nal_unit_type == H264_NAL_SLICE_IDR):
+				x += (sl.idr_pic_id * 2)
+		push(0x2d800000 | x << 0xf, "slc_a7c_cmd_set_coded_slice")
 		push(ctx.slice_data_addr + sl.get_payload_offset(), "inp_8b4d4_slice_addr_low")
 		push(sl.get_payload_size(), "inp_8b4d8_slice_hdr_size")
 		push(0x2c000000, "cm3_cmd_exec_mb_vp")
@@ -229,6 +238,8 @@ class AVDH264HalV3(AVDHal):
 			for i,lst in enumerate(sl.pic.list0):
 				pos = list([x.pic_num for x in ctx.dpb_list]).index(lst.pic_num)
 				push(0x2dc00000 | (lx << 8) | (i << 4) | pos, "slc_6e8_cmd_ref_list_0", i)
+				if (pps.weighted_bipred_idc == 0 and sl.nal_ref_idc):  # this is what macOS does, but I'm very suspicious
+					break
 			if (sl.slice_type == H264_SLICE_TYPE_B):
 				lx = 1
 				for i,lst in enumerate(sl.pic.list1):

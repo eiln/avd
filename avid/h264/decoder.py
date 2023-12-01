@@ -277,7 +277,9 @@ class AVDH264Decoder(AVDDecoder):
 	def init_slice(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
 		self.refresh(sl)
+		pps = self.get_pps(sl)
 
+		sl.transform_8x8_mode_flag = pps.transform_8x8_mode_flag
 		sl.pic = self.get_next_pic()
 		sl.pic.flags |= H264_FRAME_FLAG_OUTPUT | H264_FRAME_FLAG_SHORT_REF
 		sps = self.get_sps(sl)
@@ -327,24 +329,25 @@ class AVDH264Decoder(AVDDecoder):
 		if (sl.nal_unit_type != H264_NAL_SLICE_IDR) and (sl.nal_ref_idc == 0):
 			sl.pic.unref()
 
-		if (sl.nal_unit_type == H264_NAL_SLICE_IDR) or (sl.adaptive_ref_pic_marking_mode_flag == 0):
-			if (len(ctx.dpb_list) > self.get_sps(sl).max_num_ref_frames):
-				oldest = sorted(ctx.dpb_list, key=lambda pic: pic.access_idx)[0]
-				self.log(f"Removing oldest ref {oldest}")
-				oldest.unref()
-		else:
-			for i,opcode in enumerate(sl.memory_management_control_operation):
-				if (opcode == H264_MMCO_END): break
-				if (opcode == H264_MMCO_SHORT2UNUSED):
-					pic_num_diff = sl.mmco_short_args[i] + 1  # abs_diff_pic_num_minus1
-					pic_num = sl.pic.pic_num - pic_num_diff
-					pic_num &= ctx.max_frame_num - 1
-					for pic in ctx.dpb_list:
-						if (pic.pic_num == pic_num):
-							self.log(f"MMCO: Removing short {pic}")
-							pic.unref()
-				else:
-					raise ValueError("opcode %d not implemented. probably LT ref. pls send sample" % (opcode))
+		if (sl.nal_ref_idc):
+			if (sl.nal_unit_type == H264_NAL_SLICE_IDR) or (sl.adaptive_ref_pic_marking_mode_flag == 0):
+				if (len(ctx.dpb_list) > self.get_sps(sl).max_num_ref_frames):
+					oldest = sorted(ctx.dpb_list, key=lambda pic: pic.access_idx)[0]
+					self.log(f"Removing oldest ref {oldest}")
+					oldest.unref()
+			else:
+				for i,opcode in enumerate(sl.memory_management_control_operation):
+					if (opcode == H264_MMCO_END): break
+					if (opcode == H264_MMCO_SHORT2UNUSED):
+						pic_num_diff = sl.mmco_short_args[i] + 1  # abs_diff_pic_num_minus1
+						pic_num = sl.pic.pic_num - pic_num_diff
+						pic_num &= ctx.max_frame_num - 1
+						for pic in ctx.dpb_list:
+							if (pic.pic_num == pic_num):
+								self.log(f"MMCO: Removing short {pic}")
+								pic.unref()
+					else:
+						raise ValueError("opcode %d not implemented. probably LT ref. pls send sample" % (opcode))
 		ctx.dpb_list = [pic for pic in ctx.dpb_list if (pic.flags & H264_FRAME_FLAG_OUTPUT)]
 
 		ctx.prev_poc_lsb = sl.pic.poc_lsb
