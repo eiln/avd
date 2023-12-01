@@ -106,6 +106,7 @@ class AVDH264HalV3(AVDHal):
 
 	def set_header(self, ctx, sl):
 		push = self.push
+		pps = self.get_pps(ctx, sl)
 
 		assert((ctx.inst_fifo_idx >= 0) and (ctx.inst_fifo_idx <= ctx.inst_fifo_count))
 		push(0x2b000000 | 0x100 | (ctx.inst_fifo_idx * 0x10), "cm3_cmd_inst_fifo_start")
@@ -123,7 +124,8 @@ class AVDH264HalV3(AVDHal):
 		push((((ctx.height - 1) >> 3) << 16) | ((ctx.width - 1) >> 3), "hdr_28_height_width_shift3")
 
 		x = 0x1000000 * self.get_sps(ctx, sl).chroma_format_idc | 0x2000 | 0x800
-		x |= (1 << 7) | 1  # 264 is always 8x8 txfm | txfm always specified for each block
+		x |= (pps.transform_8x8_mode_flag << 7)  # 4x4, 8x8
+		x |= 1  # txfm always specified for each block
 		push(x, "hdr_2c_sps_param")
 
 		x = 0x100000
