@@ -384,12 +384,12 @@ if __name__ == "__main__":
 
 	parser.add_argument('-u', '--debug-mode', action='store_true')
 	parser.add_argument('-b', '--show-bits', action='store_true')
-	parser.add_argument('--show-all', action='store_true')
-	parser.add_argument('--show-headers', action='store_true')
-	parser.add_argument('--show-index', action='store_true')
-	parser.add_argument('--show-paths', action='store_true')
-	parser.add_argument('--show-fp', action='store_true')
-	parser.add_argument('--nonfatal', action='store_true')
+	parser.add_argument('-sa', '--show-all', action='store_true')
+	parser.add_argument('-sh', '--show-headers', action='store_true')
+	parser.add_argument('-si', '--show-index', action='store_true')
+	parser.add_argument('-sp', '--show-paths', action='store_true')
+	parser.add_argument('-sf', '--show-fp', action='store_true')
+	parser.add_argument('-nf', '--nonfatal', action='store_true')
 
 	args = parser.parse_args()
 	args.firmware = resolve_input(args.firmware)
