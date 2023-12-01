@@ -530,8 +530,8 @@ static int h264_parse_pps(struct h264_context *ctx, struct h264_pps *pps)
 
 	pps->entropy_coding_mode_flag = get_bits1(gb);
 	pps->bottom_field_pic_order_in_frame_present_flag = get_bits1(gb);
-	pps->num_slice_groups = get_ue_golomb(gb);
-	if (pps->num_slice_groups) {
+	pps->num_slice_groups = get_ue_golomb(gb) + 1;
+	if (pps->num_slice_groups > 1) {
 		if (pps->num_slice_groups > 7) {
 			h264_err("num_slice_groups over limit\n");
 			return -1;
