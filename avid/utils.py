@@ -4,6 +4,8 @@
 
 def round_up(x, y): return ((x + (y - 1)) & (-y))
 def round_down(x, y): return (x - (x % y))
+def ceildiv(a, b): return -(a // -b)
+def rounddiv(a, b): return (a + b // 2) // b  # round up 0.5
 
 def swrap(x, w): return ((w + x) & ~w)
 

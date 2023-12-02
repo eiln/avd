@@ -43,7 +43,7 @@ class AVDH265Decoder(AVDDecoder):
 		ctx.inst_fifo_addrs = [0 for n in range(ctx.inst_fifo_count)]
 		self.allocator_move_up(0x18000)
 		for n in range(ctx.inst_fifo_count):
-			ctx.inst_fifo_addrs[n] = self.allocate(0x100000, pad=0x4000, name="inst_fifo%d" % n)
+			ctx.inst_fifo_addrs[n] = self.range_alloc(0x100000, pad=0x4000, name="inst_fifo%d" % n)
 		ctx.inst_fifo_iova = ctx.inst_fifo_addrs[ctx.inst_fifo_idx]
 
 	def new_context(self, vps_list, sps_list, pps_list):
@@ -67,8 +67,9 @@ class AVDH265Decoder(AVDDecoder):
 		ctx.poc = -1
 		self.allocate_fifo()
 
-	def refresh_sps(self, sps_id):
+	def refresh_sps(self, sl):
 		ctx = self.ctx
+		sps_id = self.get_sps_id(sl)
 		if (sps_id == ctx.cur_sps_id):
 			return
 		sps = ctx.sps_list[sps_id]
@@ -77,19 +78,18 @@ class AVDH265Decoder(AVDDecoder):
 
 		ctx.orig_width = width
 		ctx.orig_height = height
-		if (width & 15):
-			width = round_up(width, 16)
-		if (height & 15):
-			height = round_up(height, 16)
+		if (width & 1):
+			width = round_up(width, 2)
+		if (height & 1):
+			height = round_up(height, 2)
 		if ((width != ctx.orig_width) or (height != ctx.orig_height)):
 			self.log("dimensions changed from %dx%d -> %dx%d" % (ctx.width, ctx.height, width, height))
 		ctx.width = width
 		ctx.height = height
 
 		assert((64 <= width and width <= 4096) and (64 <= height and height <= 4096)) # hardware caps
-		assert(not(width & 15) and not(height & 15)) # hardware caps
+		assert(not(width & 1) and not(height & 1)) # hardware caps
 		ctx.cur_sps_id = sps_id
-
 		self.allocate_buffers()
 
 	def allocate_buffers(self):
@@ -100,37 +100,36 @@ class AVDH265Decoder(AVDDecoder):
 		self.allocator_move_up(0x734000)
 		ctx.rvra_count = 6
 		ctx.rvra_base_addrs = [0 for n in range(ctx.rvra_count)]
-		ctx.rvra_base_addrs[0] = self.allocate(rvra_total_size, pad=0x100, name="rvra0")
+		ctx.rvra_base_addrs[0] = self.range_alloc(rvra_total_size, pad=0x100, name="rvra0")
 
 		if (not(isdiv(ctx.width, 32))):
 			wr = round_up(ctx.width, 64)
 		else:
-			wr = ctx.width
-		luma_size = wr * ctx.height
-		ctx.y_addr = self.allocate(luma_size, name="disp_y")
-		chroma_size = wr * ctx.height
+			wr = round_up(ctx.width, 16)
+		ctx.luma_size = wr * ctx.height
+		ctx.y_addr = self.range_alloc(ctx.luma_size, name="disp_y")
+		ctx.chroma_size = wr * round_up(ctx.height, 16)
 		if (sps.chroma_format_idc == HEVC_CHROMA_IDC_420):
-			chroma_size //= 2
-		ctx.uv_addr = self.allocate(chroma_size, name="disp_uv")
+			ctx.chroma_size //= 2
+		ctx.uv_addr = self.range_alloc(ctx.chroma_size, name="disp_uv")
 
-		slice_data_size = min((((round_up(ctx.width, 32) - 1) * (round_up(ctx.height, 32) - 1) // 0x8000) + 2), 0xff) * 0x4000
-		ctx.slice_data_addr = self.allocate(slice_data_size, align=0x4000, padb4=0x4000,name="slice_data")
+		ctx.slice_data_size = min((((round_up(ctx.width, 32) - 1) * (round_up(ctx.height, 32) - 1) // 0x8000) + 2), 0xff) * 0x4000
+		ctx.slice_data_addr = self.range_alloc(ctx.slice_data_size, align=0x4000, padb4=0x4000, name="slice_data")
 
 		ctx.sps_tile_count = 16
 		ctx.sps_tile_addrs = [0 for n in range(ctx.sps_tile_count)]
-		sps_tile_size = 0x8000
-		if (ctx.height == 512):
-			sps_tile_size = 0xc000
+		n = max(rounddiv(ctx.height * ctx.width, 0x40000), 1) + 1
+		sps_tile_size = n * 0x4000
 		for n in range(ctx.sps_tile_count):
-			ctx.sps_tile_addrs[n] = self.allocate(sps_tile_size, name="sps_tile%d" % n)
+			ctx.sps_tile_addrs[n] = self.range_alloc(sps_tile_size, name="sps_tile%d" % n)
 
 		pps_tile_count = 5
 		ctx.pps_tile_addrs = [0 for n in range(pps_tile_count)]
 		for n in range(pps_tile_count):
-			ctx.pps_tile_addrs[n] = self.allocate(0x8000, name="pps_tile%d" % n)
+			ctx.pps_tile_addrs[n] = self.range_alloc(0x8000, name="pps_tile%d" % n)
 
 		for n in range(ctx.rvra_count - 1):
-			ctx.rvra_base_addrs[n + 1] = self.allocate(rvra_total_size, name="rvra1_%d" % n)
+			ctx.rvra_base_addrs[n + 1] = self.range_alloc(rvra_total_size, name="rvra1_%d" % n)
 		self.dump_ranges()
 
 		ctx.dpb_pool = []
@@ -140,9 +139,8 @@ class AVDH265Decoder(AVDDecoder):
 			self.log(f"DPB Pool: {pic}")
 
 	def refresh(self, sl):
-		ctx = self.ctx
-		sps_id = self.get_sps_id(sl)
-		self.refresh_sps(sps_id)
+		self.refresh_sps(sl)
+		self.realloc_rbsp_size(sl)
 
 	def setup(self, path, num=0, **kwargs):
 		vps_list, sps_list, pps_list, slices = self.parser.parse(path, num=num)
