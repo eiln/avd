@@ -91,7 +91,7 @@ static const uint8_t default_scaling8[2][64] = {
 
 static int decode_scaling_list(struct bitstream *gb, uint8_t *factors, int size,
                                const uint8_t *jvt_list, const uint8_t *fallback_list,
-                               uint16_t *mask, int pos)
+                               uint16_t *mask, int pos, int is_sps)
 {
 	int i, last = 8, next = 8;
 	const uint8_t *scan = size == 16 ? h264_avd_zigzag_scan4x4 : h264_avd_zigzag_scan8x8;
@@ -107,10 +107,12 @@ static int decode_scaling_list(struct bitstream *gb, uint8_t *factors, int size,
 					h264_err("delta scale %d is invalid\n", delta_scale);
 					return -EINVALDATA;
 				}
-				next = (last + delta_scale + 256) % 256;
+				next = (last + delta_scale + 256) % 256; // use_default_scaling_matrix_flag
 			}
 			if (!i && !next) { /* matrix not written, we use the preset one */
 				memcpy(factors, jvt_list, size * sizeof(uint8_t));
+				if (is_sps)
+					*mask &= ~(seq_scaling_list_present_flag << pos); // Don't feed AVD default SPS
 				break;
 			}
 			last = factors[scan[i]] = next ? next : last;
@@ -132,28 +134,31 @@ static int h264_parse_scaling_list(struct bitstream *gb, struct h264_sps *sps,
 		fallback_sps ? sps->seq_scaling_list_8x8[0] : default_scaling8[0],
 		fallback_sps ? sps->seq_scaling_list_8x8[3] : default_scaling8[1]
 	};
+
+	#define DECODE(m1, sz, m2, fb, i) (decode_scaling_list(gb, m1, sz, m2, fb, mask, i, is_sps))
 	int ret = 0;
 	*mask = 0x0;
 	if (present_flag) {
-		ret |= decode_scaling_list(gb, scaling_matrix4[0], 16, default_scaling4[0], fallback[0], mask, 0);        // Intra, Y
-		ret |= decode_scaling_list(gb, scaling_matrix4[1], 16, default_scaling4[0], scaling_matrix4[0], mask, 1); // Intra, Cr
-		ret |= decode_scaling_list(gb, scaling_matrix4[2], 16, default_scaling4[0], scaling_matrix4[1], mask, 2); // Intra, Cb
-		ret |= decode_scaling_list(gb, scaling_matrix4[3], 16, default_scaling4[1], fallback[1], mask, 3);        // Inter, Y
-		ret |= decode_scaling_list(gb, scaling_matrix4[4], 16, default_scaling4[1], scaling_matrix4[3], mask, 4); // Inter, Cr
-		ret |= decode_scaling_list(gb, scaling_matrix4[5], 16, default_scaling4[1], scaling_matrix4[4], mask, 5); // Inter, Cb
+		ret |= DECODE(scaling_matrix4[0], 16, default_scaling4[0], fallback[0], 0); // Intra, Y
+		ret |= DECODE(scaling_matrix4[1], 16, default_scaling4[0], scaling_matrix4[0], 1); // Intra, Cr
+		ret |= DECODE(scaling_matrix4[2], 16, default_scaling4[0], scaling_matrix4[1], 2); // Intra, Cb
+		ret |= DECODE(scaling_matrix4[3], 16, default_scaling4[1], fallback[1], 3); // Inter, Y
+		ret |= DECODE(scaling_matrix4[4], 16, default_scaling4[1], scaling_matrix4[3], 4); // Inter, Cr
+		ret |= DECODE(scaling_matrix4[5], 16, default_scaling4[1], scaling_matrix4[4], 5); // Inter, Cb
 		if (is_sps || pps->transform_8x8_mode_flag) {
-			ret |= decode_scaling_list(gb, scaling_matrix8[0], 64, default_scaling8[0], fallback[2], mask, 6); // Intra, Y
-			ret |= decode_scaling_list(gb, scaling_matrix8[3], 64, default_scaling8[1], fallback[3], mask, 6+3); // Inter, Y
+			ret |= DECODE(scaling_matrix8[0], 64, default_scaling8[0], fallback[2], 6); // Intra, Y
+			ret |= DECODE(scaling_matrix8[3], 64, default_scaling8[1], fallback[3], 6+3); // Inter, Y
 			if (sps->chroma_format_idc == 3) {
-				ret |= decode_scaling_list(gb, scaling_matrix8[1], 64, default_scaling8[0], scaling_matrix8[0], mask,  6+1); // Intra, Cr
-				ret |= decode_scaling_list(gb, scaling_matrix8[4], 64, default_scaling8[1], scaling_matrix8[3], mask,  6+4); // Inter, Cr
-				ret |= decode_scaling_list(gb, scaling_matrix8[2], 64, default_scaling8[0], scaling_matrix8[1], mask,  6+2); // Intra, Cb
-				ret |= decode_scaling_list(gb, scaling_matrix8[5], 64, default_scaling8[1], scaling_matrix8[4], mask,  6+5); // Inter, Cb
+				ret |= DECODE(scaling_matrix8[1], 64, default_scaling8[0], scaling_matrix8[0], 6+1); // Intra, Cr
+				ret |= DECODE(scaling_matrix8[4], 64, default_scaling8[1], scaling_matrix8[3], 6+4); // Inter, Cr
+				ret |= DECODE(scaling_matrix8[2], 64, default_scaling8[0], scaling_matrix8[1], 6+2); // Intra, Cb
+				ret |= DECODE(scaling_matrix8[5], 64, default_scaling8[1], scaling_matrix8[4], 6+5); // Inter, Cb
 			}
 		}
 		if (!ret)
 			ret = is_sps;
 	}
+	#undef DECODE
 
 	return ret;
 }
@@ -343,11 +348,11 @@ static int h264_parse_sps(struct bitstream *gb, struct h264_sps *sps)
 		sps->qpprime_y_zero_transform_bypass_flag = get_bits1(gb);
 		sps->seq_scaling_matrix_present_flag = get_bits1(gb);
 		ret = h264_parse_scaling_list(gb, sps, NULL, 1, sps->seq_scaling_matrix_present_flag,
-									  &sps->scaling_matrix_present_mask,
+									  &sps->seq_scaling_matrix_present_mask,
 									  sps->seq_scaling_list_4x4, sps->seq_scaling_list_8x8);
 		if (ret < 0)
 			h264_err("failed to decode scaling list (%d)\n", ret);
-		sps->seq_scaling_matrix_present_flag |= ret;
+		//sps->seq_scaling_matrix_present_flag |= ret;
 		break;
 	default:
 		h264_err("unknown profile (%d)\n", sps->profile_idc);

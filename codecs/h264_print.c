@@ -111,30 +111,26 @@ void h264_print_sps(struct h264_sps *sps)
 	h264_field("bit_depth_chroma_minus8", sps->bit_depth_chroma_minus8);
 	h264_field("qpprime_y_zero_transform_bypass_flag",
 	       sps->qpprime_y_zero_transform_bypass_flag);
-	h264_field("seq_scaling_matrix_present_flag",
-	       sps->seq_scaling_matrix_present_flag);
+
+	h264_field("seq_scaling_matrix_present_flag", sps->seq_scaling_matrix_present_flag);
 	if (sps->seq_scaling_matrix_present_flag) {
-		for (i = 0; i < (sps->chroma_format_idc == 3 ? 12 : 8); i++) {
-			h264_field("seq_scaling_list_present_flag[%d]", i,
-			       sps->seq_scaling_list_present_flag[i]);
-			if (sps->seq_scaling_list_present_flag[i]) {
-				h264_field("use_default_scaling_matrix_flag[%d]", i,
-				       sps->use_default_scaling_matrix_flag[i]);
-				if (!sps->use_default_scaling_matrix_flag[i]) {
-					for (j = 0; j < (i < 6 ? 16 : 64); j++) {
-						if (i < 6)
-							h264_field("seq_scaling_list[%d][%d]",
-							       i, j,
-							       sps->seq_scaling_list_4x4[i][j]);
-						else
-							h264_field("seq_scaling_list[%d][%d]",
-							       i, j,
-							       sps->seq_scaling_list_8x8[i - 6][j]);
-					}
-				}
-			}
+		h264_fieldt("seq_scaling_matrix_present_mask", sps->seq_scaling_matrix_present_mask);
+		for (i = 0; i < 6; i++) {
+			h264_fieldt("seq_scaling_list_present_flag[%d]", i,
+						sps->seq_scaling_matrix_present_mask & (1 << i));
+			for (j = 0; j < 16; j++)
+				h264_fieldt("seq_scaling_list_4x4[%d][%d]",
+						    i, j, sps->seq_scaling_list_4x4[i][j]);
+		}
+		for (i = 0; i < 6; i++) {
+			h264_fieldt("seq_scaling_list_present_flag[%d]", i + 6,
+				sps->seq_scaling_matrix_present_mask & (1 << (i + 6)));
+			for (j = 0; j < 64; j++)
+				h264_fieldt("seq_scaling_list_8x8[%d][%d]",
+						    i, j, sps->seq_scaling_list_8x8[i][j]);
 		}
 	}
+
 	h264_field("log2_max_frame_num_minus4", sps->log2_max_frame_num - 4);
 	h264_field("pic_order_cnt_type", sps->pic_order_cnt_type);
 	switch (sps->pic_order_cnt_type) {
