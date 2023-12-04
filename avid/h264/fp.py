@@ -24,14 +24,14 @@ class AVDH264V3InstHeader(AVDFrameParams):
 	subcon = "AvdH264V3InstHeader" / Struct(
 		"hdr_28_height_width_shift3" / u32,
 		"hdr_2c_sps_param" / u32,
-		"hdr_30_zero" / ExprValidator(u32, obj_ == 0),
+		"hdr_30_seq_scaling_list_dims" / u32,
 		"hdr_34_cmd_start_hdr" / ExprValidator(u32, obj_ & 0x2db00000 == 0x2db00000),
 		"hdr_38_mode" / u32,
 		"hdr_3c_height_width" / u32,
 		"hdr_40_zero" / ExprValidator(u32, obj_ == 0),
 		"hdr_44_is_idr_mask" / u32,
 		"hdr_48_3de" / u32,
-		"hdr_4c_scaling_list_dims" / u32,
+		"hdr_4c_pic_scaling_list_dims" / u32,
 		"hdr_50_zero" / ExprValidator(u32, obj_ == 0),
 		"hdr_54_height_width" / u32,
 		"hdr_58_const_3a" / ExprValidator(u32, obj_ == 0x30000a),
@@ -63,10 +63,11 @@ class AVDH264V3DFWScalingList(AVDFrameParams):
 		"scl_220_dfw_pad" / ZPadding(0x60),
 		"scl_280_dfw_zero" / ExprValidator(u32, obj_ == 0),
 		"scl_284_dfw_ipc" / ExprValidator(u32, obj_ == 0x1de28b5),
-		"scl_280_dfw_pad" / ZPadding(0x464 - 0x284),
+		"scl_28c_seq_scaling_matrix_4x4" / Array(6 * 16 // 4, u32),
+		"scl_2ec_seq_scaling_matrix_8x8" / Array(6 * 64 // 4, u32),
 		"scl_468_dfw_ipc" / ExprValidator(u32, obj_ == 0x1de28b5),
-		"scl_46c_scaling_matrix_4x4" / Array(6 * 16 // 4, u32),
-		"scl_4cc_scaling_matrix_8x8" / Array(6 * 64 // 4, u32),
+		"scl_46c_pic_scaling_matrix_4x4" / Array(6 * 16 // 4, u32),
+		"scl_4cc_pic_scaling_matrix_8x8" / Array(6 * 64 // 4, u32),
 		"scl_64c_dfw_ipc" / ExprValidator(u32, obj_ == 0x764099),
 		"scl_650_dfw_pad" / ZPadding(0x6c8 - 0x650),
 		"scl_6c8_dfw_ipc" / ExprValidator(u32, obj_ == 0x124111),
@@ -133,8 +134,12 @@ class AVDH264V3FakeFrameParams(AVDFakeFrameParams):
 		obj["hdr_190_ref2_addr_lsb7"] = [0] * 16
 		obj["hdr_1d0_ref3_addr_lsb7"] = [0] * 16
 
-		obj["scl_46c_scaling_matrix_4x4"] = [0] * (6 * 16 // 4)
-		obj["scl_4cc_scaling_matrix_8x8"] = [0] * (6 * 64 // 4)
+		obj["hdr_30_seq_scaling_list_dims"] = 0
+		obj["hdr_4c_pic_scaling_list_dims"] = 0
+		obj["scl_28c_seq_scaling_matrix_4x4"] = [0] * (6 * 16 // 4)
+		obj["scl_2ec_seq_scaling_matrix_8x8"] = [0] * (6 * 64 // 4)
+		obj["scl_46c_pic_scaling_matrix_4x4"] = [0] * (6 * 16 // 4)
+		obj["scl_4cc_pic_scaling_matrix_8x8"] = [0] * (6 * 64 // 4)
 
 		obj["slc_6e8_cmd_ref_list_0"] = [0] * 16
 		obj["slc_728_cmd_ref_list_1"] = [0] * 16

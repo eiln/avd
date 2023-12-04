@@ -79,6 +79,9 @@ class AVDH264Parser(AVDParser):
 				("chroma_weight_l1", (H264_MAX_REFS, 2)),
 				("chroma_offset_l1", (H264_MAX_REFS, 2)),
 
+				("seq_scaling_list_present_flag", 12),
+				("seq_scaling_list_4x4", (6, 16)),
+				("seq_scaling_list_8x8", (6, 64)),
 				("pic_scaling_list_present_flag", 12),
 				("pic_scaling_list_4x4", (6, 16)),
 				("pic_scaling_list_8x8", (6, 64)),

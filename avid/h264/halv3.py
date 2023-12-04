@@ -55,57 +55,95 @@ class AVDH264HalV3(AVDHal):
 
 	def set_scaling_list(self, ctx, sl):
 		push = self.push
+		sps = self.get_sps(ctx, sl)
 		pps = self.get_pps(ctx, sl)
 
 		x = 0
-		if (not pps.pic_scaling_matrix_present_flag):
-			push(x, "hdr_4c_scaling_list_dims")
+		if (pps.pic_scaling_matrix_present_flag or sps.seq_scaling_matrix_present_flag):
+			x |= 0x1000000
+		else:
+			push(x, "cm3_mark_end_section_scl")
 			return
-		x |= 0x1000000
-		x |= 640 - 1  # TODO
-		push(x, "hdr_4c_scaling_list_dims")
 
-		for i in range(6):
-			for j in range(16 // 4):
-				y = j * 4
-				x = 0
-				x |= pps.pic_scaling_list_4x4[i][y + 0] << 24
-				x |= pps.pic_scaling_list_4x4[i][y + 1] << 16
-				x |= pps.pic_scaling_list_4x4[i][y + 2] << 8
-				x |= pps.pic_scaling_list_4x4[i][y + 3] << 0
-				push(x, "scl_46c_scaling_matrix_4x4", i*(16 // 4) + j)
+		# SPS: Set iff explicitly decoded non-default scaling list
+		# mask aggregates all flags in u16; flag cleared if default for SPS
+		if (sps.seq_scaling_matrix_present_flag and sps.seq_scaling_matrix_present_mask):
+			x |= ((64 // 4) << 5) | ((16 // 4) << 5) - 1
+		if (sps.seq_scaling_matrix_present_flag):
+			push(x, "hdr_30_seq_scaling_list_dims")
 
-		if (pps.transform_8x8_mode_flag):
+		if (sps.seq_scaling_matrix_present_flag and sps.seq_scaling_matrix_present_mask):
 			for i in range(6):
-				if (pps.pic_scaling_list_present_flag[i + 6]):
+				if (sps.seq_scaling_list_present_flag[i]): # Do not set default list
+					for j in range(16 // 4):
+						y = j * 4
+						x = 0
+						x |= sps.seq_scaling_list_4x4[i][y + 0] << 24
+						x |= sps.seq_scaling_list_4x4[i][y + 1] << 16
+						x |= sps.seq_scaling_list_4x4[i][y + 2] << 8
+						x |= sps.seq_scaling_list_4x4[i][y + 3] << 0
+						push(x, "scl_28c_seq_scaling_matrix_4x4", i*(16 // 4) + j)
+
+			for i in range(6):
+				if (sps.seq_scaling_list_present_flag[i + 6]):
 					for j in range(64 // 4):
 						y = j * 4
 						x = 0
-						x |= pps.pic_scaling_list_8x8[i][y + 0] << 24
-						x |= pps.pic_scaling_list_8x8[i][y + 1] << 16
-						x |= pps.pic_scaling_list_8x8[i][y + 2] << 8
-						x |= pps.pic_scaling_list_8x8[i][y + 3] << 0
-						push(x, "scl_4cc_scaling_matrix_8x8", (i)*(64 // 4) + j)
-		else:
-			default_8x8_intra_scaling_list = [
-				0x060a0d10, 0x0a0b1012, 0x0d101217, 0x10121719,
-				0x1217191b, 0x17191b1d, 0x191b1d1f, 0x1b1d1f21,
-				0x1217191b, 0x17191b1d, 0x191b1d1f, 0x1b1d1f21,
-				0x1d1f2124, 0x1f212426, 0x21242628, 0x2426282a,
-			]
-			default_8x8_inter_scaling_list = [
-				0x090d0f11, 0x0d0d1113, 0x0f111315, 0x11131516,
-				0x13151618, 0x15161819, 0x1618191b, 0x18191b1c,
-				0x13151618, 0x15161819, 0x1618191b, 0x18191b1c,
-				0x191b1c1e, 0x1b1c1e20, 0x1c1e2021, 0x1e202123,
-			]
-			for i in range(len(default_8x8_intra_scaling_list)):
-				push(default_8x8_intra_scaling_list[i], "scl_4cc_scaling_matrix_8x8", i)
-			for i in range(len(default_8x8_inter_scaling_list)):
-				push(default_8x8_inter_scaling_list[i], "scl_4cc_scaling_matrix_8x8", i)
+						x |= sps.seq_scaling_list_8x8[i][y + 0] << 24
+						x |= sps.seq_scaling_list_8x8[i][y + 1] << 16
+						x |= sps.seq_scaling_list_8x8[i][y + 2] << 8
+						x |= sps.seq_scaling_list_8x8[i][y + 3] << 0
+						push(x, "scl_2ec_seq_scaling_matrix_8x8", i*(64 // 4) + j)
+
+		# TODO unsure of this order; I've yet to see both SPS/PPS
+		# PPS: Set all lists unconditionally if flag is present
+		if (pps.pic_scaling_matrix_present_flag):
+			x |= ((64 // 4) << 5) | ((16 // 4) << 5) - 1
+			push(x, "hdr_4c_pic_scaling_list_dims")
+
+		if (pps.pic_scaling_matrix_present_flag):
+			for i in range(6):
+				for j in range(16 // 4): # Set unconditionally
+					y = j * 4
+					x = 0
+					x |= pps.pic_scaling_list_4x4[i][y + 0] << 24
+					x |= pps.pic_scaling_list_4x4[i][y + 1] << 16
+					x |= pps.pic_scaling_list_4x4[i][y + 2] << 8
+					x |= pps.pic_scaling_list_4x4[i][y + 3] << 0
+					push(x, "scl_46c_pic_scaling_matrix_4x4", i*(16 // 4) + j)
+
+			if (pps.transform_8x8_mode_flag):
+				for i in range(6):
+					if (pps.pic_scaling_list_present_flag[i + 6]):
+						for j in range(64 // 4):
+							y = j * 4
+							x = 0
+							x |= pps.pic_scaling_list_8x8[i][y + 0] << 24
+							x |= pps.pic_scaling_list_8x8[i][y + 1] << 16
+							x |= pps.pic_scaling_list_8x8[i][y + 2] << 8
+							x |= pps.pic_scaling_list_8x8[i][y + 3] << 0
+							push(x, "scl_4cc_pic_scaling_matrix_8x8", i*(64 // 4) + j)
+			else:
+				default_8x8_intra_scaling_list = [
+					0x060a0d10, 0x0a0b1012, 0x0d101217, 0x10121719,
+					0x1217191b, 0x17191b1d, 0x191b1d1f, 0x1b1d1f21,
+					0x1217191b, 0x17191b1d, 0x191b1d1f, 0x1b1d1f21,
+					0x1d1f2124, 0x1f212426, 0x21242628, 0x2426282a,
+				]
+				default_8x8_inter_scaling_list = [
+					0x090d0f11, 0x0d0d1113, 0x0f111315, 0x11131516,
+					0x13151618, 0x15161819, 0x1618191b, 0x18191b1c,
+					0x13151618, 0x15161819, 0x1618191b, 0x18191b1c,
+					0x191b1c1e, 0x1b1c1e20, 0x1c1e2021, 0x1e202123,
+				]
+				for i in range(len(default_8x8_intra_scaling_list)):
+					push(default_8x8_intra_scaling_list[i], "scl_4cc_pic_scaling_matrix_8x8", i)
+				for i in range(len(default_8x8_inter_scaling_list)):
+					push(default_8x8_inter_scaling_list[i], "scl_4cc_pic_scaling_matrix_8x8", i)
 
 	def set_header(self, ctx, sl):
 		push = self.push
+		sps = self.get_sps(ctx, sl)
 		pps = self.get_pps(ctx, sl)
 
 		assert((ctx.inst_fifo_idx >= 0) and (ctx.inst_fifo_idx <= ctx.inst_fifo_count))

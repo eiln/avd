@@ -197,13 +197,14 @@ class AVDH264UnitTest(AVDUnitTest):
 		self.fp_keys = [
 			"hdr_28_height_width_shift3",
 			"hdr_2c_sps_param",
+			"hdr_30_seq_scaling_list_dims",
 			"hdr_34_cmd_start_hdr",
 			"hdr_38_mode",
 			"hdr_3c_height_width",
 			"hdr_40_zero",
 			"hdr_44_is_idr_mask",
 			"hdr_48_3de",
-			"hdr_4c_scaling_list_dims",
+			"hdr_4c_pic_scaling_list_dims",
 			"hdr_54_height_width",
 			"hdr_58_const_3a",
 
@@ -222,8 +223,10 @@ class AVDH264UnitTest(AVDUnitTest):
 			"hdr_218_width_align",
 			"hdr_21c_width_align",
 
-			"scl_46c_scaling_matrix_4x4",
-			"scl_4cc_scaling_matrix_8x8",
+			"scl_28c_seq_scaling_matrix_4x4",
+			"scl_2ec_seq_scaling_matrix_8x8",
+			"scl_46c_pic_scaling_matrix_4x4",
+			"scl_4cc_pic_scaling_matrix_8x8",
 
 			"slc_6e4_cmd_ref_type",
 			"slc_6e8_cmd_ref_list_0",
