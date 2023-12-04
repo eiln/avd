@@ -12,6 +12,7 @@ if __name__ == "__main__":
 	parser.add_argument('input', type=str, help="path to bitstream")
 	parser.add_argument('-n', '--num', type=int, default=1, help="count")
 	parser.add_argument('-a', '--all', action='store_true', help="run all")
+	parser.add_argument('-sh', '--show-headers', action='store_true', help="run all")
 	parser.add_argument('-q', '--do-probs', action='store_true', help="run all")
 	args = parser.parse_args()
 
@@ -29,9 +30,24 @@ if __name__ == "__main__":
 	else:
 		raise ValueError("Not supported")
 
-	units = dec.setup(path, do_probs=args.do_probs)
-	n = len(units) if args.all else args.num
-	for unit in units[:n]:
-		print(unit)
+	num = 0 if args.all else args.num
+	units = dec.setup(path, num=num, nal_stop=1, do_probs=args.do_probs)
+
+	if (args.show_headers):
+		if  (mode == "h264" or mode == "h265"):
+			if (mode == "h265"):
+				for n in range(len(dec.ctx.vps_list)):
+					if (dec.ctx.vps_list[n]):
+						print(dec.ctx.vps_list[n])
+			for n in range(len(dec.ctx.sps_list)):
+				if (dec.ctx.sps_list[n]):
+					print(dec.ctx.sps_list[n])
+			for n in range(len(dec.ctx.pps_list)):
+				if (dec.ctx.pps_list[n]):
+					print(dec.ctx.pps_list[n])
+
+	for unit in units[:num]:
+		if (args.show_headers):
+			print(unit)
 		inst = dec.decode(unit)
 		print()
