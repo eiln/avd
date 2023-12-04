@@ -162,7 +162,6 @@ class AVDH264Decoder(AVDDecoder):
 		sps_list, pps_list, slices = self.parser.parse(path, num, nal_stop, **kwargs)
 		self.new_context(sps_list, pps_list)
 		# realistically we'd have the height/width as metadata w/o relying on sps
-		self.refresh(slices[0])
 		return slices
 
 	def get_short_ref_by_num(self, lst, pic_num):
@@ -274,9 +273,7 @@ class AVDH264Decoder(AVDDecoder):
 	def init_slice(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
 		self.refresh(sl)
-		pps = self.get_pps(sl)
 
-		sl.transform_8x8_mode_flag = pps.transform_8x8_mode_flag
 		sl.pic = self.get_next_pic()
 		sl.pic.flags |= H264_FRAME_FLAG_OUTPUT | H264_FRAME_FLAG_SHORT_REF
 		sps = self.get_sps(sl)

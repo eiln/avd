@@ -12,7 +12,7 @@ from math import ceil
 class AVDH264Slice(AVDSlice):
 	def __init__(self):
 		super().__init__()
-		self._banned_keys = ["payload", "nal_unit_type", "idx", "transform_8x8_mode_flag"]
+		self._banned_keys = ["payload", "nal_unit_type", "idx", "nal_offset"]
 		self._reprwidth = 38
 		self.mode = "h264"
 
@@ -34,16 +34,14 @@ class AVDH264Slice(AVDSlice):
 			new = b'\x00' + dat
 			return new[:2] + b'\x00.' + new[4:]
 		payload = transform(self.payload)
-		if ((self.nal_unit_type == H264_NAL_SLICE_IDR) and not (self.transform_8x8_mode_flag == 0 and self.nal_ref_idc)):
-			start = 0
-		else:
-			start = 1
+		start = self.nal_offset - 3
 		return payload[start:]
 
 	def get_payload_offset(self):
-		off = ceil(self.slice_header_size / 8) + 4
-		if ((self.transform_8x8_mode_flag == 0 and self.nal_ref_idc)):
-			off -= 1
+		if (not self.slice_header_size & 7): # CAVLC
+			off = ceil(self.slice_header_size / 8) + 4
+		else:
+			off = (self.slice_header_size // 8) + 4
 		return off
 
 	def get_payload_size(self):
@@ -99,6 +97,7 @@ class AVDH264Parser(AVDParser):
 			raise RuntimeError("Failed to init libh264")
 
 		with pipes() as (out, err):
+			offsets = []
 			nalus = []
 			while (bytesnum > 0):
 				if ((num) and (len(nalus) >= num + 20) and nal_stop):
@@ -106,15 +105,16 @@ class AVDH264Parser(AVDParser):
 				self.lib.libh264_decode(handle, buf[bufpos:], bytesnum, ctypes.byref(nal_start), ctypes.byref(nal_end))
 				payload = buf[bufpos:bufpos+nal_end.value]
 				nalus.append(payload)
+				offsets.append(nal_start.value)
 				bufpos += nal_end.value
 				bytesnum -= nal_end.value
 		stdout = out.read()
 
 		self.lib.libh264_free(handle)
-		return nalus, stdout
+		return nalus, stdout, offsets
 
 	def parse(self, path, num, nal_stop, **kwargs):
-		payloads, stdout = self.parse_payloads(path, num, nal_stop, **kwargs)
+		payloads, stdout, offsets = self.parse_payloads(path, num, nal_stop, **kwargs)
 		units = self.parse_headers(stdout)
 
 		slice_idx = 0
@@ -135,6 +135,7 @@ class AVDH264Parser(AVDParser):
 				unit.idx = unit.pic_parameter_set_id
 				pps_list[unit.pic_parameter_set_id] = unit
 			elif (unit.nal_unit_type in [H264_NAL_SLICE_NONIDR, H264_NAL_SLICE_PART_A, H264_NAL_SLICE_PART_B, H264_NAL_SLICE_PART_C, H264_NAL_SLICE_IDR, H264_NAL_SLICE_AUX, H264_NAL_SLICE_EXT]):
+				unit.nal_offset = offsets[i]
 				slices.append(unit)
 				slice_idx += 1
 			else:
