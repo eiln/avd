@@ -28,7 +28,7 @@ class AVDDecoder:
 		self.last_iova = 0x0
 		self.used = []
 
-	def allocate(self, size, pad=0x0, padb4=0x0, align=0x0, name=""):
+	def range_alloc(self, size, pad=0x0, padb4=0x0, align=0x0, name=""):
 		iova = self.last_iova
 		if (align):
 			iova = round_up(iova, align)
@@ -43,6 +43,20 @@ class AVDDecoder:
 	def allocator_move_up(self, start):
 		assert(start >= self.last_iova)
 		self.last_iova = start
+
+	def range_free(self, name):
+		self.used = [x for x in self.used if x.name != name]
+
+	def allocator_top(self):
+		return self.last_iova
+
+	def realloc_rbsp_size(self, sl):
+		ctx = self.ctx
+		size = len(sl.get_payload())
+		if (size > ctx.slice_data_size):
+			self.range_free(name="slice_data")
+			ctx.slice_data_addr = self.range_alloc(size, align=0x4000, name="slice_data")
+			ctx.slice_data_size = size
 
 	def dump_ranges(self):
 		for i,x in enumerate(self.used):

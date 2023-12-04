@@ -62,6 +62,10 @@ class AVDH264Decoder(AVDDecoder):
 		ctx.dpb_pool = []
 
 	def refresh(self, sl):
+		self.refresh_sps(sl)
+		self.realloc_rbsp_size(sl)
+
+	def refresh_sps(self, sl):
 		ctx = self.ctx
 		sps_id = self.get_sps_id(sl)
 		if (sps_id == ctx.cur_sps_id):
@@ -113,46 +117,39 @@ class AVDH264Decoder(AVDDecoder):
 		ctx.inst_fifo_addrs = [0 for n in range(ctx.inst_fifo_count)]
 		self.allocator_move_up(0x4000)
 		for n in range(ctx.inst_fifo_count):
-			ctx.inst_fifo_addrs[n] = self.allocate(0x100000, pad=0x4000, name="inst_fifo%d" % n)
+			ctx.inst_fifo_addrs[n] = self.range_alloc(0x100000, pad=0x4000, name="inst_fifo%d" % n)
 		ctx.inst_fifo_iova = ctx.inst_fifo_addrs[ctx.inst_fifo_idx]
 
 		rvra_total_size = self.calc_rvra(is_422=sps.chroma_format_idc == H264_CHROMA_IDC_422)
 		ctx.rvra_count = ctx.max_dpb_frames + 1 + 1  # all refs + IDR + current
 		self.allocator_move_up(0x734000)
 		ctx.rvra_base_addrs = [0 for n in range(ctx.rvra_count)]
-		ctx.rvra_base_addrs[0] = self.allocate(rvra_total_size, pad=0x100, name="rvra0")
+		ctx.rvra_base_addrs[0] = self.range_alloc(rvra_total_size, pad=0x100, name="rvra0")
 
-		if (not(isdiv(ctx.width, 32))):
-			wr = round_up(ctx.width, 64)
-		else:
-			wr = ctx.width
-		ctx.luma_size = wr * ctx.height
-		ctx.y_addr = self.allocate(ctx.luma_size, name="disp_y")
-		ctx.chroma_size = wr * ctx.height
+		ctx.luma_size = round_up(ctx.width, 64) * round_up(ctx.height, 64)
+		ctx.y_addr = self.range_alloc(ctx.luma_size, name="disp_y")
+		ctx.chroma_size = round_up(ctx.width, 64) * round_up(ctx.height, 64)
 		if (sps.chroma_format_idc == H264_CHROMA_IDC_420):
 			ctx.chroma_size //= 2
-		ctx.uv_addr = self.allocate(ctx.chroma_size, name="disp_uv")
+		ctx.uv_addr = self.range_alloc(ctx.chroma_size, name="disp_uv")
 
-		slice_data_size = min((((round_up(ctx.width, 32) - 1) * (round_up(ctx.height, 32) - 1) // 0x8000) + 2), 0xff) * 0x4000
-		ctx.slice_data_addr = self.allocate(slice_data_size, align=0x4000, padb4=0x4000, name="slice_data")
+		ctx.slice_data_size = min((((round_up(ctx.width, 32) - 1) * (round_up(ctx.height, 32) - 1) // 0x8000) + 2), 0xff) * 0x4000
+		ctx.slice_data_addr = self.range_alloc(ctx.slice_data_size, align=0x4000, padb4=0x4000, name="slice_data")
 
 		ctx.sps_tile_count = 24
 		ctx.sps_tile_addrs = [0 for n in range(ctx.sps_tile_count)]
 		sps_tile_size = (((ctx.width - 1) * (ctx.height - 1) // 0x10000) + 2) * 0x4000
 		for n in range(ctx.sps_tile_count):
-			ctx.sps_tile_addrs[n] = self.allocate(sps_tile_size, name="sps_tile%d" % n)
+			ctx.sps_tile_addrs[n] = self.range_alloc(sps_tile_size, name="sps_tile%d" % n)
 
 		pps_tile_count = 5
 		ctx.pps_tile_addrs = [0 for n in range(pps_tile_count)]
 		for n in range(pps_tile_count):
-			if (n == 2) and (sps.level_idc >= 50): # literally fuck OFF
-				sz = 0xc000
-			else:
-				sz = 0x8000
-			ctx.pps_tile_addrs[n] = self.allocate(sz, name="pps_tile%d" % n)
+			size = (((ctx.width >> 11) + 1) * 0x4000) + 0x4000
+			ctx.pps_tile_addrs[n] = self.range_alloc(size, name="pps_tile%d" % n)
 
 		for n in range(ctx.rvra_count - 1):
-			ctx.rvra_base_addrs[n + 1] = self.allocate(rvra_total_size, name="rvra1_%d" % n)
+			ctx.rvra_base_addrs[n + 1] = self.range_alloc(rvra_total_size, name="rvra1_%d" % n)
 		self.dump_ranges()
 
 		ctx.dpb_pool = []
