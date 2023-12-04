@@ -45,7 +45,8 @@ Where
 https://github.com/eiln/avd/assets/113484710/e7ab13fb-6472-47bf-93d3-1dbfb2667994
 
 - What works:
-	- High Profile (100) i.e. 8-bit 4:2:0 I/P/B (i.e. normal x264 output)
+	- High Profile i.e. 8-bit 4:2:0 I/P/B (i.e. normal x264 output)
+	- High 4:2:2 Profile; tested less than 4:2:0 but I haven't seen it not work
 	- Up to hardware cap of 4096x4096 (that includes 4K)
 
 - Works in macOS but not in mine:
@@ -53,16 +54,16 @@ https://github.com/eiln/avd/assets/113484710/e7ab13fb-6472-47bf-93d3-1dbfb266799
 	- frame_num gaps. This is a 10-line fix if I can see a sample.
 	- Multiple slice groups. Ditto but 20
 	- ~~Scaling lists~~ Done
-	- 4:2:2 (just few quirks left)
 
 - Don't know if it works in macOS:
-	- Bitdepth > 8-bit
+	- ~~Bitdepth > 8-bit~~ Hardware can't, sorry.
 	- Top/bottom field coding (x264 doesn't support)
 	- Display formats other than NV12
 	- ~~I_PCM or anything else funny that I'll literally have to make a sample for~~ Works
 
 - No:
 	- SVC/MVC
+	- MBAFF/PAFF interlaced
 
 
 ### H.265 / HEVC
