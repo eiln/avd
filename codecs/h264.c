@@ -1108,6 +1108,11 @@ static int h264_parse_slice_header(struct h264_context *ctx, struct h264_slice *
 		sl->slice_group_change_cycle = get_bits(gb, s);
 	}
 
+	if (pps->entropy_coding_mode_flag) {
+		while (!bs_byte_aligned(gb))
+			skip_bits1(gb); /* cabac_alignment_zero_bit */
+	}
+
 	return 0;
 }
 
