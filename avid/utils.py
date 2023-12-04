@@ -6,8 +6,7 @@ def round_up(x, y): return ((x + (y - 1)) & (-y))
 def round_down(x, y): return (x - (x % y))
 def ceildiv(a, b): return -(a // -b)
 def rounddiv(a, b): return (a + b // 2) // b  # round up 0.5
-
-def swrap(x, w): return ((w + x) & ~w)
+def swrap(x, w): assert(abs(x) <= w); return (x & (w - 1))
 
 def isdiv(x, d): return ((x & (d - 1)) == 0)
 def ispow2(x): return (x != 0) and (x & (x - 1) == 0)

@@ -202,8 +202,8 @@ class AVDH264UnitTest(AVDUnitTest):
 			"hdr_38_mode",
 			"hdr_3c_height_width",
 			"hdr_40_zero",
-			"hdr_44_is_idr_mask",
-			"hdr_48_3de",
+			"hdr_44_flags",
+			"hdr_48_chroma_qp_index_offset",
 			"hdr_4c_pic_scaling_list_dims",
 			"hdr_54_height_width",
 			"hdr_58_const_3a",
@@ -235,15 +235,12 @@ class AVDH264UnitTest(AVDUnitTest):
 			"slc_76c_cmd_weights_denom",
 			"slc_770_cmd_weights_weights",
 			"slc_8f0_cmd_weights_offsets",
-			"slc_a70_cmd_slice_qpy",
-			"slc_a74_cmd_flags",
+			"slc_a70_cmd_quant_param",
+			"slc_a74_cmd_deblocking_filter",
 			"slc_a7c_cmd_set_coded_slice",
 			"slc_a78_sps_tile_addr2_lsb8",
-
-			#"inp_8b4d4_slice_addr_low",
-			#"inp_8b4d8_slice_hdr_size",
 		]
-		self.emu_ignore_keys = ["inp_8b4d4_slice_addr_low"]
+		self.emu_ignore_keys = ["slc_a84_slice_addr_low"]
 
 class AVDH265UnitTest(AVDUnitTest):
 	def __init__(self, **kwargs):

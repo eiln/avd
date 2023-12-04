@@ -167,17 +167,14 @@ class AVDH264HalV3(AVDHal):
 		push(x, "hdr_2c_sps_param")
 
 		x = 0
+		if (pps.entropy_coding_mode_flag):
+			x |= set_bit(20)
 		if (sl.nal_unit_type != H264_NAL_SLICE_IDR):
-			x |= 0x200000
-		if (pps.transform_8x8_mode_flag):
-			x |= 0x100000
-		push(x, "hdr_44_is_idr_mask")
+			x |= set_bit(21)
+		push(x, "hdr_44_flags")
 
-		if (pps.pic_scaling_matrix_present_flag): # this one I really can't tell
-			x = 0x0
-		else:
-			x = 0x3de
-		push(x, "hdr_48_3de")
+		x = swrap(pps.chroma_qp_index_offset, 32) << 5 | swrap(pps.second_chroma_qp_index_offset, 32)
+		push(x, "hdr_48_chroma_qp_index_offset")
 		push(0x30000a, "hdr_58_const_3a")
 		push(0x4020002, "cm3_dma_config_1")
 		push(0x20002, "cm3_dma_config_2")
@@ -187,7 +184,7 @@ class AVDH264HalV3(AVDHal):
 
 		push(0x4020002, "cm3_dma_config_3")
 		push(0x4020002, "cm3_dma_config_4")
-		push(0x0)
+		push(0x0, "cm3_mark_end_section")
 		push(ctx.pps_tile_addrs[1] >> 8, "hdr_9c_pps_tile_addr_lsb8", 1)
 		push(ctx.pps_tile_addrs[2] >> 8, "hdr_9c_pps_tile_addr_lsb8", 2)
 		push(ctx.pps_tile_addrs[3] >> 8, "hdr_9c_pps_tile_addr_lsb8", 3)
@@ -202,7 +199,7 @@ class AVDH264HalV3(AVDHal):
 		push((round_up(ctx.width, 64) >> 6) << 2, "hdr_218_width_align")
 		push(ctx.uv_addr >> 8, "hdr_214_uv_addr_lsb8")
 		push((round_up(ctx.width, 64) >> 6) << 2, "hdr_21c_width_align")
-		push(0x0)
+		push(0x0, "cm3_mark_end_section")
 		push((((ctx.height - 1) & 0xffff) << 16) | ((ctx.width - 1) & 0xffff), "hdr_54_height_width")
 
 		if (sl.nal_unit_type != H264_NAL_SLICE_IDR):
@@ -228,32 +225,31 @@ class AVDH264HalV3(AVDHal):
 		x |= (sl.luma_log2_weight_denom << 3) | sl.chroma_log2_weight_denom
 		push(x, "slc_76c_cmd_weights_denom")
 
-		def get_wbase(i, j): return 0x2de00000 | ((j + 1) * 0x4000) | (i * 0x200)
 		num = 0
 		for i in range(sl.num_ref_idx_l0_active_minus1 + 1):
 			if (sl.luma_weight_l0_flag[i]):
-				push(get_wbase(i, 0) | sl.luma_weight_l0[i], "slc_770_cmd_weights_weights", num)
+				push(0x2de00000 | 1 << 14 | i << 9 | sl.luma_weight_l0[i], "slc_770_cmd_weights_weights", num)
 				push(0x2df00000 | swrap(sl.luma_offset_l0[i], 0x10000), "slc_8f0_cmd_weights_offsets", num)
 				num += 1
 			if (sl.chroma_weight_l0_flag[i]):
-				push(get_wbase(i, 1) | sl.chroma_weight_l0[i][0], "slc_770_cmd_weights_weights", num)
+				push(0x2de00000 | 2 << 14 | i << 9 | sl.chroma_weight_l0[i][0], "slc_770_cmd_weights_weights", num)
 				push(0x2df00000 | swrap(sl.chroma_offset_l0[i][0], 0x10000), "slc_8f0_cmd_weights_offsets", num)
 				num += 1
-				push(get_wbase(i, 2) | sl.chroma_weight_l0[i][1], "slc_770_cmd_weights_weights", num)
+				push(0x2de00000 | 3 << 14 | i << 9 | sl.chroma_weight_l0[i][1], "slc_770_cmd_weights_weights", num)
 				push(0x2df00000 | swrap(sl.chroma_offset_l0[i][1], 0x10000), "slc_8f0_cmd_weights_offsets", num)
 				num += 1
 
 		if (sl.slice_type == H264_SLICE_TYPE_B):
 			for i in range(sl.num_ref_idx_l1_active_minus1 + 1):
 				if (sl.luma_weight_l1_flag[i]):
-					push(get_wbase(i, 0) | sl.luma_weight_l1[i], "slc_770_cmd_weights_weights", num)
+					push(0x2de00000 | 1 << 14 | i << 9 | sl.luma_weight_l1[i], "slc_770_cmd_weights_weights", num)
 					push(0x2df00000 | swrap(sl.luma_offset_l1[i], 0x10000), "slc_8f0_cmd_weights_offsets", num)
 					num += 1
 				if (sl.chroma_weight_l1_flag[i]):
-					push(get_wbase(i, 1) | sl.chroma_weight_l1[i][0], "slc_770_cmd_weights_weights", num)
+					push(0x2de00000 | 2 << 14 | i << 9 | sl.chroma_weight_l1[i][0], "slc_770_cmd_weights_weights", num)
 					push(0x2df00000 | swrap(sl.chroma_offset_l1[i][0], 0x10000), "slc_8f0_cmd_weights_offsets", num)
 					num += 1
-					push(get_wbase(i, 2) | sl.chroma_weight_l1[i][1], num)
+					push(0x2de00000 | 3 << 14 | i << 9 | sl.chroma_weight_l1[i][1], num)
 					push(0x2df00000 | swrap(sl.chroma_offset_l1[i][1], 0x10000), "slc_8f0_cmd_weights_offsets", num)
 					num += 1
 
@@ -262,22 +258,27 @@ class AVDH264HalV3(AVDHal):
 		pps = self.get_pps(ctx, sl)
 
 		x = 0
-		if (not pps.transform_8x8_mode_flag):
+		y = 15 if (pps.transform_8x8_mode_flag == 0 or sl.nal_unit_type == H264_NAL_SLICE_IDR) else 14
+		if (pps.entropy_coding_mode_flag == 0): # CAVLC
 			x = sl.nal_ref_idc
 			if (sl.nal_unit_type == H264_NAL_SLICE_IDR):
-				x += (sl.idr_pic_id * 2)
-		push(0x2d800000 | x << 0xf, "slc_a7c_cmd_set_coded_slice")
-		push(ctx.slice_data_addr + sl.get_payload_offset(), "inp_8b4d4_slice_addr_low")
-		push(sl.get_payload_size(), "inp_8b4d8_slice_hdr_size")
+				x += (sl.idr_pic_id * 2)  # I'm 99% sure this is wrong
+		push(0x2d800000 | x << y, "slc_a7c_cmd_set_coded_slice")
+		push(ctx.slice_data_addr + sl.get_payload_offset(), "slc_a84_slice_addr_low")
+		push(sl.get_payload_size(), "slc_a88_slice_hdr_size")
 		push(0x2c000000, "cm3_cmd_exec_mb_vp")
 		# ---- FW BP -----
 
-		push(0x2d900000 | ((26 + self.get_pps(ctx, sl).pic_init_qp_minus26 + sl.slice_qp_delta) * 0x400), "slc_a70_cmd_slice_qpy")
+		push(0x2d900000 | ((26 + self.get_pps(ctx, sl).pic_init_qp_minus26 + sl.slice_qp_delta) * 0x400), "slc_a70_cmd_quant_param")
+
 		x = 0
-		if (not pps.pic_scaling_matrix_present_flag):
-			x |= set_bit(16)
+		if (sl.disable_deblocking_filter_idc == 0):
 			x |= set_bit(17)
-		push(0x2da00000 | x, "slc_a74_cmd_flags")
+		if (sl.disable_deblocking_filter_idc != 1):
+			x |= set_bit(16)
+			x |= swrap(sl.slice_alpha_c0_offset_div2, 16) << 12
+			x |= swrap(sl.slice_beta_offset_div2, 16) << 8  # odd shift
+		push(0x2da00000 | x, "slc_a74_cmd_deblocking_filter")
 
 		if (sl.slice_type == H264_SLICE_TYPE_P) or (sl.slice_type == H264_SLICE_TYPE_B):
 			lx = 0
@@ -315,6 +316,8 @@ class AVDH264HalV3(AVDHal):
 					x |= sl.num_ref_idx_l1_active_minus1 << 7
 				else:
 					x |= pps.num_ref_idx_l1_default_active_minus1 << 7
+				if (not sl.direct_spatial_mb_pred_flag):
+					x |= 16 << 11
 		push(x, "slc_6e4_cmd_ref_type")
 
 		if (sl.slice_type == H264_SLICE_TYPE_B):
