@@ -1138,7 +1138,7 @@ int h264_decode_nal_unit(struct h264_context *ctx, uint8_t *buf, int size)
 
 	bs_init(&ctx->gb, rbsp_buf, rbsp_size);
 	gb = &ctx->gb;
-	start_pos = (((uint64_t)(void *)gb->p) * 8) + (8 - gb->bits_left);
+	start_pos = get_bits_pos(gb);
 	if (get_bits1(gb) != 0) {
 		h264_err("forbidden bit != 0\n");
 		goto exit;
@@ -1160,7 +1160,7 @@ int h264_decode_nal_unit(struct h264_context *ctx, uint8_t *buf, int size)
 			h264_err("failed to parse slice header\n");
 			goto exit;
 		}
-		end_pos = (((uint64_t)(void *)gb->p) * 8) + (8 - gb->bits_left);
+		end_pos = get_bits_pos(gb);
 		printf("\tslice_header_size = %ld\n", end_pos - start_pos);
 		h264_print_slice_header(ctx, sl);
 		break;
