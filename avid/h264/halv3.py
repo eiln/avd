@@ -178,12 +178,13 @@ class AVDH264HalV3(AVDHal):
 		pps = self.get_pps(ctx, sl)
 
 		x = 0x2dd00000
-		if (pps.weighted_pred_flag or pps.weighted_bipred_idc == 1):
-			if (sl.slice_type == H264_SLICE_TYPE_P):
-				x |= 0x40
-			else:
+		if ((sl.slice_type == H264_SLICE_TYPE_P) and pps.weighted_pred_flag):
+			x |= 0x40
+		elif ((sl.slice_type == H264_SLICE_TYPE_B) and (pps.weighted_bipred_idc == 1)):
+			x |= 0xad
+		else:
+			if ((sl.slice_type == H264_SLICE_TYPE_B) and (pps.weighted_bipred_idc == 2)):
 				x |= 0xad
-		if (sl.has_luma_weights == 0):
 			push(x, "slc_76c_cmd_weights_denom")
 			return
 		x |= (sl.luma_log2_weight_denom << 3) | sl.chroma_log2_weight_denom
