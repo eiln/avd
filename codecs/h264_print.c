@@ -347,7 +347,7 @@ void h264_print_pps(struct h264_pps *pps)
 	       pps->bottom_field_pic_order_in_frame_present_flag);
 
 	h264_field("num_slice_groups_minus1", pps->num_slice_groups - 1);
-	if (pps->num_slice_groups) {
+	if (pps->num_slice_groups > 1) {
 		h264_field("slice_group_map_type", pps->slice_group_map_type);
 		switch (pps->slice_group_map_type) {
 		case H264_SLICE_GROUP_MAP_INTERLEAVED:
