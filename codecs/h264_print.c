@@ -578,8 +578,9 @@ void h264_print_slice_header(struct h264_context *ctx, struct h264_slice *sl)
 			h264_print_dec_ref_base_pic_marking(sl, &sl->svc);
 	}
 
-	if (sl->slice_type != H264_SLICE_TYPE_I &&
-	    sl->slice_type != H264_SLICE_TYPE_SI)
+	if (pps->entropy_coding_mode_flag &&
+		sl->slice_type != H264_SLICE_TYPE_I &&
+		sl->slice_type != H264_SLICE_TYPE_SI)
 		h264_field("cabac_init_idc", sl->cabac_init_idc);
 
 	h264_field("slice_qp_delta", sl->slice_qp_delta);

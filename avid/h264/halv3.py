@@ -312,6 +312,8 @@ class AVDH264HalV3(AVDHal):
 				x |= sl.num_ref_idx_l1_active_minus1 << 7
 				if (not sl.direct_spatial_mb_pred_flag):
 					x |= 16 << 11
+			if (pps.entropy_coding_mode_flag):
+				x |= sl.cabac_init_idc << 5
 		push(x, "slc_6e4_cmd_ref_type")
 
 		if (sl.slice_type == H264_SLICE_TYPE_B):
