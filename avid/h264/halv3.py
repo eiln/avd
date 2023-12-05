@@ -276,8 +276,8 @@ class AVDH264HalV3(AVDHal):
 			x |= set_bit(17)
 		if (sl.disable_deblocking_filter_idc != 1):
 			x |= set_bit(16)
-			x |= swrap(sl.slice_alpha_c0_offset_div2, 16) << 12
-			x |= swrap(sl.slice_beta_offset_div2, 16) << 8  # odd shift
+			x |= swrap(sl.slice_beta_offset_div2, 16) << 12
+			x |= swrap(sl.slice_alpha_c0_offset_div2, 16) << 8
 		push(0x2da00000 | x, "slc_a74_cmd_deblocking_filter")
 
 		if (sl.slice_type == H264_SLICE_TYPE_P) or (sl.slice_type == H264_SLICE_TYPE_B):
