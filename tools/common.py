@@ -133,9 +133,9 @@ def bassert(x, y, msg="", nonfatal=False):
         assert(x == y)
 
 def getext(mode):
-    if (mode in ["vp9", "vp09", "av1", "av01"]): return ".ivf"
-    if (mode in ["h264", "avc"]): return ".h264"
-    if (mode in ["h265", "hevc"]): return ".h265"
+    if (mode in ["vp9", "vp09", "av1", "av01"]): return [".ivf"]
+    if (mode in ["h264", "avc"]): return [".h264", ".264"]
+    if (mode in ["h265", "hevc"]): return [".h265", ".265"]
 
 def mode2fourcc(mode):
     if (mode in ["h264", "avc"]): return "h264"
@@ -166,8 +166,9 @@ def resolve_input(path, isdir=False):
     if (isdir): return path
     if (not Path(path).exists()) or (os.path.isdir(path)):
         mode = os.path.split(os.path.split(path)[0])[1]
-        ext = getext(mode)
-        return path.as_posix() + ext
+        for ext in getext(mode):
+            p = path.as_posix() + ext
+            if (os.path.exists(p)): return p
     return path
 
 def get_fpcls(path):
