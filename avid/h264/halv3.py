@@ -39,19 +39,20 @@ class AVDH264HalV3(AVDHal):
 		push(0x70007, "cm3_dma_config_a")
 
 		pred = sl.pic.poc
-		for n,rvra in enumerate(ctx.dpb_list):
+		for n,pic in enumerate(ctx.dpb_list):
 			if (n == 0):
 				delta_base = 0
 			else:
 				delta_base = ctx.dpb_list[n-1].poc
-			delta = delta_base - rvra.poc
+			delta = delta_base - pic.poc
 			pred = pred + delta
-			x = ((len(ctx.dpb_list) - 1) * 0x10000000) | 0x1000000 | swrap(pred, 0x20000)
+			x = (len(ctx.dpb_list) - 1) << 28 | 0x1000000
+			x |= boolify(pic.flags & H264_FRAME_FLAG_LONG_REF) << 17 | swrap(pred, 1 << 17)
 			push(x, "hdr_d0_ref_hdr", n)
-			push((rvra.addr + self.rvra_offset(ctx, 0)) >> 7, "hdr_110_ref0_addr_lsb7", n)
-			push((rvra.addr + self.rvra_offset(ctx, 1)) >> 7, "hdr_150_ref1_addr_lsb7", n)
-			push((rvra.addr + self.rvra_offset(ctx, 2)) >> 7, "hdr_190_ref2_addr_lsb7", n)
-			push((rvra.addr + self.rvra_offset(ctx, 3)) >> 7, "hdr_1d0_ref3_addr_lsb7", n)
+			push((pic.addr + self.rvra_offset(ctx, 0)) >> 7, "hdr_110_ref0_addr_lsb7", n)
+			push((pic.addr + self.rvra_offset(ctx, 1)) >> 7, "hdr_150_ref1_addr_lsb7", n)
+			push((pic.addr + self.rvra_offset(ctx, 2)) >> 7, "hdr_190_ref2_addr_lsb7", n)
+			push((pic.addr + self.rvra_offset(ctx, 3)) >> 7, "hdr_1d0_ref3_addr_lsb7", n)
 
 	def set_scaling_list(self, ctx, sl):
 		push = self.push

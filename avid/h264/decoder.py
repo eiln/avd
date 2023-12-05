@@ -56,6 +56,7 @@ class AVDH264Decoder(AVDDecoder):
 		ctx.last_p_sps_tile_idx = 0
 		ctx.prev_poc_lsb = 0
 		ctx.prev_poc_msb = 0
+		ctx.max_lt_idx = -1
 		ctx.dpb_list = []
 		ctx.dpb_pool = []
 
@@ -218,7 +219,7 @@ class AVDH264Decoder(AVDDecoder):
 						lst[nidx] = lst[i]
 						nidx += 1
 			elif (mod == 2):
-				raise NotImplementedError("LT refs not support yet")
+				raise NotImplementedError("LT reordering not yet supported. pls send sample")
 
 		setattr(sl, f"list{lx}", lst)
 
@@ -228,9 +229,13 @@ class AVDH264Decoder(AVDDecoder):
 		short_refs = sorted(short_refs, key=lambda pic: pic.frame_num_wrap, reverse=True)
 		for ref in short_refs:
 			self.log(f"P: ST Refs: {ref}")
-		sl.list0 = short_refs
+		long_refs = [pic for pic in ctx.dpb_list if pic.flags & H264_FRAME_FLAG_LONG_REF]
+		long_refs = sorted(long_refs, key=lambda pic: pic.pic_num)
+		for ref in long_refs:
+			self.log(f"P: LT Refs: {ref}")
+		sl.list0 = short_refs + long_refs
 		if (sl.ref_pic_list_modification_flag_l0):
-			self.modify_ref_list(0, short_refs)
+			self.modify_ref_list(0, short_refs + long_refs)
 
 	def construct_ref_list_b(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
@@ -342,13 +347,13 @@ class AVDH264Decoder(AVDDecoder):
 		else:
 			raise NotImplementedError("pic_order_cnt_type (%d)" % (sps.pic_order_cnt_type))
 		ctx.poc_msb = poc_msb
-
 		sl.pic.poc = poc_msb + poc_lsb
 		sl.pic.access_idx = ctx.access_idx
 		self.construct_ref_list()
 
 	def finish_slice(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
+		sps = self.get_sps(sl)
 
 		if ((sl.nal_unit_type == H264_NAL_SLICE_IDR) or (sl.nal_ref_idc != 0)):
 			self.log(f"Adding pic to DPB {sl.pic}")
@@ -357,27 +362,63 @@ class AVDH264Decoder(AVDDecoder):
 
 		if ((sl.nal_unit_type != H264_NAL_SLICE_IDR) and (sl.nal_ref_idc == 0)):
 			# non reference picture
-			sl.pic.flags = 0
+			sl.pic.flags &= ~(H264_FRAME_FLAG_OUTPUT | H264_FRAME_FLAG_SHORT_REF)
 
 		if (sl.nal_ref_idc):
 			if (sl.nal_unit_type == H264_NAL_SLICE_IDR) or (sl.adaptive_ref_pic_marking_mode_flag == 0):
-				if (len(ctx.dpb_list) > self.get_sps(sl).max_num_ref_frames):
-					pic = sorted(ctx.dpb_list, key=lambda pic: pic.access_idx)[0]
-					self.log(f"Removing oldest ref {pic}")
-					pic.flags = 0
+				if (len(ctx.dpb_list) > max(sps.max_num_ref_frames, 1)):
+					short_refs = [pic for pic in ctx.dpb_list if pic.flags & H264_FRAME_FLAG_SHORT_REF]
+					if (len(short_refs) > 0):
+						pic = sorted(short_refs, key=lambda pic: pic.access_idx)[0]
+						self.log(f"Removing oldest ref {pic}")
+						pic.flags &= ~(H264_FRAME_FLAG_OUTPUT | H264_FRAME_FLAG_SHORT_REF)
 			else:
 				for i,opcode in enumerate(sl.memory_management_control_operation):
-					if (opcode == H264_MMCO_END): break
-					if (opcode == H264_MMCO_SHORT2UNUSED):
+					if (opcode == H264_MMCO_END):
+						break
+
+					elif (opcode == H264_MMCO_FORGET_SHORT):
 						pic_num_diff = sl.mmco_short_args[i] + 1  # abs_diff_pic_num_minus1
 						pic_num = sl.pic.pic_num - pic_num_diff
 						pic_num &= ctx.max_frame_num - 1
 						for pic in ctx.dpb_list:
 							if (pic.pic_num == pic_num):
 								self.log(f"MMCO: Removing short {pic}")
+								assert(pic.flags & H264_FRAME_FLAG_SHORT_REF)
 								pic.flags &= ~(H264_FRAME_FLAG_OUTPUT | H264_FRAME_FLAG_SHORT_REF)
+
+					elif (opcode == H264_MMCO_FORGET_LONG):
+						long_term_pic_num = sl.mmco_long_args[i]
+						for pic in ctx.dpb_list:
+							if (pic.pic_num == long_term_pic_num):
+								self.log(f"MMCO: Removing long {pic}")
+								assert(pic.flags & H264_FRAME_FLAG_LONG_REF)
+								pic.flags &= ~(H264_FRAME_FLAG_OUTPUT | H264_FRAME_FLAG_LONG_REF)
+
+					elif (opcode == H264_MMCO_SHORT_TO_LONG):
+						long_term_frame_idx = sl.mmco_long_args[i]
+						pic_num_diff = sl.mmco_short_args[i] + 1  # abs_diff_pic_num_minus1
+						pic_num = sl.pic.pic_num - pic_num_diff
+						pic_num &= ctx.max_frame_num - 1
+						for pic in ctx.dpb_list:
+							if (pic.pic_num == pic_num):
+								self.log(f"MMCO: Short to long {pic}")
+								assert(pic.flags & H264_FRAME_FLAG_SHORT_REF)
+								pic.flags &= ~(H264_FRAME_FLAG_SHORT_REF)
+								pic.flags |= H264_FRAME_FLAG_LONG_REF
+								pic.pic_num = long_term_frame_idx
+
+					elif (opcode == H264_MMCO_FORGET_LONG_MAX):
+						ctx.max_lt_idx = sl.mmco_long_args[i] - 1  # max_long_term_frame_idx_plus1
+						for pic in ctx.dpb_list:
+							if ((pic.flags & H264_FRAME_FLAG_LONG_REF) and (pic.pic_num >= ctx.max_lt_idx)):
+								self.log(f"MMCO: Removing long max {pic}")
+								assert(pic.flags & H264_FRAME_FLAG_LONG_REF)
+								pic.flags &= ~(H264_FRAME_FLAG_LONG_REF)
+
 					else:
 						raise ValueError("opcode %d not implemented. probably LT ref. pls send sample" % (opcode))
+
 		ctx.dpb_list = [pic for pic in ctx.dpb_list if (pic.flags & H264_FRAME_FLAG_OUTPUT)]
 
 		ctx.prev_poc_lsb = sl.pic_order_cnt_lsb
