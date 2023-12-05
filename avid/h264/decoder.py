@@ -262,11 +262,8 @@ class AVDH264Decoder(AVDDecoder):
 		cand = None
 
 		for pic in ctx.dpb_pool:
-			if (pic.flags & H264_FRAME_FLAG_UNUSED): # fill pool at init
+			if (pic.flags & H264_FRAME_FLAG_UNUSED): # fill pool at init / drain by poc order sorted at IDR
 				pic.flags &= ~(H264_FRAME_FLAG_UNUSED)
-				return pic
-			if (pic.flags & H264_FRAME_FLAG_DRAIN):  # drain by poc order sorted at IDR
-				pic.flags &= ~(H264_FRAME_FLAG_DRAIN)
 				return pic
 
 		ctx.dpb_pool = sorted(ctx.dpb_pool, key=lambda x:x.poc)
@@ -280,7 +277,7 @@ class AVDH264Decoder(AVDDecoder):
 		if (sl.nal_unit_type == H264_NAL_SLICE_IDR):
 			for pic in ctx.dpb_pool:
 				if (not pic.idx == cand.idx):
-					pic.flags |= H264_FRAME_FLAG_DRAIN
+					pic.flags |= H264_FRAME_FLAG_UNUSED
 			ctx.dpb_list = []  # clear DPB on IDR
 
 		return cand
