@@ -553,25 +553,19 @@ void h264_print_slice_header(struct h264_context *ctx, struct h264_slice *sl)
 		h264_field("delta_pic_order_cnt[1]", sl->delta_pic_order_cnt[1]);
 		break;
 	}
+
 	h264_field("redundant_pic_cnt", sl->redundant_pic_cnt);
 	if (sl->slice_type == H264_SLICE_TYPE_B)
-		h264_field("direct_spatial_mb_pred_flag",
-		       sl->direct_spatial_mb_pred_flag);
+		h264_field("direct_spatial_mb_pred_flag", sl->direct_spatial_mb_pred_flag);
 
-	if (sl->slice_type != H264_SLICE_TYPE_I &&
-	    sl->slice_type != H264_SLICE_TYPE_SI) {
-		h264_field("num_ref_idx_active_override_flag",
-		       sl->num_ref_idx_active_override_flag);
-		h264_field("num_ref_idx_l0_active_minus1",
-		       sl->num_ref_idx_l0_active - 1);
+	if (sl->slice_type_nos == H264_SLICE_TYPE_P || sl->slice_type_nos == H264_SLICE_TYPE_B) {
+		h264_field("num_ref_idx_active_override_flag", sl->num_ref_idx_active_override_flag);
+		h264_field("num_ref_idx_l0_active_minus1", sl->num_ref_idx_l0_active - 1);
 		if (sl->slice_type == H264_SLICE_TYPE_B)
-			h264_field("num_ref_idx_l1_active_minus1",
-			       sl->num_ref_idx_l1_active - 1);
-		h264_print_ref_pic_list_modification(&sl->ref_pic_list_modification_l0,
-						     "l0");
+			h264_field("num_ref_idx_l1_active_minus1", sl->num_ref_idx_l1_active - 1);
+		h264_print_ref_pic_list_modification(&sl->ref_pic_list_modification_l0, "l0");
 		if (sl->slice_type == H264_SLICE_TYPE_B)
-			h264_print_ref_pic_list_modification(
-				&sl->ref_pic_list_modification_l1, "l1");
+			h264_print_ref_pic_list_modification(&sl->ref_pic_list_modification_l1, "l1");
 	}
 
 	if (sl->has_luma_weights)

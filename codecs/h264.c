@@ -1009,6 +1009,10 @@ static int h264_parse_slice_header(struct h264_context *ctx, struct h264_slice *
 	sl->has_luma_weights = 0;
 	sl->has_chroma_weights = 0;
 
+	if (sl->slice_type_nos == H264_SLICE_TYPE_P || sl->slice_type == H264_SLICE_TYPE_B)
+		sl->num_ref_idx_l0_active = pps->num_ref_idx_l0_default_active;
+	if (sl->slice_type == H264_SLICE_TYPE_B)
+		sl->num_ref_idx_l1_active = pps->num_ref_idx_l1_default_active;
 	if (!sps->is_svc || sl->svc.quality_id == 0) {
 		if (sl->slice_type == H264_SLICE_TYPE_B)
 			sl->direct_spatial_mb_pred_flag = get_bits1(gb);
@@ -1016,21 +1020,15 @@ static int h264_parse_slice_header(struct h264_context *ctx, struct h264_slice *
 			sl->num_ref_idx_active_override_flag = get_bits1(gb);
 			if (sl->num_ref_idx_active_override_flag) {
 				sl->num_ref_idx_l0_active = get_ue_golomb(gb) + 1;
-				if (sl->slice_type_nos == H264_SLICE_TYPE_B)
+				if (sl->slice_type == H264_SLICE_TYPE_B)
 					sl->num_ref_idx_l1_active = get_ue_golomb(gb) + 1;
-			} else {
-				sl->num_ref_idx_l0_active = pps->num_ref_idx_l0_default_active;
-				if (sl->slice_type_nos == H264_SLICE_TYPE_B) {
-					sl->num_ref_idx_l1_active = pps->num_ref_idx_l1_default_active;
-				}
 			}
-
 			if (sl->num_ref_idx_l0_active >= H264_MAX_REFS) {
 				h264_err("num_ref_idx_l0_active (%d) out of bounds\n",
 					sl->num_ref_idx_l0_active);
 				return -1;
 			}
-			if (sl->slice_type_nos == H264_SLICE_TYPE_B &&
+			if (sl->slice_type == H264_SLICE_TYPE_B &&
 				sl->num_ref_idx_l1_active >= H264_MAX_REFS) {
 				h264_err("num_ref_idx_l1_active (%d) out of bounds\n",
 					sl->num_ref_idx_l1_active);

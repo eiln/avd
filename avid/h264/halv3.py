@@ -307,15 +307,9 @@ class AVDH264HalV3(AVDHal):
 		elif (sl.slice_type == H264_SLICE_TYPE_B):
 			x |= 0x40000
 		if ((sl.slice_type == H264_SLICE_TYPE_P) or (sl.slice_type == H264_SLICE_TYPE_B)):
-			if (sl.num_ref_idx_active_override_flag):
-				x |= sl.num_ref_idx_l0_active_minus1 << 11
-			else:
-				x |= pps.num_ref_idx_l0_default_active_minus1 << 11
+			x |= sl.num_ref_idx_l0_active_minus1 << 11
 			if (sl.slice_type == H264_SLICE_TYPE_B):
-				if (sl.num_ref_idx_active_override_flag):
-					x |= sl.num_ref_idx_l1_active_minus1 << 7
-				else:
-					x |= pps.num_ref_idx_l1_default_active_minus1 << 7
+				x |= sl.num_ref_idx_l1_active_minus1 << 7
 				if (not sl.direct_spatial_mb_pred_flag):
 					x |= 16 << 11
 		push(x, "slc_6e4_cmd_ref_type")
