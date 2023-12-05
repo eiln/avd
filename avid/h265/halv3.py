@@ -160,32 +160,31 @@ class AVDH265HalV3(AVDHal):
 		x |= (sl.luma_log2_weight_denom << 3) | sl.chroma_log2_weight_denom
 		push(x, "slc_b08_cmd_weights_denom")
 
-		def get_wbase(i, j): return 0x2de00000 | ((j + 1) * 0x4000) | (i * 0x200)
 		num = 0
 		for i in range(sl.num_ref_idx_l0_active_minus1 + 1):
 			if (sl.luma_weight_l0_flag[i]):
-				push(get_wbase(i, 0) | sl.luma_weight_l0[i], "slc_b0c_cmd_weights_weights", num)
+				push(0x2de00000 | 1 << 14 | i << 9 | sl.luma_weight_l0[i], "slc_b0c_cmd_weights_weights", num)
 				push(0x2df00000 | swrap(sl.luma_offset_l0[i], 0x10000), "slc_b6c_cmd_weights_offsets", num)
 				num += 1
 			if (sl.chroma_weight_l0_flag[i]):
-				push(get_wbase(i, 1) | sl.chroma_weight_l0[i][0], "slc_b0c_cmd_weights_weights", num)
+				push(0x2de00000 | 2 << 14 | i << 9 | sl.chroma_weight_l0[i][0], "slc_b0c_cmd_weights_weights", num)
 				push(0x2df00000 | swrap(sl.chroma_offset_l0[i][0], 0x10000), "slc_b6c_cmd_weights_offsets", num)
 				num += 1
-				push(get_wbase(i, 2) | sl.chroma_weight_l0[i][1], "slc_b0c_cmd_weights_weights", num)
+				push(0x2de00000 | 3 << 14 | i << 9 | sl.chroma_weight_l0[i][1], "slc_b0c_cmd_weights_weights", num)
 				push(0x2df00000 | swrap(sl.chroma_offset_l0[i][1], 0x10000), "slc_b6c_cmd_weights_offsets", num)
 				num += 1
 
 		if (sl.slice_type == HEVC_SLICE_B):
 			for i in range(sl.num_ref_idx_l1_active_minus1 + 1):
 				if (sl.luma_weight_l1_flag[i]):
-					push(get_wbase(i, 0) | sl.luma_weight_l1[i], "slc_b0c_cmd_weights_weights", num)
+					push(0x2de00000 | 1 << 14 | i << 9 | sl.luma_weight_l1[i], "slc_b0c_cmd_weights_weights", num)
 					push(0x2df00000 | swrap(sl.luma_offset_l1[i], 0x10000), "slc_b6c_cmd_weights_offsets", num)
 					num += 1
 				if (sl.chroma_weight_l1_flag[i]):
-					push(get_wbase(i, 1) | sl.chroma_weight_l1[i][0], "slc_b0c_cmd_weights_weights", num)
+					push(0x2de00000 | 2 << 14 | i << 9 | sl.chroma_weight_l1[i][0], "slc_b0c_cmd_weights_weights", num)
 					push(0x2df00000 | swrap(sl.chroma_offset_l1[i][0], 0x10000), "slc_b6c_cmd_weights_offsets", num)
 					num += 1
-					push(get_wbase(i, 2) | sl.chroma_weight_l1[i][1], num)
+					push(0x2de00000 | 3 << 14 | i << 9 | sl.chroma_weight_l1[i][1], num)
 					push(0x2df00000 | swrap(sl.chroma_offset_l1[i][1], 0x10000), "slc_b6c_cmd_weights_offsets", num)
 					num += 1
 
@@ -197,7 +196,7 @@ class AVDH265HalV3(AVDHal):
 		push(0x2c000000, "cm3_cmd_exec_mb_vp")
 		# ---- FW BP -----
 
-		push(0x2d900000 | ((26 + self.get_pps(ctx, sl).pic_init_qp_minus26 + sl.slice_qp_delta) * 0x400), "slc_bcc_cmd_slice_qp")
+		push(0x2d900000 | ((26 + self.get_pps(ctx, sl).pic_init_qp_minus26 + sl.slice_qp_delta) * 0x400), "slc_bcc_cmd_quantization")
 
 		x = 0
 		x |= set_bit(6)
@@ -206,7 +205,7 @@ class AVDH265HalV3(AVDHal):
 		if (sl.slice_loop_filter_across_slices_enabled_flag):
 			x |= set_bit(17)
 		x |= set_bit(18)
-		push(0x2da00000 | x, "slc_bd0_cmd_flags")
+		push(0x2da00000 | x, "slc_bd0_cmd_deblocking_filter")
 
 		if (sl.slice_type == HEVC_SLICE_P) or (sl.slice_type == HEVC_SLICE_B):
 			num = 0

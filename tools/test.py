@@ -275,8 +275,8 @@ class AVDH265UnitTest(AVDUnitTest):
 			"hdr_1bc_width_align",
 			"hdr_1c0_width_align",
 
-			"slc_bcc_cmd_slice_qp",
-			"slc_bd0_cmd_flags",
+			"slc_bcc_cmd_quantization",
+			"slc_bd0_cmd_deblocking_filter",
 			"slc_b08_cmd_weights_denom",
 			"slc_b0c_cmd_weights_weights",
 			"slc_b6c_cmd_weights_offsets",
