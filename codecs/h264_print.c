@@ -434,7 +434,6 @@ static void h264_print_pred_weight_table(struct h264_slice *sl)
 {
 	uint32_t i;
 
-	h264_field("has_chroma_weights", sl->has_chroma_weights);
 	h264_field("luma_log2_weight_denom", sl->luma_log2_weight_denom);
 	h264_field("chroma_log2_weight_denom", sl->chroma_log2_weight_denom);
 
@@ -575,7 +574,6 @@ void h264_print_slice_header(struct h264_context *ctx, struct h264_slice *sl)
 				&sl->ref_pic_list_modification_l1, "l1");
 	}
 
-	h264_field("has_luma_weights", sl->has_luma_weights);
 	if (sl->has_luma_weights)
 		h264_print_pred_weight_table(sl);
 
