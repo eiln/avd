@@ -119,6 +119,8 @@ class AVDDecoder:
 			ctx.rvra_size3 = 0x4300
 			if (is_422):
 				ctx.rvra_size3 = 0x6f00
+		elif (ctx.width == 176 and ctx.height == 144):
+			ctx.rvra_size3 = 0x5700
 		elif (ctx.width == 352 and ctx.height == 288):
 			ctx.rvra_size3 = 0x7a00
 		elif (ctx.width == 1024 and ctx.height == 512):

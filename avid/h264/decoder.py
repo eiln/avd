@@ -95,8 +95,9 @@ class AVDH264Decoder(AVDDecoder):
 		assert(width_mbs == (sps.pic_width_in_mbs_minus1 + 1))
 		assert(height_mbs == (sps.pic_height_in_map_units_minus1 + 1))
 
-		level = [level for level in h264_levels if level[1] == sps.level_idc][0]
+		level = [level for level in h264_levels if level[1] == sps.level_idc][-1]
 		ctx.max_dpb_frames = min((level[5]) // (width_mbs * height_mbs), 16) # max_dpb_mbs
+		ctx.rvra_count = ctx.max_dpb_frames + 1 + 1  # all refs + IDR + current
 		assert((width_mbs * height_mbs) <= level[4]) # MaxFS
 		assert(width_mbs <= sqrt(level[4] * 8))
 		assert(height_mbs <= sqrt(level[4] * 8))
@@ -121,7 +122,6 @@ class AVDH264Decoder(AVDDecoder):
 		ctx.inst_fifo_iova = ctx.inst_fifo_addrs[ctx.inst_fifo_idx]
 
 		rvra_total_size = self.calc_rvra(is_422=sps.chroma_format_idc == H264_CHROMA_IDC_422)
-		ctx.rvra_count = ctx.max_dpb_frames + 1 + 1  # all refs + IDR + current
 		self.allocator_move_up(0x734000)
 		ctx.rvra_base_addrs = [0 for n in range(ctx.rvra_count)]
 		ctx.rvra_base_addrs[0] = self.range_alloc(rvra_total_size, pad=0x100, name="rvra0")
