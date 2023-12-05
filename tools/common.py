@@ -161,8 +161,8 @@ def resolve_datadir(path):
         return (Path(__file__).parent / ('../data/%s' % (path))).resolve()
     return path
 
-def resolve_input(path, isdir=False):
-    path = resolve_datadir(path)
+def resolve_input(path, isdir=False, mode=""):
+    path = resolve_datadir(os.path.join(mode, path) if mode else path)
     if (isdir): return path
     if (not Path(path).exists()) or (os.path.isdir(path)):
         mode = os.path.split(os.path.split(path)[0])[1]
@@ -186,3 +186,16 @@ def get_fpcls(path):
     else:
         raise ValueError("Not supported")
     return fpcls
+
+def get_decoder(mode):
+    if  (mode == "h264"):
+        from avid.h264.decoder import AVDH264Decoder
+        return AVDH264Decoder
+    elif (mode == "h265"):
+        from avid.h265.decoder import AVDH265Decoder
+        return AVDH265Decoder
+    elif (mode == "vp09"):
+        from avid.vp9.decoder import AVDVP9Decoder
+        return AVDVP9Decoder
+    else:
+        raise ValueError("Codec %s not supported" % mode)

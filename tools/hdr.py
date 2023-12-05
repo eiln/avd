@@ -7,38 +7,30 @@ sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 import argparse
 from tools.common import ffprobe, resolve_input
 
-def parse_headers(path, num=0):
+def parse_headers(path, num=0, nal_stop=0):
 	ed = (None)
 	mode = ffprobe(path)
 	if (mode == "h264"):
 		from avid.h264.parser import AVDH264Parser
 		parser = AVDH264Parser()
-		sps_list, pps_list, units = parser.parse(path, num=num, nal_stop=1)
+		sps_list, pps_list, units = parser.parse(path, num=num, nal_stop=0)
 		ed = (sps_list, pps_list)
 	elif (mode == "h265"):
 		from avid.h265.parser import AVDH265Parser
 		parser = AVDH265Parser()
-		vps_list, sps_list, pps_list, units = parser.parse(path, num=num, nal_stop=1)
+		vps_list, sps_list, pps_list, units = parser.parse(path, num=num, nal_stop=0)
 		ed = (vps_list, sps_list, pps_list)
 	elif (mode == "vp09"):
 		from avid.vp9.parser import AVDVP9Parser
 		parser = AVDVP9Parser()
-		units = parser.parse(path)
+		units = parser.parse(path, num=num, do_probs=0)
 	else:
-		raise ValueError("Not supported")
+		raise ValueError("Mode %s not supported" % (mode))
 	return units, ed
 
-if __name__ == "__main__":
-	parser = argparse.ArgumentParser(prog='Show bitstream headers')
-	parser.add_argument('input', type=str, help="path to bitstream")
-	parser.add_argument('-s', '--start', type=int, default=0, help="start index")
-	parser.add_argument('-n', '--num', type=int, default=1, help="count from start")
-	parser.add_argument('-a', '--all', action='store_true', help="run all")
-	args = parser.parse_args()
-
-	path = resolve_input(args.input)
+def print_headers(path, num, nal_stop=0):
 	mode = ffprobe(path)
-	units, ed = parse_headers(path, num=args.num)
+	units, ed = parse_headers(path, num=num, nal_stop=nal_stop)
 	if  (mode == "h264" or mode == "h265"):
 		if (mode == "h264"):
 			sps_list, pps_list = ed
@@ -53,5 +45,18 @@ if __name__ == "__main__":
 		for n in range(len(pps_list)):
 			if (pps_list[n]):
 				print(pps_list[n])
+	return units
+
+if __name__ == "__main__":
+	parser = argparse.ArgumentParser(prog='Show bitstream headers')
+	parser.add_argument('input', type=str, help="path to bitstream")
+	parser.add_argument('-s', '--start', type=int, default=0, help="start index")
+	parser.add_argument('-n', '--num', type=int, default=1, help="count from start")
+	parser.add_argument('-a', '--all', action='store_true', help="run all")
+	args = parser.parse_args()
+
+	path = resolve_input(args.input)
+	mode = ffprobe(path)
+	units = print_headers(path, num=args.num, nal_stop=0)
 	for unit in units[args.start:args.start+args.num]:
 		print(unit)

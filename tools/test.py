@@ -9,11 +9,6 @@ import os
 
 from avid.fp import *
 from avid.utils import *
-from avid.h264.decoder import AVDH264Decoder
-from avid.h265.decoder import AVDH265Decoder
-from avid.vp9.decoder import AVDVP9Decoder
-from avd_emu import AVDEmulator
-
 from tools.common import *
 
 class AVDUnitTest:
@@ -40,7 +35,7 @@ class AVDUnitTest:
 		if (x1 == 0): return # they fill out N/A fields
 		if (x0 != x1) and (not (self.args.debug_mode)):
 			print(sl)
-		cassert(x0, x1, name, fatal=not self.args.nonfatal)
+		cassert(x0, x1, name, fatal=not self.args.non_fatal)
 
 	def diff_fp(self, sl, fp0, fp1, args):
 		for cand in self.fp_keys:
@@ -162,6 +157,7 @@ class AVDUnitTest:
 				self.log(s + diff)
 
 	def test_emu(self, args):
+		from avd_emu import AVDEmulator
 		self.dec.hal.stfu = True
 		self.emu = AVDEmulator(args.firmware, stfu=True)
 		self.emu.start()
@@ -191,8 +187,8 @@ class AVDUnitTest:
 		self.log(hl(f"Emu test '{args.dir}' ({count} frames) all good", ANSI_GREEN))
 
 class AVDH264UnitTest(AVDUnitTest):
-	def __init__(self, **kwargs):
-		super().__init__(AVDH264Decoder, **kwargs)
+	def __init__(self, dec, **kwargs):
+		super().__init__(dec, **kwargs)
 		self.name = hl("H264", ANSI_BLUE)
 		self.fp_keys = [
 			"hdr_28_height_width_shift3",
@@ -243,8 +239,8 @@ class AVDH264UnitTest(AVDUnitTest):
 		self.emu_ignore_keys = ["slc_a84_slice_addr_low"]
 
 class AVDH265UnitTest(AVDUnitTest):
-	def __init__(self, **kwargs):
-		super().__init__(AVDH265Decoder, **kwargs)
+	def __init__(self, dec, **kwargs):
+		super().__init__(dec, **kwargs)
 		self.name = hl("H265", ANSI_PURPLE)
 		self.fp_keys = [
 			"hdr_4c_cmd_start_hdr",
@@ -287,8 +283,8 @@ class AVDH265UnitTest(AVDUnitTest):
 		]
 
 class AVDVP9UnitTest(AVDUnitTest):
-	def __init__(self, **kwargs):
-		super().__init__(AVDVP9Decoder, **kwargs)
+	def __init__(self, dec, **kwargs):
+		super().__init__(dec, **kwargs)
 		self.name = hl("VP9", ANSI_GREEN)
 		self.fp_keys = [
 			"hdr_28_height_width_shift3",
@@ -354,7 +350,6 @@ class AVDVP9UnitTest(AVDUnitTest):
 		ret = 0
 		count = 0
 		for i in range(num):
-			#pidx = i * 4 + (i % 4)
 			pidx = i
 			if (pidx > len(paths)):
 				break
@@ -383,10 +378,64 @@ class AVDVP9UnitTest(AVDUnitTest):
 			count += 1
 		self.log(hl(f"Prob test '{args.dir}' ({count} frames) all good", ANSI_GREEN))
 
+def test(args):
+	if ((not args.list_data) and (args.list_data) or (args.mode and not (args.dir or args.input))):
+		args.list_data = [args.mode]
+	if (args.list_data) or (args.mode and not (args.dir or args.input)):
+		for x in args.list_data:
+			print(f"codec: {x}")
+			dname = resolve_input(x, isdir=True)
+			print(dname)
+			paths = [d for d in os.listdir(dname) if os.path.isdir(os.path.join(dname, d))]
+			for p in sorted(paths):
+				print(f"\t{p}")
+			print()
+		return
+
+	args.dir = resolve_input(args.dir, isdir=True, mode=args.mode)
+	args.input = resolve_input(args.dir)
+	if (not (args.test_fp or args.test_emu or args.test_probs)):
+		if (args.show_headers):
+			from tools.hdr import print_headers
+			headers = print_headers(args.input, args.num)
+			for x in headers[:args.num]:
+				print(x)
+		return
+
+	if (not args.mode):
+		args.mode = ffprobe(args.dir)
+
+	if (args.show_all):
+		args.debug_mode = 1
+
+	if  (args.mode == "h264"):
+		from avid.h264.decoder import AVDH264Decoder
+		ut = AVDH264UnitTest(AVDH264Decoder, **vars(args))
+	elif (args.mode == "h265"):
+		from avid.h265.decoder import AVDH265Decoder
+		ut = AVDH265UnitTest(AVDH265Decoder, **vars(args))
+	elif (args.mode == "vp09"):
+		from avid.vp9.decoder import AVDVP9Decoder
+		ut = AVDVP9UnitTest(AVDVP9Decoder, **vars(args))
+	else:
+		raise ValueError("Codec %s not supported" % args.mode)
+
+	if (args.test_fp):
+		ut.test_fp(args)
+	if (args.test_emu):
+		args.firmware = resolve_input(args.firmware)
+		ut.test_emu(args)
+	if (args.test_probs):
+		import numpy as np
+		ut.test_probs(args)
+
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(prog='Unit test')
+	parser.add_argument('-m', '--mode', type=str, default="", help="codec mode")
 	parser.add_argument('-i', '--input', type=str, default="", help="path to bitstream")
-	parser.add_argument('-d', '--dir', type=str, required=True, help="matching trace dir")
+	parser.add_argument('-d', '--dir', type=str, default="", help="matching trace dir")
+	parser.add_argument('-l','--list-data', nargs='+', type=str, help="list test data for codecs")
+
 	parser.add_argument('-f', '--firmware', type=str, default="j293ap-13.5-viola-firmware.bin")
 	parser.add_argument('-p', '--prefix', type=str, default="",  help="dir prefix")
 	parser.add_argument('-n', '--num', type=int, default=1, help="count from start")
@@ -400,7 +449,7 @@ if __name__ == "__main__":
 
 	parser.add_argument('-u', '--debug-mode', action='store_true')
 	parser.add_argument('-b', '--show-bits', action='store_true')
-	parser.add_argument('-nf', '--nonfatal', action='store_true')
+	parser.add_argument('-nf', '--non-fatal', action='store_true')
 	parser.add_argument('-ns', '--nal-stop', action='store_true')
 
 	parser.add_argument('-sa', '--show-all', action='store_true')
@@ -410,23 +459,4 @@ if __name__ == "__main__":
 	parser.add_argument('-sf', '--show-fp', action='store_true')
 
 	args = parser.parse_args()
-	args.firmware = resolve_input(args.firmware)
-	args.dir = resolve_input(args.dir, isdir=True)
-	args.input = resolve_input(args.dir)
-	mode = ffprobe(args.dir)
-	if  (mode == "h264"):
-		ut = AVDH264UnitTest(**vars(args))
-	elif (mode == "h265"):
-		ut = AVDH265UnitTest(**vars(args))
-	elif (mode == "vp09"):
-		ut = AVDVP9UnitTest(**vars(args))
-	else:
-		raise ValueError("Codec %s not supported" % mode)
-
-	if (args.test_fp):
-		ut.test_fp(args)
-	if (args.test_emu):
-		ut.test_emu(args)
-	if (args.test_probs):
-		import numpy as np
-		ut.test_probs(args)
+	test(args)
