@@ -257,13 +257,10 @@ class AVDH264HalV3(AVDHal):
 		push = self.push
 		pps = self.get_pps(ctx, sl)
 
-		x = 0
-		y = 15 if (pps.transform_8x8_mode_flag == 0 or sl.nal_unit_type == H264_NAL_SLICE_IDR) else 14
-		if (pps.entropy_coding_mode_flag == 0): # CAVLC
-			x = sl.nal_ref_idc
-			if (sl.nal_unit_type == H264_NAL_SLICE_IDR):
-				x += (sl.idr_pic_id * 2)  # I'm 99% sure this is wrong
-		push(0x2d800000 | x << y, "slc_a7c_cmd_set_coded_slice")
+		x = 0  # CABAC we skipped cabac_alignment_bit
+		if (pps.entropy_coding_mode_flag == 0): # CAVLC we didn't
+			x = sl.slice_header_size % 8
+		push(0x2d800000 | x << 15, "slc_a7c_cmd_set_coded_slice")
 		push(ctx.slice_data_addr + sl.get_payload_offset(), "slc_a84_slice_addr_low")
 		push(sl.get_payload_size(), "slc_a88_slice_hdr_size")
 		push(0x2c000000, "cm3_cmd_exec_mb_vp")
