@@ -88,7 +88,12 @@ class AVDH264Decoder(AVDDecoder):
 
 		assert((64 <= width and width <= 4096) and (64 <= height and height <= 4096)) # hardware caps
 		assert(not(width & 15) and not(height & 15)) # hardware caps
+
 		ctx.max_frame_num = 1 << (sps.log2_max_frame_num_minus4 + 4)
+		if (sps.vui_parameters_present_flag):
+			ctx.num_reorder_frames = sps.num_reorder_frames + 1
+		else:
+			ctx.num_reorder_frames = sps.max_num_ref_frames
 
 		width_mbs = (sps.pic_width_in_mbs_minus1 + 1)
 		height_mbs = (2 - sps.frame_mbs_only_flag) * (sps.pic_height_in_map_units_minus1 + 1)

@@ -169,6 +169,7 @@ void h264_print_sps(struct h264_sps *sps)
 	h264_field("frame_crop_top_offset", sps->frame_crop_top_offset);
 	h264_field("frame_crop_bottom_offset", sps->frame_crop_bottom_offset);
 
+	h264_field("vui_parameters_present_flag", sps->vui_parameters_present_flag);
 	if (sps->vui_parameters_present_flag) {
 		struct h264_vui *vui = &sps->vui;
 		printf("\tVUI parameters:\n");
