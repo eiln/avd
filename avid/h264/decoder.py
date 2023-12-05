@@ -14,7 +14,7 @@ from dataclasses import dataclass
 class AVDH264Ctx(dotdict):
 	pass
 
-@dataclass
+@dataclass(slots=True)
 class AVDH264Picture:
 	idx: int
 	addr: int
@@ -22,12 +22,10 @@ class AVDH264Picture:
 	poc: int
 	frame_num_wrap: int
 	flags: int
+	access_idx: int
 
 	def __repr__(self):
 		return f"[idx: {str(self.idx).rjust(2)} addr: {hex(self.addr >> 7).ljust(2+5)} pic_num: {str(self.pic_num).rjust(2)} poc: {str(self.poc).rjust(3)} fn: {str(self.frame_num_wrap).rjust(2)} flags: {format(self.flags, '010b')}]"
-
-	def unref(self):
-		self.flags = 0
 
 class AVDH264Decoder(AVDDecoder):
 	def __init__(self):
@@ -174,14 +172,13 @@ class AVDH264Decoder(AVDDecoder):
 
 		ctx.dpb_pool = []
 		for i in range(ctx.rvra_count):
-			pic = AVDH264Picture(addr=ctx.rvra_base_addrs[i], idx=i, pic_num=-1, poc=-1, frame_num_wrap=-1, flags=H264_FRAME_FLAG_UNUSED)
+			pic = AVDH264Picture(addr=ctx.rvra_base_addrs[i], idx=i, pic_num=-1, poc=-1, frame_num_wrap=-1, flags=H264_FRAME_FLAG_UNUSED, access_idx=-1)
 			ctx.dpb_pool.append(pic)
 			self.log(f"DPB Pool: {pic}")
 
 	def setup(self, path, num=0, nal_stop=0, **kwargs):
 		sps_list, pps_list, slices = self.parser.parse(path, num, nal_stop, **kwargs)
 		self.new_context(sps_list, pps_list)
-		# realistically we'd have the height/width as metadata w/o relying on sps
 		return slices
 
 	def get_short_ref_by_num(self, lst, pic_num):
@@ -189,9 +186,9 @@ class AVDH264Decoder(AVDDecoder):
 		assert(len(cands) == 1)
 		return cands[0]
 
-	def modify_ref_list(self, lst, lx):
+	def modify_ref_list(self, lx, short_refs):
 		ctx = self.ctx; sl = self.ctx.active_sl
-		assert(sl[f"ref_pic_list_modification_flag_l{lx}"])
+		lst = getattr(sl, f"list{lx}")
 		modification_of_pic_nums_idc = sl[f"modification_of_pic_nums_idc_l{lx}"]
 		abs_diff_pic_num_minus1 = sl[f"abs_diff_pic_num_minus1_l{lx}"]
 		num_ref_idx_lx_active_minus1 = sl[f"num_ref_idx_l{lx}_active_minus1"]
@@ -208,7 +205,7 @@ class AVDH264Decoder(AVDDecoder):
 					pred += abs_diff_pic_num
 				pred &= ctx.max_pic_num - 1
 
-				sref = self.get_short_ref_by_num(sl.pic.short_refs, pred)
+				sref = self.get_short_ref_by_num(short_refs, pred)
 				assert(num_ref_idx_lx_active_minus1 + 1 < 32)
 
 				lst = lst + [None] * ((num_ref_idx_lx_active_minus1 + 1 + 1) - len(lst))
@@ -223,7 +220,7 @@ class AVDH264Decoder(AVDDecoder):
 			elif (mod == 2):
 				raise NotImplementedError("LT refs not support yet")
 
-		return lst[:num_ref_idx_lx_active_minus1 + 1]
+		setattr(sl, f"list{lx}", lst)
 
 	def construct_ref_list_p(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
@@ -231,11 +228,9 @@ class AVDH264Decoder(AVDDecoder):
 		short_refs = sorted(short_refs, key=lambda pic: pic.frame_num_wrap, reverse=True)
 		for ref in short_refs:
 			self.log(f"P: ST Refs: {ref}")
-		sl.pic.short_refs = short_refs
-		list0 = short_refs
+		sl.list0 = short_refs
 		if (sl.ref_pic_list_modification_flag_l0):
-			list0 = self.modify_ref_list(list0, 0)
-		sl.pic.list0 = list0
+			self.modify_ref_list(0, short_refs)
 
 	def construct_ref_list_b(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
@@ -243,34 +238,59 @@ class AVDH264Decoder(AVDDecoder):
 		short_refs = sorted(short_refs, key=lambda pic: pic.poc, reverse=True)
 		for ref in short_refs:
 			self.log(f"B: ST Refs: {ref}")
-		sl.pic.short_refs = short_refs
-		list0 = sorted([pic for pic in short_refs if pic.poc < sl.pic.poc], key=lambda pic: pic.poc, reverse=True)
-		list1 = sorted([pic for pic in short_refs if pic.poc > sl.pic.poc], key=lambda pic: pic.poc)
+		sl.list0 = sorted([pic for pic in short_refs if pic.poc < sl.pic.poc], key=lambda pic: pic.poc, reverse=True)
+		sl.list1 = sorted([pic for pic in short_refs if pic.poc > sl.pic.poc], key=lambda pic: pic.poc)
 		if (sl.ref_pic_list_modification_flag_l0):
-			list0 = self.modify_ref_list(list0, 0)
+			self.modify_ref_list(0, short_refs)
 		if (sl.ref_pic_list_modification_flag_l1):
-			list1 = self.modify_ref_list(list1, 1)
-		sl.pic.list0 = list0
-		sl.pic.list1 = list1
+			self.modify_ref_list(1, short_refs)
+
+	def resize_ref_list(self, lx): # 8.4.2.2
+		ctx = self.ctx; sl = self.ctx.active_sl
+		lst = getattr(sl, f"list{lx}")
+		num = sl[f"num_ref_idx_l{lx}_active_minus1"] + 1
+
+		if (len(lst) > num):
+			lst = lst[:num]
+
+		if (len(lst) < num):
+			if (lx == 0):  # we use pic_num to index pos in DPB for opcode 2dc
+				pic_num = max(x.pic_num for x in lst) + 1
+			else:
+				pic_num = max(x.pic_num for x in lst) - 1
+			for n in range(num - len(lst)):
+				pic = AVDH264Picture(addr=0xdead, idx=-1, pic_num=pic_num, poc=-1, frame_num_wrap=-1, flags=0, access_idx=-1)
+				self.log(f"Adding missing ref: {pic}")
+				lst.append(pic)
+
+		setattr(sl, f"list{lx}", lst)
 
 	def construct_ref_list(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
 		if (sl.slice_type == H264_SLICE_TYPE_P):
 			self.construct_ref_list_p()
-		elif (sl.slice_type == H264_SLICE_TYPE_B):
+		if (sl.slice_type == H264_SLICE_TYPE_B):
 			self.construct_ref_list_b()
 
-	def get_next_pic(self):
+		if (sl.slice_type == H264_SLICE_TYPE_P) or (sl.slice_type == H264_SLICE_TYPE_B):
+			self.resize_ref_list(0)
+			for x in sl.list0:
+				self.log(f"list0: {x}")
+			if (sl.slice_type == H264_SLICE_TYPE_B):
+				self.resize_ref_list(1)
+				for x in sl.list1:
+					self.log(f"list1: {x}")
+
+	def get_free_pic(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
 
 		# macOS reference list pooling algo. took me too long
-		cand = None
-
 		for pic in ctx.dpb_pool:
 			if (pic.flags & H264_FRAME_FLAG_UNUSED): # fill pool at init / drain by poc order sorted at IDR
 				pic.flags &= ~(H264_FRAME_FLAG_UNUSED)
 				return pic
 
+		cand = None
 		ctx.dpb_pool = sorted(ctx.dpb_pool, key=lambda x:x.poc)
 		for pic in ctx.dpb_pool:
 			if (not (pic.flags & H264_FRAME_FLAG_OUTPUT)):
@@ -290,10 +310,10 @@ class AVDH264Decoder(AVDDecoder):
 	def init_slice(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
 		self.refresh(sl)
-
-		sl.pic = self.get_next_pic()
-		sl.pic.flags |= H264_FRAME_FLAG_OUTPUT | H264_FRAME_FLAG_SHORT_REF
 		sps = self.get_sps(sl)
+
+		sl.pic = self.get_free_pic()
+		sl.pic.flags |= H264_FRAME_FLAG_OUTPUT
 
 		if (sl.field_pic_flag):
 			sl.pic.pic_num = (2 * sl.frame_num) + 1
@@ -321,29 +341,30 @@ class AVDH264Decoder(AVDDecoder):
 				poc_msb = ctx.prev_poc_msb
 		else:
 			raise NotImplementedError("pic_order_cnt_type (%d)" % (sps.pic_order_cnt_type))
-		sl.pic.poc_lsb = poc_lsb
-		sl.pic.poc_msb = poc_msb
+		ctx.poc_msb = poc_msb
+
 		sl.pic.poc = poc_msb + poc_lsb
 		sl.pic.access_idx = ctx.access_idx
-
 		self.construct_ref_list()
 
 	def finish_slice(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
 
-		if (sl.nal_unit_type == H264_NAL_SLICE_IDR) or (sl.nal_ref_idc != 0):
+		if ((sl.nal_unit_type == H264_NAL_SLICE_IDR) or (sl.nal_ref_idc != 0)):
 			self.log(f"Adding pic to DPB {sl.pic}")
+			sl.pic.flags |= H264_FRAME_FLAG_SHORT_REF
 			ctx.dpb_list.append(sl.pic)
 
-		if (sl.nal_unit_type != H264_NAL_SLICE_IDR) and (sl.nal_ref_idc == 0):
-			sl.pic.unref()
+		if ((sl.nal_unit_type != H264_NAL_SLICE_IDR) and (sl.nal_ref_idc == 0)):
+			# non reference picture
+			sl.pic.flags = 0
 
 		if (sl.nal_ref_idc):
 			if (sl.nal_unit_type == H264_NAL_SLICE_IDR) or (sl.adaptive_ref_pic_marking_mode_flag == 0):
 				if (len(ctx.dpb_list) > self.get_sps(sl).max_num_ref_frames):
-					oldest = sorted(ctx.dpb_list, key=lambda pic: pic.access_idx)[0]
-					self.log(f"Removing oldest ref {oldest}")
-					oldest.unref()
+					pic = sorted(ctx.dpb_list, key=lambda pic: pic.access_idx)[0]
+					self.log(f"Removing oldest ref {pic}")
+					pic.flags = 0
 			else:
 				for i,opcode in enumerate(sl.memory_management_control_operation):
 					if (opcode == H264_MMCO_END): break
@@ -354,14 +375,14 @@ class AVDH264Decoder(AVDDecoder):
 						for pic in ctx.dpb_list:
 							if (pic.pic_num == pic_num):
 								self.log(f"MMCO: Removing short {pic}")
-								pic.unref()
+								pic.flags &= ~(H264_FRAME_FLAG_OUTPUT | H264_FRAME_FLAG_SHORT_REF)
 					else:
 						raise ValueError("opcode %d not implemented. probably LT ref. pls send sample" % (opcode))
 		ctx.dpb_list = [pic for pic in ctx.dpb_list if (pic.flags & H264_FRAME_FLAG_OUTPUT)]
 
-		ctx.prev_poc_lsb = sl.pic.poc_lsb
-		ctx.prev_poc_msb = sl.pic.poc_msb
+		ctx.prev_poc_lsb = sl.pic_order_cnt_lsb
+		ctx.prev_poc_msb = ctx.poc_msb
 
-		if (sl.slice_type == H264_SLICE_TYPE_P):
+		if (sl.slice_type != H264_SLICE_TYPE_B):
 			ctx.last_p_sps_tile_idx = ctx.access_idx % ctx.sps_tile_count
 		self.ctx.access_idx += 1

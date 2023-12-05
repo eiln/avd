@@ -278,18 +278,14 @@ class AVDH264HalV3(AVDHal):
 		push(0x2da00000 | x, "slc_a74_cmd_deblocking_filter")
 
 		if (sl.slice_type == H264_SLICE_TYPE_P) or (sl.slice_type == H264_SLICE_TYPE_B):
-			lx = 0
-			for i,lst in enumerate(sl.pic.list0):
-				pos = list([x.pic_num for x in ctx.dpb_list]).index(lst.pic_num)
-				push(0x2dc00000 | (lx << 8) | (i << 4) | pos, "slc_6e8_cmd_ref_list_0", i)
-				if (pps.weighted_bipred_idc == 0 and sl.nal_ref_idc):  # this is what macOS does, but I'm very suspicious
-					break
+			for i,pic in enumerate(sl.list0):
+				pos = list([x.pic_num for x in ctx.dpb_list]).index(pic.pic_num)
+				push(0x2dc00000 | 0 << 8 | i << 4 | pos, "slc_6e8_cmd_ref_list_0", i)
 			if (sl.slice_type == H264_SLICE_TYPE_B):
-				lx = 1
-				for i,lst in enumerate(sl.pic.list1):
-					pos = list([x.pic_num for x in ctx.dpb_list]).index(lst.pic_num)
-					push(0x2dc00000 | (lx << 8) | (i << 4) | pos,
-					"slc_6e8_cmd_ref_list_0", i + len(sl.pic.list0))
+				for i,pic in enumerate(sl.list1):
+					pos = list([x.pic_num for x in ctx.dpb_list]).index(pic.pic_num)
+					push(0x2dc00000 | 1 << 8 | i << 4 | pos,
+					"slc_6e8_cmd_ref_list_0", i + len(sl.list0))
 
 			self.set_weights(ctx, sl)
 

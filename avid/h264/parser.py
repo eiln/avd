@@ -12,7 +12,7 @@ from math import ceil
 class AVDH264Slice(AVDSlice):
 	def __init__(self):
 		super().__init__()
-		self._banned_keys = ["payload", "nal_unit_type", "idx", "nal_offset"]
+		self._banned_keys = ["payload", "nal_unit_type", "idx", "nal_offset", "list0", "list1"]
 		self._reprwidth = 38
 		self.mode = "h264"
 
