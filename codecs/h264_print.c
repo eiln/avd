@@ -579,9 +579,11 @@ void h264_print_slice_header(struct h264_context *ctx, struct h264_slice *sl)
 	if (sl->has_luma_weights)
 		h264_print_pred_weight_table(sl);
 
-	h264_print_dec_ref_pic_marking(sl);
-	if (sps->is_svc && !sps->slice_header_restriction_flag)
-		h264_print_dec_ref_base_pic_marking(sl, &sl->svc);
+	if (sl->nal_ref_idc) {
+		h264_print_dec_ref_pic_marking(sl);
+		if (sps->is_svc && !sps->slice_header_restriction_flag)
+			h264_print_dec_ref_base_pic_marking(sl, &sl->svc);
+	}
 
 	if (sl->slice_type != H264_SLICE_TYPE_I &&
 	    sl->slice_type != H264_SLICE_TYPE_SI)
