@@ -196,9 +196,9 @@ class AVDH264HalV3(AVDHal):
 		push((sl.pic.addr + self.rvra_offset(ctx, 3)) >> 7, "hdr_c0_curr_ref_addr_lsb7", 3)
 
 		push(ctx.y_addr >> 8, "hdr_210_y_addr_lsb8")
-		push((round_up(ctx.width, 64) >> 6) << 2, "hdr_218_width_align")
+		push(round_up(ctx.width, 64) >> 4, "hdr_218_width_align")
 		push(ctx.uv_addr >> 8, "hdr_214_uv_addr_lsb8")
-		push((round_up(ctx.width, 64) >> 6) << 2, "hdr_21c_width_align")
+		push(round_up(ctx.width, 64) >> 4, "hdr_21c_width_align")
 		push(0x0, "cm3_mark_end_section")
 		push((((ctx.height - 1) & 0xffff) << 16) | ((ctx.width - 1) & 0xffff), "hdr_54_height_width")
 

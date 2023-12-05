@@ -3,7 +3,20 @@
 # Copyright 2023 Eileen Yoon <eyn@gmx.com>
 
 from collections import namedtuple
+from dataclasses import dataclass
 from .utils import *
+
+@dataclass(slots=True)
+class AVDOutputFormat:
+	in_width: int
+	in_height: int
+	out_width: int
+	out_height: int
+	x0: int = 0
+	x1: int = 0
+	y0: int = 0
+	y1: int = 0
+	chroma: int = 0
 
 class AVDRange(namedtuple('AVDRange', ['iova', 'size', 'name'])):
 	def __repr__(self):

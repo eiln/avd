@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright 2023 Eileen Yoon <eyn@gmx.com>
 
-from ..decoder import AVDDecoder
+from ..decoder import AVDDecoder, AVDOutputFormat
 from ..utils import *
 from .fp import AVDH264V3FrameParams
 from .halv3 import AVDH264HalV3
@@ -90,10 +90,25 @@ class AVDH264Decoder(AVDDecoder):
 		assert(not(width & 15) and not(height & 15)) # hardware caps
 		ctx.max_frame_num = 1 << (sps.log2_max_frame_num_minus4 + 4)
 
-		width_mbs = (ctx.orig_width + 15) // 16
-		height_mbs = (ctx.orig_height + 15) // 16
-		assert(width_mbs == (sps.pic_width_in_mbs_minus1 + 1))
-		assert(height_mbs == (sps.pic_height_in_map_units_minus1 + 1))
+		width_mbs = (sps.pic_width_in_mbs_minus1 + 1)
+		height_mbs = (2 - sps.frame_mbs_only_flag) * (sps.pic_height_in_map_units_minus1 + 1)
+		assert(width_mbs == (ctx.orig_width + 15) // 16)
+		assert(height_mbs == (ctx.orig_height + 15) // 16)
+
+		ctx.fmt = AVDOutputFormat(
+			in_width=(round_up(ctx.width, 64) >> 4) << 4,
+			in_height=ctx.height,
+			out_width=ctx.orig_width,
+			out_height=ctx.orig_height,
+			chroma=sps.chroma_format_idc,
+		)
+		ctx.fmt.x0 = 0
+		ctx.fmt.x1 = ctx.fmt.out_width  # TODO vui frame crop
+		ctx.fmt.y0 = 0
+		ctx.fmt.y1 = ctx.fmt.out_height
+		self.log(ctx.fmt)
+		assert(ctx.fmt.in_width >= ctx.fmt.out_width)
+		assert(ctx.fmt.in_height >= ctx.fmt.out_height)
 
 		level = [level for level in h264_levels if level[1] == sps.level_idc][-1]
 		ctx.max_dpb_frames = min((level[5]) // (width_mbs * height_mbs), 16) # max_dpb_mbs
@@ -126,9 +141,9 @@ class AVDH264Decoder(AVDDecoder):
 		ctx.rvra_base_addrs = [0 for n in range(ctx.rvra_count)]
 		ctx.rvra_base_addrs[0] = self.range_alloc(rvra_total_size, pad=0x100, name="rvra0")
 
-		ctx.luma_size = round_up(ctx.width, 64) * round_up(ctx.height, 64)
+		ctx.luma_size = ctx.fmt.in_width * ctx.fmt.in_height
 		ctx.y_addr = self.range_alloc(ctx.luma_size, name="disp_y")
-		ctx.chroma_size = round_up(ctx.width, 64) * round_up(ctx.height, 64)
+		ctx.chroma_size = ctx.fmt.in_width * ctx.fmt.in_height
 		if (sps.chroma_format_idc == H264_CHROMA_IDC_420):
 			ctx.chroma_size //= 2
 		ctx.uv_addr = self.range_alloc(ctx.chroma_size, name="disp_uv")
