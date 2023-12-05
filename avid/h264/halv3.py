@@ -12,19 +12,6 @@ class AVDH264HalV3(AVDHal):
 
 	# The idea is to pass the HALs a RO struct parsed/managed by AVDH264Decoder
 
-	def get_pps(self, ctx, sl):
-		return ctx.pps_list[sl.pic_parameter_set_id]
-
-	def get_sps(self, ctx, sl):
-		return ctx.sps_list[self.get_pps(ctx, sl).seq_parameter_set_id]
-
-	def rvra_offset(self, ctx, idx):
-		if   (idx == 0): return ctx.rvra_size0
-		elif (idx == 1): return 0
-		elif (idx == 2): return ctx.rvra_size0 + ctx.rvra_size1 + ctx.rvra_size2
-		elif (idx == 3): return ctx.rvra_size0 + ctx.rvra_size1
-		raise ValueError("invalid rvra group (%d)" % idx)
-
 	def set_refs(self, ctx, sl):
 		push = self.push
 
@@ -49,15 +36,15 @@ class AVDH264HalV3(AVDHal):
 			x = (len(ctx.dpb_list) - 1) << 28 | 0x1000000
 			x |= boolify(pic.flags & H264_FRAME_FLAG_LONG_REF) << 17 | swrap(pred, 1 << 17)
 			push(x, "hdr_d0_ref_hdr", n)
-			push((pic.addr + self.rvra_offset(ctx, 0)) >> 7, "hdr_110_ref0_addr_lsb7", n)
-			push((pic.addr + self.rvra_offset(ctx, 1)) >> 7, "hdr_150_ref1_addr_lsb7", n)
-			push((pic.addr + self.rvra_offset(ctx, 2)) >> 7, "hdr_190_ref2_addr_lsb7", n)
-			push((pic.addr + self.rvra_offset(ctx, 3)) >> 7, "hdr_1d0_ref3_addr_lsb7", n)
+			push((pic.addr + ctx.rvra_offset(0)) >> 7, "hdr_110_ref0_addr_lsb7", n)
+			push((pic.addr + ctx.rvra_offset(1)) >> 7, "hdr_150_ref1_addr_lsb7", n)
+			push((pic.addr + ctx.rvra_offset(2)) >> 7, "hdr_190_ref2_addr_lsb7", n)
+			push((pic.addr + ctx.rvra_offset(3)) >> 7, "hdr_1d0_ref3_addr_lsb7", n)
 
 	def set_scaling_list(self, ctx, sl):
 		push = self.push
-		sps = self.get_sps(ctx, sl)
-		pps = self.get_pps(ctx, sl)
+		sps = ctx.get_sps(sl)
+		pps = ctx.get_pps(sl)
 
 		x = 0
 		if (pps.pic_scaling_matrix_present_flag or sps.seq_scaling_matrix_present_flag):
@@ -144,8 +131,8 @@ class AVDH264HalV3(AVDHal):
 
 	def set_header(self, ctx, sl):
 		push = self.push
-		sps = self.get_sps(ctx, sl)
-		pps = self.get_pps(ctx, sl)
+		sps = ctx.get_sps(sl)
+		pps = ctx.get_pps(sl)
 
 		assert((ctx.inst_fifo_idx >= 0) and (ctx.inst_fifo_idx <= ctx.inst_fifo_count))
 		push(0x2b000000 | 0x100 | (ctx.inst_fifo_idx * 0x10), "cm3_cmd_inst_fifo_start")
@@ -162,7 +149,7 @@ class AVDH264HalV3(AVDHal):
 		push(0x0, "hdr_40_zero")
 		push((((ctx.height - 1) >> 3) << 16) | ((ctx.width - 1) >> 3), "hdr_28_height_width_shift3")
 
-		x = 0x1000000 * self.get_sps(ctx, sl).chroma_format_idc | 0x2000 | 0x800
+		x = 0x1000000 * sps.chroma_format_idc | 0x2000 | 0x800
 		x |= (pps.transform_8x8_mode_flag << 7)  # 4x4, 8x8
 		x |= sps.direct_8x8_inference_flag
 		push(x, "hdr_2c_sps_param")
@@ -191,10 +178,10 @@ class AVDH264HalV3(AVDHal):
 		push(ctx.pps_tile_addrs[3] >> 8, "hdr_9c_pps_tile_addr_lsb8", 3)
 		push(0x70007, "cm3_dma_config_5")
 
-		push((sl.pic.addr + self.rvra_offset(ctx, 0)) >> 7, "hdr_c0_curr_ref_addr_lsb7", 0)
-		push((sl.pic.addr + self.rvra_offset(ctx, 1)) >> 7, "hdr_c0_curr_ref_addr_lsb7", 1)
-		push((sl.pic.addr + self.rvra_offset(ctx, 2)) >> 7, "hdr_c0_curr_ref_addr_lsb7", 2)
-		push((sl.pic.addr + self.rvra_offset(ctx, 3)) >> 7, "hdr_c0_curr_ref_addr_lsb7", 3)
+		push((sl.pic.addr + ctx.rvra_offset(0)) >> 7, "hdr_c0_curr_ref_addr_lsb7", 0)
+		push((sl.pic.addr + ctx.rvra_offset(1)) >> 7, "hdr_c0_curr_ref_addr_lsb7", 1)
+		push((sl.pic.addr + ctx.rvra_offset(2)) >> 7, "hdr_c0_curr_ref_addr_lsb7", 2)
+		push((sl.pic.addr + ctx.rvra_offset(3)) >> 7, "hdr_c0_curr_ref_addr_lsb7", 3)
 
 		push(ctx.y_addr >> 8, "hdr_210_y_addr_lsb8")
 		push(round_up(ctx.width, 64) >> 4, "hdr_218_width_align")
@@ -211,7 +198,7 @@ class AVDH264HalV3(AVDHal):
 
 	def set_weights(self, ctx, sl):
 		push = self.push
-		pps = self.get_pps(ctx, sl)
+		pps = ctx.get_pps(sl)
 
 		x = 0x2dd00000
 		if ((sl.slice_type == H264_SLICE_TYPE_P) and pps.weighted_pred_flag):
@@ -256,7 +243,7 @@ class AVDH264HalV3(AVDHal):
 
 	def set_slice(self, ctx, sl):
 		push = self.push
-		pps = self.get_pps(ctx, sl)
+		pps = ctx.get_pps(sl)
 
 		x = 0  # CABAC we skipped cabac_alignment_bit
 		if (pps.entropy_coding_mode_flag == 0): # CAVLC we didn't
@@ -267,7 +254,7 @@ class AVDH264HalV3(AVDHal):
 		push(0x2c000000, "cm3_cmd_exec_mb_vp")
 		# ---- FW BP -----
 
-		push(0x2d900000 | ((26 + self.get_pps(ctx, sl).pic_init_qp_minus26 + sl.slice_qp_delta) * 0x400), "slc_a70_cmd_quant_param")
+		push(0x2d900000 | ((26 + pps.pic_init_qp_minus26 + sl.slice_qp_delta) * 0x400), "slc_a70_cmd_quant_param")
 
 		x = 0
 		if (sl.disable_deblocking_filter_idc == 0):

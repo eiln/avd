@@ -12,7 +12,18 @@ from math import sqrt
 from dataclasses import dataclass
 
 class AVDH264Ctx(dotdict):
-	pass
+	def get_pps(self, sl):
+		return self.pps_list[sl.pic_parameter_set_id]
+
+	def get_sps(self, sl):
+		return self.sps_list[self.get_pps(sl).seq_parameter_set_id]
+
+	def rvra_offset(self, idx):
+		if   (idx == 0): return self.rvra_size0
+		elif (idx == 1): return 0
+		elif (idx == 2): return self.rvra_size0 + self.rvra_size1 + self.rvra_size2
+		elif (idx == 3): return self.rvra_size0 + self.rvra_size1
+		raise ValueError("invalid rvra group (%d)" % idx)
 
 @dataclass(slots=True)
 class AVDH264Picture:
@@ -31,15 +42,6 @@ class AVDH264Decoder(AVDDecoder):
 	def __init__(self):
 		super().__init__(AVDH264Parser, AVDH264HalV3, AVDH264V3FrameParams)
 		self.mode = "h264"
-
-	def get_pps(self, sl):
-		return self.ctx.pps_list[sl.pic_parameter_set_id]
-
-	def get_sps_id(self, sl):
-		return self.get_pps(sl).seq_parameter_set_id
-
-	def get_sps(self, sl):
-		return self.ctx.sps_list[self.get_sps_id(sl)]
 
 	def new_context(self, sps_list, pps_list):
 		self.ctx = AVDH264Ctx()
@@ -66,7 +68,8 @@ class AVDH264Decoder(AVDDecoder):
 
 	def refresh_sps(self, sl):
 		ctx = self.ctx
-		sps_id = self.get_sps_id(sl)
+		pps = ctx.get_pps(sl)
+		sps_id = pps.seq_parameter_set_id
 		if (sps_id == ctx.cur_sps_id):
 			return
 		sps = ctx.sps_list[sps_id]
@@ -315,7 +318,7 @@ class AVDH264Decoder(AVDDecoder):
 	def init_slice(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
 		self.refresh(sl)
-		sps = self.get_sps(sl)
+		sps = ctx.get_sps(sl)
 
 		sl.pic = self.get_free_pic()
 		sl.pic.flags |= H264_FRAME_FLAG_OUTPUT
@@ -353,7 +356,7 @@ class AVDH264Decoder(AVDDecoder):
 
 	def finish_slice(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
-		sps = self.get_sps(sl)
+		sps = ctx.get_sps(sl)
 
 		if ((sl.nal_unit_type == H264_NAL_SLICE_IDR) or (sl.nal_ref_idc != 0)):
 			self.log(f"Adding pic to DPB {sl.pic}")
