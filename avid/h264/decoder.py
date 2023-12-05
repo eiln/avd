@@ -296,12 +296,10 @@ class AVDH264Decoder(AVDDecoder):
 		sps = self.get_sps(sl)
 
 		if (sl.field_pic_flag):
-			sl.pic.field = H264_FIELD_BOTTOM if sl.bottom_field_flag else H264_FIELD_BOTTOM
 			sl.pic.pic_num = (2 * sl.frame_num) + 1
 			ctx.max_pic_num = 1 << (sps.log2_max_frame_num_minus4 + 4 + 1)
-			raise NotImplementedError("top/bottom fields not supported. pls send sample")
+			raise NotImplementedError("top/bottom fields not supported by hardware.")
 		else:
-			sl.pic.field = H264_FIELD_FRAME
 			sl.pic.pic_num = sl.frame_num
 			ctx.max_pic_num = 1 << (sps.log2_max_frame_num_minus4 + 4)
 
