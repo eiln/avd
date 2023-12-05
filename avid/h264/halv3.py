@@ -163,7 +163,7 @@ class AVDH264HalV3(AVDHal):
 
 		x = 0x1000000 * self.get_sps(ctx, sl).chroma_format_idc | 0x2000 | 0x800
 		x |= (pps.transform_8x8_mode_flag << 7)  # 4x4, 8x8
-		x |= 1  # txfm always specified for each block
+		x |= sps.direct_8x8_inference_flag
 		push(x, "hdr_2c_sps_param")
 
 		x = 0
