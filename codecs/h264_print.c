@@ -472,29 +472,29 @@ static void h264_print_dec_ref_pic_marking(struct h264_slice *sl)
 	int i;
 
 	if (sl->nal_unit_type == H264_NAL_SLICE_IDR) {
-		h264_field("no_output_of_prior_pics_flag",
-		       sl->no_output_of_prior_pics_flag);
+		h264_field("no_output_of_prior_pics_flag", sl->no_output_of_prior_pics_flag);
 		h264_field("long_term_reference_flag", sl->long_term_reference_flag);
 	} else {
-		h264_field("adaptive_ref_pic_marking_mode_flag",
-		       sl->adaptive_ref_pic_marking_mode_flag);
-		for (i = 0; i < sl->num_mmcos + 1; i++) {
-			h264_field("memory_management_control_operation[%d]", i, sl->mmcos[i].opcode);
-			switch (sl->mmcos[i].opcode) {
-			case H264_MMCO_END:
-				break;
-			case H264_MMCO_FORGET_SHORT:
-				h264_field("mmco_short_args[%d]", i, sl->mmcos[i].short_pic_num);
-				break;
-			case H264_MMCO_SHORT_TO_LONG:
-				h264_field("mmco_short_args[%d]", i, sl->mmcos[i].short_pic_num); // fall through
-			case H264_MMCO_FORGET_LONG:
-			case H264_MMCO_THIS_TO_LONG:
-			case H264_MMCO_FORGET_LONG_MAX:
-				h264_field("mmco_long_args[%d]", i, sl->mmcos[i].long_arg);
-				break;
-			case H264_MMCO_FORGET_ALL:
-				break; /* XXX */
+		h264_field("adaptive_ref_pic_marking_mode_flag", sl->adaptive_ref_pic_marking_mode_flag);
+		if (sl->adaptive_ref_pic_marking_mode_flag) {
+			for (i = 0; i < sl->num_mmcos + 1; i++) {
+				h264_field("memory_management_control_operation[%d]", i, sl->mmcos[i].opcode);
+				switch (sl->mmcos[i].opcode) {
+				case H264_MMCO_END:
+					break;
+				case H264_MMCO_FORGET_SHORT:
+					h264_field("mmco_short_args[%d]", i, sl->mmcos[i].short_pic_num);
+					break;
+				case H264_MMCO_SHORT_TO_LONG:
+					h264_field("mmco_short_args[%d]", i, sl->mmcos[i].short_pic_num); // fall through
+				case H264_MMCO_FORGET_LONG:
+				case H264_MMCO_THIS_TO_LONG:
+				case H264_MMCO_FORGET_LONG_MAX:
+					h264_field("mmco_long_args[%d]", i, sl->mmcos[i].long_arg);
+					break;
+				case H264_MMCO_FORGET_ALL:
+					break; /* XXX */
+				}
 			}
 		}
 	}
