@@ -17,8 +17,7 @@ class AVDH264HalV3(AVDHal):
 
 		push(0x4020002, "cm3_dma_config_6")
 		push(ctx.pps_tile_addrs[4] >> 8, "hdr_9c_pps_tile_addr_lsb8", 7)
-		n = ctx.access_idx % ctx.sps_tile_count  # new space to output current mv
-		push(ctx.sps_tile_addrs[n] >> 8, "hdr_bc_sps_tile_addr_lsb8")
+		push(ctx.sps_tile_addrs[sl.pic.sps_idx] >> 8, "hdr_bc_sps_tile_addr_lsb8")
 
 		push(0x70007, "cm3_dma_config_7")
 		push(0x70007, "cm3_dma_config_8")
@@ -299,9 +298,7 @@ class AVDH264HalV3(AVDHal):
 
 		if (sl.slice_type == H264_SLICE_TYPE_B):
 			# bidirectional reference of previous mv
-			n = ctx.last_p_sps_tile_idx + sl.num_ref_idx_l1_active_minus1
-			n %= ctx.sps_tile_count
-			push(ctx.sps_tile_addrs[n] >> 8, "slc_a78_sps_tile_addr2_lsb8")
+			push(ctx.sps_tile_addrs[sl.list1[0].sps_idx] >> 8, "slc_a78_sps_tile_addr2_lsb8")
 
 		push(0x2b000000 | 0x400, "cm3_cmd_inst_fifo_end")
 

@@ -34,6 +34,7 @@ class AVDH264Picture:
 	frame_num_wrap: int
 	flags: int
 	access_idx: int
+	sps_idx: int = 0xffffffff
 
 	def __repr__(self):
 		return f"[idx: {str(self.idx).rjust(2)} addr: {hex(self.addr >> 7).ljust(2+5)} pic_num: {str(self.pic_num).rjust(2)} poc: {str(self.poc).rjust(3)} fn: {str(self.frame_num_wrap).rjust(2)} flags: {format(self.flags, '010b')}]"
@@ -55,7 +56,6 @@ class AVDH264Decoder(AVDDecoder):
 		ctx.active_sl = None
 		ctx.cur_sps_id = -1
 
-		ctx.last_p_sps_tile_idx = 0
 		ctx.prev_poc_lsb = 0
 		ctx.prev_poc_msb = 0
 		ctx.max_lt_idx = -1
@@ -322,6 +322,7 @@ class AVDH264Decoder(AVDDecoder):
 
 		sl.pic = self.get_free_pic()
 		sl.pic.flags |= H264_FRAME_FLAG_OUTPUT
+		sl.pic.sps_idx = ctx.access_idx % ctx.sps_tile_count
 
 		if (sl.field_pic_flag):
 			sl.pic.pic_num = (2 * sl.frame_num) + 1
@@ -427,6 +428,4 @@ class AVDH264Decoder(AVDDecoder):
 		ctx.prev_poc_lsb = sl.pic_order_cnt_lsb
 		ctx.prev_poc_msb = ctx.poc_msb
 
-		if (sl.slice_type != H264_SLICE_TYPE_B):
-			ctx.last_p_sps_tile_idx = ctx.access_idx % ctx.sps_tile_count
 		self.ctx.access_idx += 1
