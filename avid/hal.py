@@ -24,7 +24,7 @@ class AVDInst(namedtuple('AVDInst', ['val', 'name', 'pos', 'idx'])):
 	def rep(self, clr=ANSI_GREEN):
 		disp_name = self.get_disp_name()
 		disp_val = f"{hex(self.val).rjust(2+8)}"
-		disp_idx = f"[{hl(str(self.pos).rjust(2), clr)}]"
+		disp_idx = f"[{hl(str(self.pos).rjust(3), clr)}]"
 		return f'{disp_idx} {disp_val} | {disp_name}'
 
 	def __repr__(self):

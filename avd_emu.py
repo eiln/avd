@@ -434,7 +434,7 @@ class AVDEmulator:
 	def save_inst(self, addr, val):
 		if (self.inst_only):
 			disp_name = "unk_%d" % (len(self.inst_stream))
-			s = "[EMU] %s" % (f'[{self.hl(str(len(self.inst_stream)).rjust(2))}] {hex(val).rjust(2+8)} |')
+			s = "[EMU] %s" % (f'[{self.hl(str(len(self.inst_stream)).rjust(3))}] {hex(val).rjust(2+8)} |')
 			if (self.show_bits):
 				s += f' {bitrepr32(val)}'
 			print(s)
@@ -443,7 +443,7 @@ class AVDEmulator:
 	def save_decode_command(self, addr, val):
 		if (self.inst_only):
 			disp_name = "decode command"
-			s = "[EMU] %s" % (f'[{self.hl(str(len(self.inst_stream)).rjust(2))}] {hex(val).rjust(2+8)} | {disp_name}')
+			s = "[EMU] %s" % (f'[{self.hl(str(len(self.inst_stream)).rjust(3))}] {hex(val).rjust(2+8)} | {disp_name}')
 			print(s)
 
 	def w_40104004(self, addr, val): # 0x40104004: H265 inst FIFO

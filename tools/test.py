@@ -121,10 +121,12 @@ class AVDUnitTest:
 			s = ""
 			if (self.args.show_index):
 				s += f'[{hl(str(sl.idx).rjust(2), ANSI_CYAN)}]'
+
 			if (x0 != x1.val):
-				s += f'[{hl(str(n).rjust(2), ANSI_RED)}] '
+				c = ANSI_RED
 			else:
-				s += f'[{hl(str(n).rjust(2), ANSI_GREEN)}] '
+				c = ANSI_GREEN
+			s += f'[{hl(str(n).rjust(3), c)}] '
 
 			if (self.args.show_bits):
 				x0r = bitrepr32(x0)
@@ -147,7 +149,7 @@ class AVDUnitTest:
 				s = ""
 				if (self.args.show_index):
 					s += f'[{hl(str(sl.idx).rjust(2), ANSI_CYAN)}]'
-				s += f'[{hl(str(n + l1).rjust(2), ANSI_RED)}] '
+				s += f'[{hl(str(n + l1).rjust(3), ANSI_RED)}] '
 				x0r = f'{hex(x0).rjust(2+8)}'
 				x1r = f'{hex(x1).rjust(2+8)}'
 				if (x0 != x1):
