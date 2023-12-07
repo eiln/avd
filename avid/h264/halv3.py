@@ -215,28 +215,28 @@ class AVDH264HalV3(AVDHal):
 		num = 0
 		for i in range(sl.num_ref_idx_l0_active_minus1 + 1):
 			if (sl.luma_weight_l0_flag[i]):
-				push(0x2de00000 | 1 << 14 | i << 9 | sl.luma_weight_l0[i], "slc_770_cmd_weights_weights", num)
+				push(0x2de00000 | 1 << 14 | 0 << 13 | i << 9 | sl.luma_weight_l0[i], "slc_770_cmd_weights_weights", num)
 				push(0x2df00000 | swrap(sl.luma_offset_l0[i], 0x10000), "slc_8f0_cmd_weights_offsets", num)
 				num += 1
 			if (sl.chroma_weight_l0_flag[i]):
-				push(0x2de00000 | 2 << 14 | i << 9 | sl.chroma_weight_l0[i][0], "slc_770_cmd_weights_weights", num)
+				push(0x2de00000 | 2 << 14 | 0 << 13 | i << 9 | sl.chroma_weight_l0[i][0], "slc_770_cmd_weights_weights", num)
 				push(0x2df00000 | swrap(sl.chroma_offset_l0[i][0], 0x10000), "slc_8f0_cmd_weights_offsets", num)
 				num += 1
-				push(0x2de00000 | 3 << 14 | i << 9 | sl.chroma_weight_l0[i][1], "slc_770_cmd_weights_weights", num)
+				push(0x2de00000 | 3 << 14 | 0 << 13 | i << 9 | sl.chroma_weight_l0[i][1], "slc_770_cmd_weights_weights", num)
 				push(0x2df00000 | swrap(sl.chroma_offset_l0[i][1], 0x10000), "slc_8f0_cmd_weights_offsets", num)
 				num += 1
 
 		if (sl.slice_type == H264_SLICE_TYPE_B):
 			for i in range(sl.num_ref_idx_l1_active_minus1 + 1):
 				if (sl.luma_weight_l1_flag[i]):
-					push(0x2de00000 | 1 << 14 | i << 9 | sl.luma_weight_l1[i], "slc_770_cmd_weights_weights", num)
+					push(0x2de00000 | 1 << 14 | 1 << 13 | i << 9 | sl.luma_weight_l1[i], "slc_770_cmd_weights_weights", num)
 					push(0x2df00000 | swrap(sl.luma_offset_l1[i], 0x10000), "slc_8f0_cmd_weights_offsets", num)
 					num += 1
 				if (sl.chroma_weight_l1_flag[i]):
-					push(0x2de00000 | 2 << 14 | i << 9 | sl.chroma_weight_l1[i][0], "slc_770_cmd_weights_weights", num)
+					push(0x2de00000 | 2 << 14 | 1 << 13 | i << 9 | sl.chroma_weight_l1[i][0], "slc_770_cmd_weights_weights", num)
 					push(0x2df00000 | swrap(sl.chroma_offset_l1[i][0], 0x10000), "slc_8f0_cmd_weights_offsets", num)
 					num += 1
-					push(0x2de00000 | 3 << 14 | i << 9 | sl.chroma_weight_l1[i][1], num)
+					push(0x2de00000 | 3 << 14 | 1 << 13 | i << 9 | sl.chroma_weight_l1[i][1], num)
 					push(0x2df00000 | swrap(sl.chroma_offset_l1[i][1], 0x10000), "slc_8f0_cmd_weights_offsets", num)
 					num += 1
 
