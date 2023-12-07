@@ -330,7 +330,7 @@ static int hevc_decode_st_rps(struct bitstream *gb, struct hevc_short_term_rps *
 
     rps->inter_ref_pic_set_prediction_flag = 0;
 
-    if (rps != sps->st_rps && sps->nb_st_rps)
+    if (rps != sps->st_rps && sps->num_short_term_ref_pic_sets)
         rps->inter_ref_pic_set_prediction_flag = get_bits1(gb);
 
     if (rps->inter_ref_pic_set_prediction_flag) {
@@ -339,12 +339,12 @@ static int hevc_decode_st_rps(struct bitstream *gb, struct hevc_short_term_rps *
 
         if (is_slice_header) {
             rps->delta_idx = get_ue_golomb_long(gb) + 1;
-            if (rps->delta_idx > sps->nb_st_rps) {
+            if (rps->delta_idx > sps->num_short_term_ref_pic_sets) {
                 h265_err("Invalid value of delta_idx in slice header RPS: %d > %d.\n",
-                       rps->delta_idx, sps->nb_st_rps);
+                       rps->delta_idx, sps->num_short_term_ref_pic_sets);
                 return -EINVALDATA;
             }
-            rps_ridx = &sps->st_rps[sps->nb_st_rps - rps->delta_idx];
+            rps_ridx = &sps->st_rps[sps->num_short_term_ref_pic_sets - rps->delta_idx];
             rps->rps_idx_num_delta_pocs = rps_ridx->num_delta_pocs;
         } else
             rps_ridx = &sps->st_rps[rps - sps->st_rps - 1];
@@ -420,7 +420,7 @@ static int hevc_decode_st_rps(struct bitstream *gb, struct hevc_short_term_rps *
 
         if (rps->num_negative_pics >= HEVC_MAX_REFS ||
             rps->num_positive_pics >= HEVC_MAX_REFS) {
-            h265_err("Too many refs in a short term RPS.\n");
+            h265_err("Too many refs in a short term RPS (%d, %d).\n", rps->num_negative_pics, rps->num_positive_pics);
             return -EINVALDATA;
         }
 
@@ -1040,7 +1040,6 @@ static int h265_decode_nal_sps(struct h265_context *s, struct hevc_sps *sps)
 
     sps->width = sps->pic_width_in_luma_samples;
     sps->height = sps->pic_height_in_luma_samples;
-    sps->nb_st_rps = sps->num_short_term_ref_pic_sets;
 
     sps->ctb_width  = (sps->width  + (1 << sps->log2_ctb_size) - 1) >> sps->log2_ctb_size;
     sps->ctb_height = (sps->height + (1 << sps->log2_ctb_size) - 1) >> sps->log2_ctb_size;
@@ -1658,12 +1657,12 @@ static int hevc_decode_slice_header(struct h265_context *s, struct hevc_slice_he
             } else {
                 int numbits, rps_idx;
 
-                if (!sps->nb_st_rps) {
+                if (!sps->num_short_term_ref_pic_sets) {
                     h265_err("No ref lists in the SPS.\n");
                     return -EINVALDATA;
                 }
 
-                numbits = clog2(sps->nb_st_rps);
+                numbits = clog2(sps->num_short_term_ref_pic_sets);
                 rps_idx = numbits > 0 ? get_bits(gb, numbits) : 0;
                 sh->short_term_ref_pic_set_idx = rps_idx;
                 sh->short_term_rps = &sps->st_rps[rps_idx];

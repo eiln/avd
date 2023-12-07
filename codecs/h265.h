@@ -311,7 +311,6 @@ struct hevc_sps {
     /* derived */
     int width;
     int height;
-    int nb_st_rps;
 
     int log2_ctb_size;
     int log2_min_pu_size;

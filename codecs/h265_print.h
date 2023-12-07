@@ -30,8 +30,8 @@
 #include <stdio.h>
 
 #define h265_log(a, ...)   printf("[H265] " a, ##__VA_ARGS__)
-#define h265_wrn(a, ...)   fprintf(stderr, "[H265][WRN]" a, ##__VA_ARGS__)
-#define h265_err(a, ...)   fprintf(stderr, "[H265][ERR]" a, ##__VA_ARGS__)
+#define h265_wrn(a, ...)   fprintf(stderr, "[H265][WRN] " a, ##__VA_ARGS__)
+#define h265_err(a, ...)   fprintf(stderr, "[H265][ERR] " a, ##__VA_ARGS__)
 
 // I dont know how to do macros
 #define H265_PRINT_PREFIX "\t"
