@@ -11,7 +11,7 @@ import subprocess
 class AVDH265Slice(AVDSlice):
 	def __init__(self):
 		super().__init__()
-		self._banned_keys = ["payload", "nal_unit_type", "idx"]
+		self._banned_keys = ["payload", "nal_unit_type", "idx", "nal_offset"]
 		self._reprwidth = 39
 		self.mode = "h265"
 
@@ -38,10 +38,7 @@ class AVDH265Slice(AVDSlice):
 			new = b'\x00' + dat
 			return new[:2] + b'\x00.' + new[4:]
 		payload = transform(self.payload)
-		if (IS_IDR2(self)):
-			start = 0
-		else:
-			start = 1
+		start = self.nal_offset - 3
 		return payload[start:]
 
 	def get_payload_offset(self):
@@ -49,6 +46,9 @@ class AVDH265Slice(AVDSlice):
 
 	def get_payload_size(self):
 		return len(self.get_payload()) - self.get_payload_offset()
+
+	def get_payload_total_size(self):
+		return len(self.get_payload())
 
 class AVDH265Parser(AVDParser):
 	def __init__(self):
@@ -89,6 +89,7 @@ class AVDH265Parser(AVDParser):
 			raise RuntimeError("Failed to init libh265")
 
 		with pipes() as (out, err):
+			offsets = []
 			nalus = []
 			while (bytesnum > 0):
 				if ((num) and (len(nalus) >= num + 20) and nal_stop):
@@ -96,15 +97,16 @@ class AVDH265Parser(AVDParser):
 				self.lib.libh265_decode(handle, buf[bufpos:], bytesnum, ctypes.byref(nal_start), ctypes.byref(nal_end))
 				payload = buf[bufpos:bufpos+nal_end.value]
 				nalus.append(payload)
+				offsets.append(nal_start.value)
 				bufpos += nal_end.value
 				bytesnum -= nal_end.value
 		stdout = out.read()
 
 		self.lib.libh265_free(handle)
-		return nalus, stdout
+		return nalus, stdout, offsets
 
 	def parse(self, path, num=0, nal_stop=0, **kwargs):
-		payloads, stdout = self.parse_payloads(path, num=num, nal_stop=nal_stop)
+		payloads, stdout, offsets = self.parse_payloads(path, num=num, nal_stop=nal_stop)
 		units = self.parse_headers(stdout)
 
 		slice_idx = 0
@@ -131,6 +133,7 @@ class AVDH265Parser(AVDParser):
 			elif (unit.nal_unit_type == HEVC_NAL_SEI_PREFIX or unit.nal_unit_type == HEVC_NAL_SEI_SUFFIX):
 				continue
 			elif (unit.nal_unit_type in [HEVC_NAL_TRAIL_R, HEVC_NAL_TRAIL_N, HEVC_NAL_TSA_N,HEVC_NAL_TSA_R, HEVC_NAL_STSA_N, HEVC_NAL_STSA_R, HEVC_NAL_BLA_W_LP, HEVC_NAL_BLA_W_RADL, HEVC_NAL_BLA_N_LP, HEVC_NAL_IDR_W_RADL, HEVC_NAL_IDR_N_LP, HEVC_NAL_CRA_NUT, HEVC_NAL_RADL_N, HEVC_NAL_RADL_R, HEVC_NAL_RASL_N, HEVC_NAL_RASL_R]):
+				unit.nal_offset = offsets[i]
 				slices.append(unit)
 				slice_idx += 1
 			else:
