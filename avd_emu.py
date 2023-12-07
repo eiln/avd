@@ -336,7 +336,8 @@ class AVDEmulator:
 			instruction_str = ''.join('{:02x} '.format(x) for x in instruction)
 			pc = emu.reg_read(UC_ARM_REG_PC)
 			self.log('PC: %04x INST: %s' % (pc, instruction_str))
-			self.dump_regs()
+			if (self.verbose):
+				self.dump_regs()
 
 	def hook_mmio(self, emu, access, addr, size, val, data):
 		if addr in self.mmio_map:
