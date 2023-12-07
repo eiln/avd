@@ -114,14 +114,16 @@ def bitrepr(size, bits):
 
 def bitrepr32(x): return bitrepr(4, struct.pack("<I", x))
 
-def bitrepr_diff(x, y):
-	out = []
-	for i in range(32):
-		if (x[i] == y[i]):
-			out.append(hl(x[i], None))
-		else:
-			out.append(hl(x[i], ANSI_RED))
-	return "".join(out)
+def bitrepr_diff(x, y, width=32, stride=8):
+    out = []
+    for i in range(width):
+        if (x[i] == y[i]):
+            out.append(hl(x[i], None))
+        else:
+            out.append(hl(x[i], ANSI_RED))
+        if ((isdiv(i+1, stride)) and (i != width-1)):
+            out.append(" ")
+    return "".join(out)
 
 def bassert(x, y, msg="", nonfatal=False):
     if (x != y):
