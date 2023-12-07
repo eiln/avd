@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright 2023 Eileen Yoon <eyn@gmx.com>
 
-from ..decoder import AVDDecoder
+from ..decoder import AVDDecoder, AVDOutputFormat
 from ..utils import *
 from .fp import AVDH265V3FrameParams
 from .halv3 import AVDH265HalV3
@@ -10,7 +10,18 @@ from .parser import AVDH265Parser
 from .types import *
 
 class AVDH265Ctx(dotdict):
-	pass
+	def get_pps(self, sl):
+		return sl.pps
+
+	def get_sps(self, sl):
+		return self.sps_list[self.get_pps(sl).pps_seq_parameter_set_id]
+
+	def rvra_offset(self, idx):
+		if   (idx == 0): return self.rvra_size0
+		elif (idx == 1): return 0
+		elif (idx == 2): return self.rvra_size0 + self.rvra_size1 + self.rvra_size2
+		elif (idx == 3): return self.rvra_size0 + self.rvra_size1
+		raise ValueError("invalid rvra group (%d)" % idx)
 
 class AVDH265Picture(dotdict):
 	def __repr__(self):
@@ -24,15 +35,6 @@ class AVDH265Decoder(AVDDecoder):
 	def __init__(self):
 		super().__init__(AVDH265Parser, AVDH265HalV3, AVDH265V3FrameParams)
 		self.mode = "h265"
-
-	def get_pps(self, sl):
-		return self.ctx.pps_list[sl.slice_pic_parameter_set_id]
-
-	def get_sps_id(self, sl):
-		return self.get_pps(sl).pps_seq_parameter_set_id
-
-	def get_sps(self, sl):
-		return self.ctx.sps_list[self.get_sps_id(sl)]
 
 	def allocate_fifo(self):
 		ctx = self.ctx
@@ -58,6 +60,7 @@ class AVDH265Decoder(AVDDecoder):
 		ctx.active_sl = None
 		ctx.cur_sps_id = -1
 
+		ctx.last_intra_nal_type = -1
 		ctx.last_intra = 0
 		ctx.last_p_sps_tile_idx = 0
 		ctx.dpb_list = []
@@ -68,13 +71,33 @@ class AVDH265Decoder(AVDDecoder):
 
 	def refresh_sps(self, sl):
 		ctx = self.ctx
-		sps_id = self.get_sps_id(sl)
+		pps = ctx.get_pps(sl)
+		sps_id = pps.pps_seq_parameter_set_id
 		if (sps_id == ctx.cur_sps_id):
 			return
 		sps = ctx.sps_list[sps_id]
+
+		sps.width = sps.pic_width_in_luma_samples
+		sps.height = sps.pic_height_in_luma_samples
+
+		sps.log2_ctb_size = sps.log2_min_cb_size + sps.log2_diff_max_min_coding_block_size
+		sps.log2_min_pu_size = sps.log2_min_cb_size - 1
+
+		sps.ctb_width  = sps.width + ((1 << sps.log2_ctb_size) - 1) >> sps.log2_ctb_size
+		sps.ctb_height = (sps.height + (1 << sps.log2_ctb_size) - 1) >> sps.log2_ctb_size
+		sps.ctb_size   = sps.ctb_width * sps.ctb_height
+
+		sps.min_cb_width  = sps.width  >> sps.log2_min_cb_size
+		sps.min_cb_height = sps.height >> sps.log2_min_cb_size
+		sps.min_tb_width  = sps.width  >> sps.log2_min_tb_size
+		sps.min_tb_height = sps.height >> sps.log2_min_tb_size
+		sps.min_pu_width  = sps.width  >> sps.log2_min_pu_size
+		sps.min_pu_height = sps.height >> sps.log2_min_pu_size
+		sps.tb_mask       = (1 << (sps.log2_ctb_size - sps.log2_min_tb_size)) - 1
+
+		# TODO multiple slices with pointing to different SPSs, sigh
 		width = sps.pic_width_in_luma_samples
 		height = sps.pic_height_in_luma_samples
-
 		ctx.orig_width = width
 		ctx.orig_height = height
 		if (width & 1):
@@ -88,12 +111,29 @@ class AVDH265Decoder(AVDDecoder):
 
 		assert((64 <= width and width <= 4096) and (64 <= height and height <= 4096)) # hardware caps
 		assert(not(width & 1) and not(height & 1)) # hardware caps
-		ctx.cur_sps_id = sps_id
-		self.allocate_buffers()
 
-	def allocate_buffers(self):
+		ctx.fmt = AVDOutputFormat(
+			in_width=(round_up(ctx.width, 64) >> 4) << 4,
+			in_height=ctx.height,
+			out_width=ctx.orig_width,
+			out_height=ctx.orig_height,
+			chroma=sps.chroma_format_idc,
+		)
+		ctx.fmt.x0 = 0
+		ctx.fmt.x1 = ctx.fmt.out_width  # TODO vui frame crop
+		ctx.fmt.y0 = 0
+		ctx.fmt.y1 = ctx.fmt.out_height
+		self.log(ctx.fmt)
+		assert(ctx.fmt.in_width >= ctx.fmt.out_width)
+		assert(ctx.fmt.in_height >= ctx.fmt.out_height)
+
+		ctx.cur_sps_id = sps_id
+		self.allocate_buffers(sl)
+
+	def allocate_buffers(self, sl):
 		ctx = self.ctx
-		sps = ctx.sps_list[ctx.cur_sps_id]
+		sps = ctx.get_sps(sl)
+		pps = ctx.get_pps(sl)
 
 		rvra_total_size = self.calc_rvra(chroma=sps.chroma_format_idc)
 		self.allocator_move_up(0x734000)
@@ -101,13 +141,9 @@ class AVDH265Decoder(AVDDecoder):
 		ctx.rvra_base_addrs = [0 for n in range(ctx.rvra_count)]
 		ctx.rvra_base_addrs[0] = self.range_alloc(rvra_total_size, pad=0x100, name="rvra0")
 
-		if (not(isdiv(ctx.width, 32))):
-			wr = round_up(ctx.width, 64)
-		else:
-			wr = round_up(ctx.width, 16)
-		ctx.luma_size = wr * ctx.height
+		ctx.luma_size = ctx.fmt.in_width * ctx.fmt.in_height
 		ctx.y_addr = self.range_alloc(ctx.luma_size, name="disp_y")
-		ctx.chroma_size = wr * round_up(ctx.height, 16)
+		ctx.chroma_size = ctx.fmt.in_width * round_up(ctx.height, 16)
 		if (sps.chroma_format_idc == HEVC_CHROMA_IDC_420):
 			ctx.chroma_size //= 2
 		ctx.uv_addr = self.range_alloc(ctx.chroma_size, name="disp_uv")
@@ -122,10 +158,15 @@ class AVDH265Decoder(AVDDecoder):
 		for n in range(ctx.sps_tile_count):
 			ctx.sps_tile_addrs[n] = self.range_alloc(sps_tile_size, name="sps_tile%d" % n)
 
-		pps_tile_count = 5
+		if (pps.tiles_enabled_flag):
+			pps_tile_count = 8
+		else:
+			pps_tile_count = 5
 		ctx.pps_tile_addrs = [0 for n in range(pps_tile_count)]
 		for n in range(pps_tile_count):
 			ctx.pps_tile_addrs[n] = self.range_alloc(0x8000, name="pps_tile%d" % n)
+		if (pps.tiles_enabled_flag):
+			self.allocator_move_up(self.last_iova + 0x20000)
 
 		for n in range(ctx.rvra_count - 1):
 			ctx.rvra_base_addrs[n + 1] = self.range_alloc(rvra_total_size, name="rvra1_%d" % n)
@@ -269,19 +310,18 @@ class AVDH265Decoder(AVDDecoder):
 	def init_slice(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
 		ctx.poc = sl.pic_order_cnt
-
 		self.refresh(sl)
-
+		self.set_new_ref()
+		self.log(f"curr: {sl.pic}")
 		if (sl.first_slice_segment_in_pic_flag):
-			self.set_new_ref()
-			self.log(f"curr: {sl.pic}")
 			self.do_frame_rps()
-
 		if ((not sl.dependent_slice_segment_flag) and (sl.slice_type != HEVC_SLICE_I)):
 			self.construct_ref_list()
 
 	def finish_slice(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
 
+		if (IS_IDR2(sl)):
+			ctx.last_intra_nal_type = sl.nal_unit_type
 		ctx.last_intra = IS_INTRA(sl)
 		ctx.access_idx += 1

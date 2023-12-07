@@ -67,9 +67,10 @@ class AVDUnitTest:
 				for x in self.dec.ctx.sps_list:
 					if (x):
 						print(x)
-				for x in self.dec.ctx.pps_list:
-					if (x):
-						print(x)
+				if (self.dec.mode in ["h264"]):
+					for x in self.dec.ctx.pps_list:
+						if (x):
+							print(x)
 
 	def test_fp(self, args):
 		self.log(hl("Testing fp '%s'..." % (args.dir), None))
@@ -249,13 +250,13 @@ class AVDH265UnitTest(AVDUnitTest):
 			"hdr_50_mode",
 			"hdr_54_height_width",
 			"hdr_58_pixfmt_zero",
-			"hdr_28_height_width_shift3",
-			"hdr_2c_sps_param",
 
-			"hdr_30_flag_pt1",
-			"hdr_34_flag_pt2",
-			"hdr_5c_flag_pt3",
-			"hdr_60_zero",
+			"hdr_28_height_width_shift3",
+			"hdr_2c_sps_txfm",
+			"hdr_30_sps_pcm",
+			"hdr_34_sps_flags",
+			"hdr_5c_pps_flags",
+			"hdr_60_pps_qp",
 			"hdr_64_zero",
 			"hdr_68_zero",
 			"hdr_6c_zero",
@@ -264,8 +265,9 @@ class AVDH265UnitTest(AVDUnitTest):
 			"hdr_78_zero",
 			"hdr_98_const_30",
 
-			"hdr_114_ref_hdr",
 			"hdr_dc_pps_tile_addr_lsb8",
+			#"hdr_104_curr_ref_addr_lsb7",
+			"hdr_114_ref_hdr",
 			#"slc_bd4_sps_tile_addr2_lsb8",
 
 			"hdr_1b4_y_addr_lsb8",
@@ -280,8 +282,8 @@ class AVDH265UnitTest(AVDUnitTest):
 			"slc_b6c_cmd_weights_offsets",
 			"slc_a8c_cmd_ref_type",
 			"slc_a90_cmd_ref_list",
-			"slc_be0_unk_100",
-			"slc_bdc_slice_size",
+			#"slc_be0_unk_100",
+			#"slc_bdc_slice_size",
 		]
 
 class AVDVP9UnitTest(AVDUnitTest):

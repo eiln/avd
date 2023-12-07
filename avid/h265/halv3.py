@@ -10,18 +10,11 @@ class AVDH265HalV3(AVDHal):
 	def __init__(self):
 		super().__init__()
 
-	def get_pps(self, ctx, sl):
-		return ctx.pps_list[sl.slice_pic_parameter_set_id]
-
-	def get_sps(self, ctx, sl):
-		return ctx.sps_list[self.get_pps(ctx, sl).pps_seq_parameter_set_id]
-
-	def rvra_offset(self, ctx, idx):
-		if   (idx == 0): return ctx.rvra_size0
-		elif (idx == 1): return 0
-		elif (idx == 2): return ctx.rvra_size0 + ctx.rvra_size1 + ctx.rvra_size2
-		elif (idx == 3): return ctx.rvra_size0 + ctx.rvra_size1
-		raise ValueError("invalid rvra group (%d)" % idx)
+	def get_cond(self, ctx, sl):
+		cond = (ctx.last_intra_nal_type in [HEVC_NAL_IDR_N_LP, HEVC_NAL_CRA_NUT])
+		cond = (sl.slice_type == HEVC_SLICE_B) or cond
+		# !HEVC_NAL_IDR_W_RADL
+		return cond
 
 	def set_refs(self, ctx, sl):
 		push = self.push
@@ -38,45 +31,71 @@ class AVDH265HalV3(AVDHal):
 		push(0x70007, "cm3_dma_config_a")
 
 		pred = sl.pic.poc
-		for n,rvra in enumerate(ctx.dpb_list):
+		for n,pic in enumerate(ctx.dpb_list):
 			if (n == 0):
 				delta_base = 0
 			else:
 				delta_base = ctx.dpb_list[n-1].poc
-			delta = delta_base - rvra.poc
+			delta = delta_base - pic.poc
 			pred = pred + delta
 			x = ((len(ctx.dpb_list) - 1) * 0x10000000) | 0x1000000 | swrap(pred, 0x20000)
 			push(x, "hdr_114_ref_hdr", n)
-			push((rvra.addr + self.rvra_offset(ctx, 0)) >> 7, "hdr_134_ref0_addr_lsb7", n)
-			push((rvra.addr + self.rvra_offset(ctx, 1)) >> 7, "hdr_154_ref1_addr_lsb7", n)
-			push((rvra.addr + self.rvra_offset(ctx, 2)) >> 7, "hdr_174_ref2_addr_lsb7", n)
-			push((rvra.addr + self.rvra_offset(ctx, 3)) >> 7, "hdr_194_ref3_addr_lsb7", n)
+			push((pic.addr + ctx.rvra_offset(0)) >> 7, "hdr_134_ref0_addr_lsb7", n)
+			push((pic.addr + ctx.rvra_offset(1)) >> 7, "hdr_154_ref1_addr_lsb7", n)
+			push((pic.addr + ctx.rvra_offset(2)) >> 7, "hdr_174_ref2_addr_lsb7", n)
+			push((pic.addr + ctx.rvra_offset(3)) >> 7, "hdr_194_ref3_addr_lsb7", n)
 
 	def set_flags(self, ctx, sl):
 		push = self.push
-		pps = self.get_pps(ctx, sl)
+		sps = ctx.get_sps(sl)
+		pps = ctx.get_pps(sl)
 
 		x = 0
-		push(x, "hdr_30_flag_pt1")
+		if (sps.pcm_enabled_flag):
+			x |= 0x1000
+			x |= sps.pcm_sample_bit_depth_luma_minus1 << 4
+			x |= sps.pcm_sample_bit_depth_chroma_minus1 << 8
+			x |= sps.log2_diff_max_min_pcm_luma_coding_block_size
+		push(x, "hdr_30_sps_pcm")
 
 		x = 0
-		x |= set_bit(3)
-		x |= set_bit(9)
-		push(x, "hdr_34_flag_pt2")
+		if (1):
+			x |= set_bit(3)
+		if (sps.sps_strong_intra_smoothing_enable_flag):
+			x |= set_bit(9)
+		push(x, "hdr_34_sps_flags")
 
+		#print(pps)
 		x = 0
-		x |= set_bit(3)
-		x |= set_bit(4)
-		if (pps.tiles_enabled_flag or pps.entropy_coding_sync_enabled_flag):
+		if (1):
+			x |= set_bit(3)
+		if (1):
+			x |= set_bit(4)
+		if (pps.log2_parallel_merge_level == 3):
+			x |= set_bit(9)
+		if (pps.entropy_coding_sync_enabled_flag):
 			x |= set_bit(12)
-		x |= set_bit(16)
-		x |= set_bit(17)
-		x |= set_bit(20)
-		if (not (IS_IDR2(sl))):
+		if (pps.tiles_enabled_flag):
+			x |= set_bit(13)
+		if (pps.diff_cu_qp_delta_depth != 1 and pps.diff_cu_qp_delta_depth != 3):
+			x |= set_bit(15)
+		if (pps.diff_cu_qp_delta_depth != 3):
+			x |= set_bit(16)
+		if (pps.cu_qp_delta_enabled_flag):
+			x |= set_bit(17)
+		if (pps.transform_skip_enabled_flag):
+			x |= set_bit(18)
+		if (pps.constrained_intra_pred_flag):
+			x |= set_bit(19)
+		if (pps.sign_data_hiding_enabled_flag):
+			x |= set_bit(20)
+		if ((not IS_IDR2(sl)) and self.get_cond(ctx, sl)):
 			x |= set_bit(21)
-		push(x, "hdr_5c_flag_pt3")
+		push(x, "hdr_5c_pps_flags")
 
-		push(0, "hdr_60_zero")
+		x = pps.pps_cb_qp_offset << 5 | pps.pps_cr_qp_offset
+		push(x, "hdr_60_pps_qp")
+
 		push(0, "hdr_64_zero")
 		push(0, "hdr_68_zero")
 		push(0, "hdr_6c_zero")
@@ -86,6 +105,8 @@ class AVDH265HalV3(AVDHal):
 
 	def set_header(self, ctx, sl):
 		push = self.push
+		sps = ctx.get_sps(sl)
+		pps = ctx.get_pps(sl)
 
 		assert((ctx.inst_fifo_idx >= 0) and (ctx.inst_fifo_idx <= ctx.inst_fifo_count))
 		push(0x2b000000 | 0x100 | (ctx.inst_fifo_idx * 0x10), "cm3_cmd_inst_fifo_start")
@@ -102,9 +123,13 @@ class AVDH265HalV3(AVDHal):
 		push(0x0, "hdr_58_pixfmt_zero")
 		push((((ctx.height - 1) >> 3) << 16) | ((ctx.width - 1) >> 3), "hdr_28_height_width_shift3")
 
-		x = 0x1000000 * self.get_sps(ctx, sl).chroma_format_idc | 0x1000 | 0x800
-		x |= (3 << 7) | 0  # 265 is always up to 32x32 txfm | txfm !specified for each block
-		push(x, "hdr_2c_sps_param")
+		x = sps.chroma_format_idc << 24
+		x |= sps.log2_diff_max_min_coding_block_size << 11
+		x |= sps.log2_diff_max_min_transform_block_size << 7
+		x |= sps.max_transform_hierarchy_depth_inter << 4
+		x |= sps.max_transform_hierarchy_depth_intra << 1
+		x |= sps.amp_enabled_flag
+		push(x, "hdr_2c_sps_txfm")
 
 		self.set_flags(ctx, sl)
 		push(0x300000, "hdr_98_const_30")
@@ -115,47 +140,53 @@ class AVDH265HalV3(AVDHal):
 
 		push(0x4020002, "cm3_dma_config_3")
 		push(0x4020002, "cm3_dma_config_4")
-		push(0x0)
+		push(0x0, "cm3_dma_config_4")
 		push(ctx.pps_tile_addrs[0] >> 8, "hdr_dc_pps_tile_addr_lsb8", 0)
 		push(ctx.pps_tile_addrs[2] >> 8, "hdr_dc_pps_tile_addr_lsb8", 1)
 		push(ctx.pps_tile_addrs[3] >> 8, "hdr_dc_pps_tile_addr_lsb8", 2)
-		push(0x0)
-		push(0x0)
-		push(ctx.pps_tile_addrs[4] >> 8, "hdr_dc_pps_tile_addr_lsb8", 8)
-		push(0x0)
+		if (pps.tiles_enabled_flag):
+			push(ctx.pps_tile_addrs[4] >> 8, "hdr_dc_pps_tile_addr_lsb8", 3)
+			push(ctx.pps_tile_addrs[5] >> 8, "hdr_dc_pps_tile_addr_lsb8", 4)
+			push(ctx.pps_tile_addrs[6] >> 8, "hdr_dc_pps_tile_addr_lsb8", 8)
+			push(ctx.pps_tile_addrs[7] >> 8, "hdr_dc_pps_tile_addr_lsb8", 9)
+		else:
+			push(0x0, "hdr_dc_pps_tile_addr_lsb8", 3)
+			push(0x0, "hdr_dc_pps_tile_addr_lsb8", 4)
+			push(ctx.pps_tile_addrs[4] >> 8, "hdr_dc_pps_tile_addr_lsb8", 8)
+			push(0x0, "hdr_dc_pps_tile_addr_lsb8", 9)
 
 		push(0x70007, "cm3_dma_config_5")
-
 		x = sl.pic.addr
-		push((x + self.rvra_offset(ctx, 0)) >> 7, "hdr_104_curr_ref_addr_lsb7", 0)
-		push((x + self.rvra_offset(ctx, 1)) >> 7, "hdr_104_curr_ref_addr_lsb7", 1)
-		push((x + self.rvra_offset(ctx, 2)) >> 7, "hdr_104_curr_ref_addr_lsb7", 2)
-		push((x + self.rvra_offset(ctx, 3)) >> 7, "hdr_104_curr_ref_addr_lsb7", 3)
+		push((x + ctx.rvra_offset(0)) >> 7, "hdr_104_curr_ref_addr_lsb7", 0)
+		push((x + ctx.rvra_offset(1)) >> 7, "hdr_104_curr_ref_addr_lsb7", 1)
+		push((x + ctx.rvra_offset(2)) >> 7, "hdr_104_curr_ref_addr_lsb7", 2)
+		push((x + ctx.rvra_offset(3)) >> 7, "hdr_104_curr_ref_addr_lsb7", 3)
 		push(0x0, "cm3_mark_end_section")
 
 		push(ctx.y_addr >> 8, "hdr_1b4_y_addr_lsb8")
-		push((round_up(ctx.width, 64) >> 6) << 2, "hdr_1bc_width_align")
+		push(round_up(ctx.width, 64) >> 4, "hdr_1bc_width_align")
 		push(ctx.uv_addr >> 8, "hdr_1b8_uv_addr_lsb8")
-		push((round_up(ctx.width, 64) >> 6) << 2, "hdr_1c0_width_align")
+		push(round_up(ctx.width, 64) >> 4, "hdr_1c0_width_align")
 		push(0x0, "cm3_mark_end_section")
 		push((((ctx.height - 1) & 0xffff) << 16) | ((ctx.width - 1) & 0xffff), "hdr_54_height_width")
 
 		if (not IS_INTRA(sl)):
 			self.set_refs(ctx, sl)
-
 		push(0x0, "cm3_mark_end_section")
-		# ---- FW BP -----
 
 	def set_weights(self, ctx, sl):
 		push = self.push
+		pps = ctx.get_pps(sl)
 
 		x = 0x2dd00000
 		if (sl.has_luma_weights == 0):
 			push(x, "slc_b08_cmd_weights_denom")
 			return
-		if (sl.slice_type == HEVC_SLICE_P):
+		if ((sl.slice_type == HEVC_SLICE_P) and pps.weighted_pred_flag):
 			x |= 0x40
-		else:
+		elif ((sl.slice_type == HEVC_SLICE_B) and (pps.weighted_bipred_flag == 1)):
+			x |= 0x40
+		elif ((sl.slice_type == HEVC_SLICE_B) and (pps.weighted_bipred_flag == 0)):
 			x |= 0xad
 		x |= (sl.luma_log2_weight_denom << 3) | sl.chroma_log2_weight_denom
 		push(x, "slc_b08_cmd_weights_denom")
@@ -188,47 +219,48 @@ class AVDH265HalV3(AVDHal):
 					push(0x2df00000 | swrap(sl.chroma_offset_l1[i][1], 0x10000), "slc_b6c_cmd_weights_offsets", num)
 					num += 1
 
-	def set_slice(self, ctx, sl):
+	def set_slice_dqtblk(self, ctx, sl):
 		push = self.push
-		push(0x2d800000 | 0x6000, "cm3_cmd_set_coded_slice")
-		push(ctx.slice_data_addr + sl.get_payload_offset(), "slc_bd8_slice_addr")
-		push(sl.get_payload_size(), "slc_bdc_slice_size")
-		push(0x2c000000, "cm3_cmd_exec_mb_vp")
-		# ---- FW BP -----
+		sps = ctx.get_sps(sl)
+		pps = ctx.get_pps(sl)
 
-		push(0x2d900000 | ((26 + self.get_pps(ctx, sl).pic_init_qp_minus26 + sl.slice_qp_delta) * 0x400), "slc_bcc_cmd_quantization")
+		x = (26 + pps.pic_init_qp_minus26 + sl.slice_qp_delta) << 10
+		x |= swrap(pps.pps_cb_qp_offset + sl.slice_cb_qp_offset, 32) << 5
+		x |= swrap(pps.pps_cr_qp_offset + sl.slice_cr_qp_offset, 32)
+		push(0x2d900000 | x, "slc_bcc_cmd_quantization")
 
 		x = 0
-		x |= set_bit(6)
-		x |= set_bit(7)
-		x |= set_bit(16)
+		x |= sl.slice_sao_chroma_flag << 6
+		x |= sl.slice_sao_luma_flag << 7
+		x |= swrap(sl.slice_tc_offset_div2, 16) << 8
+		x |= swrap(sl.slice_beta_offset_div2, 16) << 12
+		if (sps.sps_strong_intra_smoothing_enable_flag):
+			x |= set_bit(16)
 		if (sl.slice_loop_filter_across_slices_enabled_flag):
 			x |= set_bit(17)
-		x |= set_bit(18)
+		if ((not pps.tiles_enabled_flag) or (pps.tiles_enabled_flag and pps.loop_filter_across_tiles_enabled_flag)):
+			x |= set_bit(18)
+		if (sps.pcm_enabled_flag and not sps.pcm_loop_filter_disabled_flag):
+			x |= set_bit(19)
 		push(0x2da00000 | x, "slc_bd0_cmd_deblocking_filter")
 
 		if (sl.slice_type == HEVC_SLICE_P) or (sl.slice_type == HEVC_SLICE_B):
 			num = 0
-			lx = 0
 			for i,lst in enumerate(sl.reflist[0]):
 				pos = list([x.poc for x in ctx.dpb_list]).index(lst.poc)
-				push(0x2dc00000 | (lx << 8) | (i << 4) | pos, "slc_a90_cmd_ref_list", i)
+				push(0x2dc00000 | 0 << 8 | i << 4 | pos, "slc_a90_cmd_ref_list", i)
 				num += 1
 			if (sl.slice_type == HEVC_SLICE_B):
-				lx = 1
 				for i,lst in enumerate(sl.reflist[1]):
 					pos = list([x.poc for x in ctx.dpb_list]).index(lst.poc)
-					push(0x2dc00000 | (lx << 8) | (i << 4) | pos,
-					"slc_a90_cmd_ref_list", num + i)
+					push(0x2dc00000 | 1 << 8 | i << 4 | pos, "slc_a90_cmd_ref_list", num + i)
 
 			self.set_weights(ctx, sl)
 
-		push(0x2a000000, "cm3_cmd_set_mb_dims")
-		sps = self.get_sps(ctx, sl)
-		log2_ctb_size = sps.log2_min_cb_size + sps.log2_diff_max_min_coding_block_size
-		ctb_width = ctx.width + ((1 << log2_ctb_size) - 1) >> log2_ctb_size
-		ctb_height = (ctx.height + (1 << log2_ctb_size) - 1) >> log2_ctb_size
-		push(((ctb_height - 1) << 12) | (ctb_width - 1), "cm3_set_mb_dims")
+	def set_slice_mv(self, ctx, sl):
+		push = self.push
+
+		cond = self.get_cond(ctx, sl)
 
 		x = 0
 		if   (sl.slice_type == HEVC_SLICE_I):
@@ -237,32 +269,99 @@ class AVDH265HalV3(AVDHal):
 			x |= 0x10000
 
 		if ((sl.slice_type == HEVC_SLICE_P) or (sl.slice_type == HEVC_SLICE_B)):
-			x |= 0x6
-			x |= 0x8000
-
-			if (sl.slice_type == HEVC_SLICE_P):
-				ref = sl.reflist[0][0]
-			else:
-				ref = sl.reflist[1][0]
-			if (not ref.rasl) and (not ctx.last_intra):
-				x |= 0x40000
-
-			x |= sl.num_ref_idx_l0_active_minus1 << 11
+			x |= sl.max_num_merge_cand << 1
 			if (sl.slice_type == HEVC_SLICE_B):
-				x |= 0x50
+				if (not sl.collocated_from_l0_flag):
+					x |= set_bit(4)
+				if (0):
+					x |= set_bit(5)
+				if (not sl.mvd_l1_zero_flag):
+					x |= set_bit(6)
 				x |= sl.num_ref_idx_l1_active_minus1 << 7
+			x |= sl.num_ref_idx_l0_active_minus1 << 11
+
+			if (cond):
+				x |= set_bit(15)
+			if (sl.slice_type == HEVC_SLICE_P):
+				n = 0
+			else:
+				n = not sl.collocated_from_l0_flag
+			ref = sl.reflist[n][0]
+			if ((not ref.rasl) and (not ctx.last_intra) and (cond)):
+				x |= set_bit(18)
+
 		push(0x2d000000 | x, "slc_a8c_cmd_ref_type")
 
-		if ((sl.slice_type == HEVC_SLICE_P) and not ctx.last_intra) or (sl.slice_type == HEVC_SLICE_B):
-			if (sl.slice_type == HEVC_SLICE_P):
-				ref = sl.reflist[0][0]
-			else:
-				ref = sl.reflist[1][0]
-			if (not ref.rasl):
-				n = ref.idx
-				push(ctx.sps_tile_addrs[n] >> 8, "slc_bd4_sps_tile_addr2_lsb8")
+		if (sl.slice_type == HEVC_SLICE_P) or (sl.slice_type == HEVC_SLICE_B):
+			if ((not ref.rasl) and (not ctx.last_intra) and (cond)):
+				push(ctx.sps_tile_addrs[ref.idx] >> 8, "slc_bd4_sps_tile_addr2_lsb8")
 
-		push(0x1000000, "slc_be0_unk_100")
+	def set_coded_slice(self, ctx, offset, size, is_primary):
+		push = self.push
+		push(0x2d800000 | boolify(is_primary) << 14 | 0x2000, "cm3_cmd_set_coded_slice")
+		push(ctx.slice_data_addr + offset, "slc_bd8_slice_addr")
+		push(size, "slc_bdc_slice_size")
+		return size
+
+	def set_slice(self, ctx, sl):
+		push = self.push
+		sps = ctx.get_sps(sl)
+		pps = ctx.get_pps(sl)
+
+		if (pps.tiles_enabled_flag):
+			col_bd = [0] * (pps.num_tile_columns + 1)
+			row_bd = [0] * (pps.num_tile_rows + 1)
+			for i in range(pps.num_tile_columns):
+				col_bd[i + 1] = col_bd[i] + pps.column_width[i]
+			for i in range(pps.num_tile_rows):
+				row_bd[i + 1] = row_bd[i] + pps.row_height[i]
+
+		offset = sl.get_payload_offset()
+		if ((not pps.tiles_enabled_flag) and (not pps.entropy_coding_sync_enabled_flag)):
+			size = sl.get_payload_size()
+		elif ((not pps.tiles_enabled_flag) and (pps.entropy_coding_sync_enabled_flag)):
+			size = sl.get_payload_size()
+		elif ((pps.tiles_enabled_flag) and (not pps.entropy_coding_sync_enabled_flag)):
+			size = sl.entry_point_offset[0]
+		else:
+			raise ValueError("todo")
+		offset += self.set_coded_slice(ctx, offset, size, 1)
+		push(0x2c000000, "cm3_cmd_exec_mb_vp")
+
+		self.set_slice_dqtblk(ctx, sl)
+
+		if (pps.tiles_enabled_flag):
+			c = (row_bd[0] & 0xffff) << 12 | col_bd[0] & 0xffff
+			x = 0 << 24 | ((row_bd[0 + 1] - 1) & 0xffff) << 12 | ((col_bd[0 + 1] - 1) & 0xffff)
+		else:
+			c = 0
+			x = ((sps.ctb_height - 1) & 0xffff) << 12 | (sps.ctb_width - 1) & 0xffff
+		push(0x2a000000 | c, "cm3_cmd_set_mb_dims")
+		push(x, "cm3_set_mb_dims")
+		self.set_slice_mv(ctx, sl)
+		push(0x1000000 | c, "cm3_cmd_set_mb_dims")
+
+		if (pps.tiles_enabled_flag and pps.entropy_coding_sync_enabled_flag == 0):
+			for n in range(1, sl.num_entry_point_offsets + 1):  # We did tile #0 above
+				push(0x2b000000, "cm3_cmd_inst_fifo_start")
+				if (n != sl.num_entry_point_offsets):
+					size = sl.entry_point_offset[n]
+				else:
+					size = sl.get_payload_total_size() - offset
+				offset += self.set_coded_slice(ctx, offset, size, 0)
+
+				row = n // pps.num_tile_rows
+				col = n % pps.num_tile_columns
+				x = ((row_bd[row + 1] - 1) & 0xffff) << 12 | (col_bd[col + 1] - 1) & 0xffff
+				x |= col << 24
+				if (row > 0 and col > 0): # ??
+					x |= 0x80000000
+				if (row == 1):
+					x |= 0x40000000
+				push(0x2a000000 | (row_bd[row] & 0xffff) << 12 | col_bd[col] & 0xffff, "cm3_cmd_set_mb_dims")
+				push(x, "cm3_cmd_set_mb_dims")
+				push(0x1000000  | (row_bd[row] & 0xffff) << 12 | col_bd[col] & 0xffff, "cm3_cmd_set_mb_dims")
+
 		push(0x2b000000 | 0x400, "cm3_cmd_inst_fifo_end")
 
 	def set_insn(self, ctx, sl):

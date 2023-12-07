@@ -23,9 +23,9 @@ class AVDH265V3PiodmaHeader(AVDFrameParams):
 class AVDH265V3InstHeader(AVDFrameParams):
 	subcon = Struct(
 		"hdr_28_height_width_shift3" / u32,
-		"hdr_2c_sps_param" / u32,
-		"hdr_30_flag_pt1" / ExprValidator(u32, obj_ == 0),
-		"hdr_34_flag_pt2" / ExprValidator(u32, obj_ == 0x208),
+		"hdr_2c_sps_txfm" / u32,
+		"hdr_30_sps_pcm" / u32,
+		"hdr_34_sps_flags" / u32,
 		"hdr_38_zero" / ExprValidator(u32, obj_ == 0),
 		"hdr_3c_zero" / ExprValidator(u32, obj_ == 0),
 		"hdr_40_zero" / ExprValidator(u32, obj_ == 0),
@@ -36,8 +36,8 @@ class AVDH265V3InstHeader(AVDFrameParams):
 		"hdr_50_mode" / ExprValidator(u32, obj_ == 0),
 		"hdr_54_height_width" / u32,
 		"hdr_58_pixfmt_zero" / ExprValidator(u32, obj_ == 0),
-		"hdr_5c_flag_pt3" / u32,
-		"hdr_60_zero" / ExprValidator(u32, obj_ == 0),
+		"hdr_5c_pps_flags" / u32,
+		"hdr_60_pps_qp" / u32,
 		"hdr_64_zero" / ExprValidator(u32, obj_ == 0),
 		"hdr_68_zero" / ExprValidator(u32, obj_ == 0),
 		"hdr_6c_zero" / ExprValidator(u32, obj_ == 0),
@@ -106,7 +106,7 @@ class AVDH265V3DumbFuckingWasteOfMemory(AVDFrameParams):
 class AVDH265V3Slice(AVDFrameParams):
 	subcon = Struct(
 		"slc_a88_unk" / u32,
-		"slc_a8c_cmd_ref_type" / u32,
+		"slc_a8c_cmd_ref_type" / ExprValidator(u32, obj_ & 0x2d000000 == 0x2d000000),
 		"slc_a90_cmd_ref_list" / Array(30, u32),
 		"slc_b04_unk_count" / u32,
 		"slc_b08_cmd_weights_denom" / ExprValidator(u32, obj_ & 0x2dd00000 == 0x2dd00000),
@@ -162,4 +162,4 @@ class AVDH265V3FrameParams(AVDFrameParams):
 		super().__init__()
 
 	def __str__(self):
-		return ''.join([str(getattr(self, x)) for x in ["hdr", "slc"]])
+		return ''.join([str(getattr(self, x)) for x in ["pio", "hdr", "slc"]])

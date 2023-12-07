@@ -74,6 +74,10 @@ class AVDH265Parser(AVDParser):
 
 			("st_rps_poc", HEVC_MAX_SHORT_TERM_REF_PIC_SETS),
 			("st_rps_used", HEVC_MAX_SHORT_TERM_REF_PIC_SETS),
+
+			("entry_point_offset", HEVC_MAX_ENTRY_POINT_OFFSETS),
+			("column_width", HEVC_MAX_TILE_COLUMNS),
+			("row_height", HEVC_MAX_TILE_ROWS),
 		]
 		self.slccls = AVDH265Slice
 
@@ -133,6 +137,7 @@ class AVDH265Parser(AVDParser):
 			elif (unit.nal_unit_type == HEVC_NAL_SEI_PREFIX or unit.nal_unit_type == HEVC_NAL_SEI_SUFFIX):
 				continue
 			elif (unit.nal_unit_type in [HEVC_NAL_TRAIL_R, HEVC_NAL_TRAIL_N, HEVC_NAL_TSA_N,HEVC_NAL_TSA_R, HEVC_NAL_STSA_N, HEVC_NAL_STSA_R, HEVC_NAL_BLA_W_LP, HEVC_NAL_BLA_W_RADL, HEVC_NAL_BLA_N_LP, HEVC_NAL_IDR_W_RADL, HEVC_NAL_IDR_N_LP, HEVC_NAL_CRA_NUT, HEVC_NAL_RADL_N, HEVC_NAL_RADL_R, HEVC_NAL_RASL_N, HEVC_NAL_RASL_R]):
+				unit.pps = pps_list[unit.slice_pic_parameter_set_id]
 				unit.nal_offset = offsets[i]
 				slices.append(unit)
 				slice_idx += 1
