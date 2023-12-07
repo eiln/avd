@@ -13,7 +13,7 @@ class AVDH265V3PiodmaHeader(AVDFrameParams):
 		"pio_10_notused" / u32,
 		"pio_14_deadcafe" / ExprValidator(u32, obj_ == 0xdeadcafe),
 		"pio_18_101_notused" / ExprValidator(u32, (obj_ & 0xfff) == 0x101),
-		"pio_1c_slice_count" / u32,
+		"pio_1c_num_entry_points" / u32,
 		"pio_20_piodma2_cmd" / ExprValidator(u32, obj_ == 0x34ce4),
 		"pio_24_piodma3_cmd" / ExprValidator(u32, obj_ == 0x4ace4),
 	)

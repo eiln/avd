@@ -151,6 +151,10 @@ class AVDEmulator:
 	def set_params_h265(self, frame_params):
 		fifo1_idx = self.set_dart1_space(frame_params, 0x221ef15)
 		fifo1_iova = 0x4000 + (AVD_DART1_FIFO_WIDTH * fifo1_idx)
+		tile_count = 1
+		hdr = struct.unpack("<8I", frame_params[:0x20])
+		if (not (hdr[6] & 0x40000 == 0x40000)):
+			tile_count = hdr[7]  # pio_1c_num_entry_points
 
 		"""
 		00000000  00000001 00000000 00004000 00000001 00010003 00000001 00000000 0108ef38
@@ -163,7 +167,7 @@ class AVDEmulator:
 		cmd[ 2] = fifo1_iova
 		cmd[ 3] = fifo1_idx + 1
 		cmd[ 4] = 0x10003
-		cmd[ 5] = 0x1
+		cmd[ 5] = tile_count
 		cmd[ 6] = 0x0
 		cmd[ 7] = 0x108ef38 + (AVD_CM3_FIFO_WIDTH * (fifo1_idx % AVD_CM3_FIFO_COUNT))
 		cmd[ 8] = fifo1_iova + 0x288
