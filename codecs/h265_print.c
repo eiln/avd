@@ -195,7 +195,7 @@ static void h265_print_lt_rps(struct hevc_long_term_rps *rps)
 static void h265_print_vui(struct hevc_sps *sps, struct hevc_vui *vui)
 {
     h265_header("VUI parameters:");
-    h265_fieldt("taspect_ratio_info_present_flag", vui->aspect_ratio_info_present_flag);
+    h265_fieldt("aspect_ratio_info_present_flag", vui->aspect_ratio_info_present_flag);
     h265_fieldt("aspect_ratio_idc", vui->aspect_ratio_idc);
     h265_fieldt("sar_width", vui->sar_width);
     h265_fieldt("sar_height", vui->sar_height);
