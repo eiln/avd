@@ -305,10 +305,10 @@ void h265_print_nal_sps(struct hevc_sps *sps)
     h265_field("sample_adaptive_offset_enabled_flag", sps->sample_adaptive_offset_enabled_flag);
     h265_field("pcm_enabled_flag", sps->pcm_enabled_flag);
     if (sps->pcm_enabled_flag) {
-        h265_field("pcm_sample_bit_depth_luma", sps->pcm_sample_bit_depth_luma);
-        h265_field("pcm_sample_bit_depth_chroma", sps->pcm_sample_bit_depth_chroma);
-        h265_field("log2_min_pcm_luma_coding_block_size", sps->log2_min_pcm_cb_size);
-        h265_field("log2_man_pcm_luma_coding_block_size", sps->log2_max_pcm_cb_size);
+        h265_field("pcm_sample_bit_depth_luma_minus1", sps->pcm_sample_bit_depth_luma-1);
+        h265_field("pcm_sample_bit_depth_chroma_minus1", sps->pcm_sample_bit_depth_chroma-1);
+        h265_field("log2_min_pcm_luma_coding_block_size_minus3", sps->log2_min_pcm_cb_size-3);
+        h265_field("log2_diff_max_min_pcm_luma_coding_block_size", sps->log2_max_pcm_cb_size-sps->log2_min_pcm_cb_size);
         h265_field("pcm_loop_filter_disabled_flag", sps->pcm_loop_filter_disabled_flag);
     }
 
@@ -358,6 +358,8 @@ static void h265_print_pps_range_extension(struct hevc_pps *pps)
 
 void h265_print_nal_pps(struct hevc_pps *pps)
 {
+    int i;
+
     h265_field("pps_pic_parameter_set_id", pps->pps_pic_parameter_set_id);
     h265_field("pps_seq_parameter_set_id", pps->sps_id);
 
@@ -402,8 +404,8 @@ void h265_print_nal_pps(struct hevc_pps *pps)
         h265_field("deblocking_filter_override_enabled_flag", pps->deblocking_filter_override_enabled_flag);
         h265_field("pps_deblocking_filter_disabled_flag", pps->pps_deblocking_filter_disabled_flag);
         if (!pps->pps_deblocking_filter_disabled_flag) {
-            h265_field("pps_beta_offset", pps->pps_beta_offset);
-            h265_field("pps_tc_offset", pps->pps_tc_offset);
+            h265_field("pps_beta_offset_div2", pps->pps_beta_offset / 2);
+            h265_field("pps_tc_offset_div2", pps->pps_tc_offset / 2);
         }
     }
 
@@ -538,8 +540,8 @@ void h265_print_nal_slice_header(struct h265_context *s, struct hevc_slice_heade
 
         h265_field("deblocking_filter_override_flag", sh->deblocking_filter_override_flag);
         h265_field("slice_deblocking_filter_disabled_flag", sh->slice_deblocking_filter_disabled_flag);
-        h265_field("slice_beta_offset", sh->slice_beta_offset);
-        h265_field("slice_tc_offset", sh->slice_tc_offset);
+        h265_field("slice_beta_offset_div2", sh->slice_beta_offset / 2);
+        h265_field("slice_tc_offset_div2", sh->slice_tc_offset / 2);
 
         h265_field("slice_loop_filter_across_slices_enabled_flag", sh->slice_loop_filter_across_slices_enabled_flag);
     }
