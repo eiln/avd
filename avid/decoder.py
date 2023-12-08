@@ -108,43 +108,29 @@ class AVDDecoder:
 				ffp[inst.name] = inst.val
 		return ffp
 
-	def calc_rvra(self, is_422):
+	def calc_rvra(self, chroma):
 		ctx = self.ctx
-
 		# reference VRA (video resolution adaptation) scaler buffer.
 		ws = round_up(ctx.width, 32)
 		hs = round_up(ctx.height, 32)
-
-		# 1. luma
 		ctx.rvra_size0 = (ws * hs) + ((ws * hs) // 4)
-
-		# 2. chroma
 		ctx.rvra_size2 = ctx.rvra_size0
-		if (not is_422): # TODO sucks
+		if   (chroma == 0):   # 4:0:0
+			ctx.rvra_size2 *= 0
+		elif (chroma == 1): # 4:2:0
 			ctx.rvra_size2 //= 2
-
-		# 3. luma weights
-		ctx.rvra_size1 = ((nextpow2(ctx.height) // 32) * nextpow2(ctx.width))
-
-		# 4. chroma weights
-		# I can't figure this one out. at least make tests pass
-		if (ctx.width == 128 and ctx.height == 64):
-			ctx.rvra_size3 = 0x4300
-			if (is_422):
-				ctx.rvra_size3 = 0x6f00
-		elif (ctx.width == 176 and ctx.height == 144):
-			ctx.rvra_size3 = 0x5700
-		elif (ctx.width == 352 and ctx.height == 288):
-			ctx.rvra_size3 = 0x7a00
-		elif (ctx.width == 1024 and ctx.height == 512):
-			ctx.rvra_size3 = 0x8000
-		elif ((ctx.width >= 1910 and ctx.width <= 1920) and (ctx.height >= 1080 and ctx.height <= 1088)):
-			ctx.rvra_size3 = 0xfc00
-		elif (ctx.width == 3840 and ctx.height == 2160):
-			ctx.rvra_size3 = 0x27000
-		else:  # best approximation / worst case, oops
-			rvra_total_size = (ws * hs) * 4
-			ctx.rvra_size3 = rvra_total_size - (ctx.rvra_size0 + ctx.rvra_size1 + ctx.rvra_size2)
-
-		rvra_total_size = ctx.rvra_size0 + ctx.rvra_size1 + ctx.rvra_size2 + ctx.rvra_size3
-		return rvra_total_size
+		ctx.rvra_size1 = max(nextpow2(ctx.width) * nextpow2(ctx.height) // 32, 0x100)
+		size = ctx.rvra_size0 + ctx.rvra_size1 + ctx.rvra_size2
+		size = round_up(size, 0x4000)
+		# TODO
+		d = 1
+		if (ctx.width >= 1000):
+			d = 2
+		if (ctx.width >= 1800):
+			d = 3
+		if (ctx.width >= 3800):
+			d = 9
+		size += d * 0x4000
+		ctx.rvra_total_size = size
+		ctx.rvra_size3 = ctx.rvra_total_size - (ctx.rvra_size0 + ctx.rvra_size1 + ctx.rvra_size2)
+		return ctx.rvra_total_size

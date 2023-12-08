@@ -143,13 +143,13 @@ class AVDH264Decoder(AVDDecoder):
 			ctx.inst_fifo_addrs[n] = self.range_alloc(0x100000, pad=0x4000, name="inst_fifo%d" % n)
 		ctx.inst_fifo_iova = ctx.inst_fifo_addrs[ctx.inst_fifo_idx]
 
-		rvra_total_size = self.calc_rvra(is_422=sps.chroma_format_idc == H264_CHROMA_IDC_422)
+		rvra_total_size = self.calc_rvra(chroma=sps.chroma_format_idc)
 		self.allocator_move_up(0x734000)
 		ctx.rvra_base_addrs = [0 for n in range(ctx.rvra_count)]
-		ctx.rvra_base_addrs[0] = self.range_alloc(rvra_total_size, pad=0x100, name="rvra0")
+		ctx.rvra_base_addrs[0] = self.range_alloc(rvra_total_size, name="rvra0")
 
 		ctx.luma_size = ctx.fmt.in_width * ctx.fmt.in_height
-		ctx.y_addr = self.range_alloc(ctx.luma_size, name="disp_y")
+		ctx.y_addr = self.range_alloc(ctx.luma_size, padb4=0x100, name="disp_y")
 		ctx.chroma_size = ctx.fmt.in_width * ctx.fmt.in_height
 		if (sps.chroma_format_idc == H264_CHROMA_IDC_420):
 			ctx.chroma_size //= 2
@@ -171,7 +171,7 @@ class AVDH264Decoder(AVDDecoder):
 			ctx.pps_tile_addrs[n] = self.range_alloc(size, name="pps_tile%d" % n)
 
 		for n in range(ctx.rvra_count - 1):
-			ctx.rvra_base_addrs[n + 1] = self.range_alloc(rvra_total_size, name="rvra1_%d" % n)
+			ctx.rvra_base_addrs[n + 1] = self.range_alloc(rvra_total_size, align=0x4000, name="rvra1_%d" % n)
 		self.dump_ranges()
 
 		ctx.dpb_pool = []

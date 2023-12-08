@@ -95,7 +95,7 @@ class AVDH265Decoder(AVDDecoder):
 		ctx = self.ctx
 		sps = ctx.sps_list[ctx.cur_sps_id]
 
-		rvra_total_size = self.calc_rvra(is_422=sps.chroma_format_idc == HEVC_CHROMA_IDC_422)
+		rvra_total_size = self.calc_rvra(chroma=sps.chroma_format_idc)
 		self.allocator_move_up(0x734000)
 		ctx.rvra_count = 6
 		ctx.rvra_base_addrs = [0 for n in range(ctx.rvra_count)]
