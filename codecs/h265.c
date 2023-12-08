@@ -1299,6 +1299,16 @@ static int h265_decode_nal_pps(struct h265_context *s, struct hevc_pps *pps)
             }
             pps->row_height[pps->num_tile_rows - 1] = sps->ctb_height - sum;
         }
+        else {
+            for (i = 0; i < pps->num_tile_columns; i++) {
+                pps->column_width[i] = ((i + 1) * sps->ctb_width) / pps->num_tile_columns -
+                                        (i * sps->ctb_width) / pps->num_tile_columns;
+            }
+            for (i = 0; i < pps->num_tile_rows; i++) {
+                pps->row_height[i] = ((i + 1) * sps->ctb_height) / pps->num_tile_rows -
+                                      (i * sps->ctb_height) / pps->num_tile_rows;
+            }
+        }
         pps->loop_filter_across_tiles_enabled_flag = get_bits1(gb);
     }
 

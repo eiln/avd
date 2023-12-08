@@ -373,6 +373,11 @@ void h265_print_nal_pps(struct hevc_pps *pps)
     if (pps->tiles_enabled_flag) {
         h265_field("num_tile_columns", pps->num_tile_columns);
         h265_field("num_tile_rows", pps->num_tile_rows);
+        h265_field("uniform_spacing_flag", pps->uniform_spacing_flag);
+        for (i = 0; i < pps->num_tile_columns; i++)
+            h265_field("column_width[%d]", i, pps->column_width[i]);
+        for (i = 0; i < pps->num_tile_rows; i++)
+            h265_field("row_height[%d]", i, pps->row_height[i]);
         h265_field("loop_filter_across_tiles_enabled_flag", pps->loop_filter_across_tiles_enabled_flag);
     }
     h265_field("pps_loop_filter_across_slices_enabled_flag", pps->pps_loop_filter_across_slices_enabled_flag);
