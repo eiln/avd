@@ -8,7 +8,6 @@ from .fp import AVDH265V3FrameParams
 from .halv3 import AVDH265HalV3
 from .parser import AVDH265Parser
 from .types import *
-from copy import deepcopy
 
 class AVDH265Ctx(dotdict):
 	pass
@@ -155,6 +154,7 @@ class AVDH265Decoder(AVDDecoder):
 			lx_count = 1
 		else:
 			lx_count = 2
+		dpb_list = []
 		reflist = [None, None]
 		for lx in range(lx_count):
 			num_ref_idx_lx_active = sl[f"num_ref_idx_l{lx}_active_minus1"] + 1
@@ -173,10 +173,9 @@ class AVDH265Decoder(AVDDecoder):
 			reflist[lx] = rpl_tmp[:nb_refs]
 			for x in reflist[lx]:
 				self.log(f"List{lx}: {x}")
+				if (x not in dpb_list):
+					dpb_list.append(x)
 		sl.reflist = reflist
-		dpb_list = deepcopy(sl.reflist[0])
-		if (sl.reflist[1]):
-			dpb_list += sl.reflist[1]
 		ctx.dpb_list = dpb_list
 
 	def bump_frame(self):
