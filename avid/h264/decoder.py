@@ -88,26 +88,23 @@ class AVDH264Decoder(AVDDecoder):
 		ctx.width = width
 		ctx.height = height
 
-		assert((64 <= width and width <= 4096) and (64 <= height and height <= 4096)) # hardware caps
-		assert(not(width & 15) and not(height & 15)) # hardware caps
+		# Hardware caps
+		assert((64 <= width and width <= 4096) and (64 <= height and height <= 4096))
+		assert(not(width & 15) and not(height & 15))
+		assert((sps.chroma_format_idc == H264_CHROMA_IDC_420) or
+		       (sps.chroma_format_idc == H264_CHROMA_IDC_422))
+		if (sps.bit_depth_luma_minus8 != sps.bit_depth_chroma_minus8):
+			raise ValueError("Haven't tested")
 
-		ctx.max_frame_num = 1 << (sps.log2_max_frame_num_minus4 + 4)
-		if (sps.vui_parameters_present_flag):
-			ctx.num_reorder_frames = sps.num_reorder_frames + 1
-		else:
-			ctx.num_reorder_frames = sps.max_num_ref_frames
-
-		width_mbs = (sps.pic_width_in_mbs_minus1 + 1)
-		height_mbs = (2 - sps.frame_mbs_only_flag) * (sps.pic_height_in_map_units_minus1 + 1)
-		assert(width_mbs == (ctx.orig_width + 15) // 16)
-		assert(height_mbs == (ctx.orig_height + 15) // 16)
-
+		stride = round_up(sps.bit_depth_luma_minus8 + 8, 8) // 8
 		ctx.fmt = AVDOutputFormat(
-			in_width=(round_up(ctx.width, 64) >> 4) << 4,
-			in_height=ctx.height,
-			out_width=ctx.orig_width,
-			out_height=ctx.orig_height,
-			chroma=sps.chroma_format_idc,
+			in_width         = ((round_up(ctx.width, 64) >> 4) << 4) * stride,
+			in_height        = (round_up(ctx.height, 16) >> 4) << 4,
+			out_width        = ctx.orig_width,
+			out_height       = ctx.orig_height,
+			chroma           = sps.chroma_format_idc,
+			bitdepth_luma    = sps.bit_depth_luma_minus8 + 8,
+			bitdepth_chroma  = sps.bit_depth_chroma_minus8 + 8,
 		)
 		ctx.fmt.x0 = 0
 		ctx.fmt.x1 = ctx.fmt.out_width  # TODO vui frame crop
@@ -117,6 +114,17 @@ class AVDH264Decoder(AVDDecoder):
 		assert(ctx.fmt.in_width >= ctx.fmt.out_width)
 		assert(ctx.fmt.in_height >= ctx.fmt.out_height)
 
+		ctx.max_frame_num = 1 << (sps.log2_max_frame_num_minus4 + 4)
+		if (sps.vui_parameters_present_flag):
+			ctx.num_reorder_frames = sps.num_reorder_frames + 1
+		else:
+			ctx.num_reorder_frames = sps.max_num_ref_frames
+
+		width_mbs = (sps.pic_width_in_mbs_minus1 + 1)
+		height_mbs = (2 - sps.frame_mbs_only_flag) * (sps.pic_height_in_map_units_minus1 + 1)
+		assert(width_mbs == (ctx.orig_width + 15) // 16)  # No interlaced
+		assert(height_mbs == (ctx.orig_height + 15) // 16)
+
 		level = [level for level in h264_levels if level[1] == sps.level_idc][-1]
 		ctx.max_dpb_frames = min((level[5]) // (width_mbs * height_mbs), 16) # max_dpb_mbs
 		ctx.rvra_count = ctx.max_dpb_frames + 1 + 1  # all refs + IDR + current
@@ -124,15 +132,13 @@ class AVDH264Decoder(AVDDecoder):
 		assert(width_mbs <= sqrt(level[4] * 8))
 		assert(height_mbs <= sqrt(level[4] * 8))
 		ctx.cur_sps_id = sps_id
-		self.allocate_buffers()
+		self.allocate_buffers(sl)
 
-	def allocate_buffers(self):
+	def allocate_buffers(self, sl):
 		ctx = self.ctx
 		# matching macOS allocations makes for easy diffs
 		# see tools/dims264.py experiment
-		sps = ctx.sps_list[ctx.cur_sps_id]
-		assert((sps.chroma_format_idc == H264_CHROMA_IDC_420) or
-		       (sps.chroma_format_idc == H264_CHROMA_IDC_422))
+		sps = ctx.get_sps(sl)
 
 		self.reset_allocator()
 		ctx.inst_fifo_count = 7
@@ -167,7 +173,9 @@ class AVDH264Decoder(AVDDecoder):
 		pps_tile_count = 5
 		ctx.pps_tile_addrs = [0 for n in range(pps_tile_count)]
 		for n in range(pps_tile_count):
-			size = (((ctx.width >> 11) + 1) * 0x4000) + 0x4000
+			size = 0x8000
+			if (n == 2 and ctx.fmt.in_width > 2048):
+				size = 0xc000
 			ctx.pps_tile_addrs[n] = self.range_alloc(size, name="pps_tile%d" % n)
 
 		for n in range(ctx.rvra_count - 1):

@@ -17,6 +17,8 @@ class AVDOutputFormat:
 	y0: int = 0
 	y1: int = 0
 	chroma: int = 0
+	bitdepth_luma: int = 8
+	bitdepth_chroma: int = 8
 
 class AVDRange(namedtuple('AVDRange', ['iova', 'size', 'name'])):
 	def __repr__(self):

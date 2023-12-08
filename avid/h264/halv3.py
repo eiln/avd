@@ -148,9 +148,12 @@ class AVDH264HalV3(AVDHal):
 		push(0x0, "hdr_40_zero")
 		push((((ctx.height - 1) >> 3) << 16) | ((ctx.width - 1) >> 3), "hdr_28_height_width_shift3")
 
-		x = 0x1000000 * sps.chroma_format_idc | 0x2000 | 0x800
-		x |= (pps.transform_8x8_mode_flag << 7)  # 4x4, 8x8
-		x |= sps.direct_8x8_inference_flag
+		x = (sps.chroma_format_idc & 3) << 24
+		x |= (sps.bit_depth_luma_minus8 & 15) << 19
+		x |= (sps.bit_depth_chroma_minus8 & 15) << 15
+		x |= 0x2800
+		x |= boolify(pps.transform_8x8_mode_flag) << 7  # 4x4, 8x8
+		x |= boolify(sps.direct_8x8_inference_flag)
 		push(x, "hdr_2c_sps_param")
 
 		x = 0
@@ -183,9 +186,9 @@ class AVDH264HalV3(AVDHal):
 		push((sl.pic.addr + ctx.rvra_offset(3)) >> 7, "hdr_c0_curr_ref_addr_lsb7", 3)
 
 		push(ctx.y_addr >> 8, "hdr_210_y_addr_lsb8")
-		push(round_up(ctx.width, 64) >> 4, "hdr_218_width_align")
+		push(ctx.fmt.in_width >> 4, "hdr_218_width_align")
 		push(ctx.uv_addr >> 8, "hdr_214_uv_addr_lsb8")
-		push(round_up(ctx.width, 64) >> 4, "hdr_21c_width_align")
+		push(ctx.fmt.in_width >> 4, "hdr_21c_width_align")
 		push(0x0, "cm3_mark_end_section")
 		push((((ctx.height - 1) & 0xffff) << 16) | ((ctx.width - 1) & 0xffff), "hdr_54_height_width")
 
