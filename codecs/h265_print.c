@@ -336,9 +336,24 @@ void h265_print_nal_sps(struct hevc_sps *sps)
         h265_print_sps_extensions(sps);
 }
 
-static void h265_print_pps_extensions(struct hevc_pps *pps)
+static void h265_print_pps_range_extension(struct hevc_pps *pps)
 {
-    (void)pps;
+    int i;
+
+    if (pps->transform_skip_enabled_flag)
+        h265_field("log2_max_transform_skip_block_size", pps->log2_max_transform_skip_block_size);
+    h265_field("cross_component_prediction_enabled_flag", pps->cross_component_prediction_enabled_flag);
+    h265_field("chroma_qp_offset_list_enabled_flag", pps->chroma_qp_offset_list_enabled_flag);
+    if (pps->chroma_qp_offset_list_enabled_flag) {
+        h265_field("diff_cu_chroma_qp_offset_depth", pps->diff_cu_chroma_qp_offset_depth);
+        h265_field("chroma_qp_offset_list_len_minus1", pps->chroma_qp_offset_list_len_minus1);
+        for (i = 0; i <= pps->chroma_qp_offset_list_len_minus1; i++) {
+            h265_field("cb_qp_offset_list[%d]", i, pps->cb_qp_offset_list[i]);
+            h265_field("cr_qp_offset_list[%d]", i, pps->cr_qp_offset_list[i]);
+        }
+    }
+    h265_field("log2_sao_offset_scale_luma", pps->log2_sao_offset_scale_luma);
+    h265_field("log2_sao_offset_scale_chroma", pps->log2_sao_offset_scale_chroma);
 }
 
 void h265_print_nal_pps(struct hevc_pps *pps)
@@ -400,8 +415,14 @@ void h265_print_nal_pps(struct hevc_pps *pps)
     h265_field("log2_parallel_merge_level", pps->log2_parallel_merge_level);
     h265_field("slice_segment_header_extension_present_flag", pps->slice_segment_header_extension_present_flag);
     h265_field("pps_extension_present_flag", pps->pps_extension_present_flag);
-    if (pps->pps_extension_present_flag)
-        h265_print_pps_extensions(pps);
+    if (pps->pps_extension_present_flag) {
+        h265_field("pps_range_extension_flag", pps->pps_range_extension_flag);
+        h265_field("pps_multilayer_extension_flag", pps->pps_multilayer_extension_flag);
+        h265_field("pps_3d_extension_flag", pps->pps_3d_extension_flag);
+        h265_field("pps_scc_extension_flag", pps->pps_scc_extension_flag);
+        if (pps->pps_range_extension_flag)
+            h265_print_pps_range_extension(pps);
+    }
 }
 
 static void h265_print_pred_weight_table(struct hevc_slice_header *sh)
