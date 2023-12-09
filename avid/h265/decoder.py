@@ -217,8 +217,8 @@ class AVDH265Decoder(AVDDecoder):
 		self.refresh(slices[0])
 		return slices
 
-	def construct_ref_list(self):
-		ctx = self.ctx; sl = self.ctx.active_sl
+	def construct_ref_list(self, sl):
+		ctx = self.ctx
 		if (sl.slice_type == HEVC_SLICE_P):
 			lx_count = 1
 		else:
@@ -244,20 +244,19 @@ class AVDH265Decoder(AVDDecoder):
 				self.log(f"List{lx}: {x}")
 				if (x not in dpb_list):
 					dpb_list.append(x)
-		sl.reflist = reflist
 		ctx.dpb_list = dpb_list
+		return reflist
 
 	def bump_frame(self):
-		ctx = self.ctx; sl = self.ctx.active_sl
+		ctx = self.ctx
 		dpb = 0
 		for frame in ctx.dpb_list:
 			if (frame.flags and frame.poc != sl.poc):
 				dpb += 1
-		print(self.get_sps(sl))
 		raise ValueError("uh")
 
 	def find_ref_idx(self, poc):
-		ctx = self.ctx; sl = self.ctx.active_sl
+		ctx = self.ctx
 		cands = [pic for pic in ctx.dpb_pool if pic.poc == poc]
 		assert(len(cands) <= 1)
 		if (len(cands) == 0):
@@ -265,20 +264,20 @@ class AVDH265Decoder(AVDDecoder):
 		return cands[0]
 
 	def get_free_pic(self):
-		ctx = self.ctx; sl = self.ctx.active_sl
+		ctx = self.ctx
 		cands = [pic for pic in ctx.dpb_pool if not (pic.flags & HEVC_FRAME_FLAG_SHORT_REF)]
 		cand = cands[0] # this refill algo isn't same as macOS but it doesnt matter
 		cand.flags |= (HEVC_FRAME_FLAG_SHORT_REF)
 		return cand
 
 	def generate_missing_ref(self, poc, t):
-		ctx = self.ctx; sl = self.ctx.active_sl
+		ctx = self.ctx
 		pic = self.get_free_pic()
 		pic.flags = 0
 		raise ValueError("uh")
 
 	def add_candidate_ref(self, t, poc, flags):
-		ctx = self.ctx; sl = self.ctx.active_sl
+		ctx = self.ctx
 		# add a reference with the given poc to the list and mark it as used in DPB
 		ref = self.find_ref_idx(poc)
 		if (ref == None):
@@ -288,11 +287,8 @@ class AVDH265Decoder(AVDDecoder):
 		ref.flags |= flags
 		ctx.ref_lst_cnt[t] += 1
 
-	def do_frame_rps(self):
-		ctx = self.ctx; sl = self.ctx.active_sl
-
-		for x in ctx.dpb_pool:
-			self.log(f"DPB Pool: {x}")
+	def do_frame_rps(self, sl):
+		ctx = self.ctx
 
 		if (not IS_IDR(sl)):
 			for x in ctx.dpb_pool:
@@ -321,8 +317,8 @@ class AVDH265Decoder(AVDDecoder):
 		if (not IS_IRAP(sl)):
 			self.bump_frame()
 
-	def set_new_ref(self):
-		ctx = self.ctx; sl = self.ctx.active_sl
+	def set_new_ref(self, sl):
+		ctx = self.ctx
 		ref = self.get_free_pic()
 		ref.type = HEVC_REF_ST
 		ref.poc = ctx.poc
@@ -332,23 +328,32 @@ class AVDH265Decoder(AVDDecoder):
 		    ref.flags |= HEVC_FRAME_FLAG_SHORT_REF
 		ref.rasl = IS_IDR(sl) or IS_BLA(sl) or (sl.nal_unit_type == HEVC_NAL_CRA_NUT)
 		ref.access_idx = ctx.access_idx
-		sl.pic = ref
 		self.log(f"INDEX: {ref.idx}")
+		return ref
 
 	def init_slice(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
 		ctx.poc = sl.pic_order_cnt
 		self.refresh(sl)
-		self.set_new_ref()
-		self.log(f"curr: {sl.pic}")
+		sl.pic = self.set_new_ref(sl)
+		self.log(f"Curr: {sl.pic}")
 		if (sl.first_slice_segment_in_pic_flag):
-			self.do_frame_rps()
+			self.do_frame_rps(sl)
 		if ((not sl.dependent_slice_segment_flag) and (sl.slice_type != HEVC_SLICE_I)):
-			self.construct_ref_list()
+			sl.reflist = self.construct_ref_list(sl)
+		for x in ctx.dpb_pool:
+			self.log(f"DPB Pool: {x}")
+
+		for s in sl.slices:
+			if (s.slice_type != HEVC_SLICE_I):
+				s.pic = self.set_new_ref(s)
+			if (sl.first_slice_segment_in_pic_flag):
+				self.do_frame_rps(s)
+			if ((not s.dependent_slice_segment_flag) and (s.slice_type != HEVC_SLICE_I)):
+				s.reflist = self.construct_ref_list(s)
 
 	def finish_slice(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
-
 		if (IS_IDR2(sl)):
 			ctx.last_intra_nal_type = sl.nal_unit_type
 		ctx.last_intra = IS_INTRA(sl)
