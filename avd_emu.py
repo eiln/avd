@@ -153,8 +153,7 @@ class AVDEmulator:
 		fifo1_iova = 0x4000 + (AVD_DART1_FIFO_WIDTH * fifo1_idx)
 		tile_count = 1
 		hdr = struct.unpack("<8I", frame_params[:0x20])
-		if (not (hdr[6] & 0x40000 == 0x40000)):
-			tile_count = hdr[7]  # pio_1c_num_entry_points
+		tile_count = hdr[7]  # pio_1c_num_entry_points
 
 		"""
 		00000000  00000001 00000000 00004000 00000001 00010003 00000001 00000000 0108ef38
