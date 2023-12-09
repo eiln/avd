@@ -24,7 +24,7 @@ class AVDH265Slice(AVDSlice):
 		return s
 
 	def show_slice_header(self):
-		s = "\n[slice: %d nal_unit_type: %d intra: %d" % (self.idx, self.nal_unit_type, IS_INTRA(self))
+		s = "\n[slice: %s nal_unit_type: %d intra: %d" % (str(self.idx).rjust(2), self.nal_unit_type, IS_INTRA(self))
 		if (IS_SLICE(self)):
 			s += " slice_type: %s" % (self.get_slice_str(self.slice_type))
 		s += "]\n"

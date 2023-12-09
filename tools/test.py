@@ -72,6 +72,13 @@ class AVDUnitTest:
 						if (x):
 							print(x)
 
+	def show_mini_header(self, sl):
+		if (self.args.debug_mode) and (not self.args.show_headers):
+			print(sl.show_slice_header().strip())
+			if hasattr(sl, "slices"):
+				for s in sl.slices:
+					print(s.show_slice_header().strip())
+
 	def test_fp(self, args):
 		self.log(hl("Testing fp '%s'..." % (args.dir), None))
 		paths, num = self.get_paths("frame", args)
@@ -85,8 +92,7 @@ class AVDUnitTest:
 			fp0 = self.dec.fpcls.parse(open(path, "rb").read())
 
 			sl = slices[i]
-			if (self.args.debug_mode) and (not self.args.show_headers):
-				print(sl.show_slice_header().strip())
+			self.show_mini_header(sl)
 			if (self.args.show_headers):
 				print(sl)
 			if (self.args.show_fp):
@@ -177,8 +183,7 @@ class AVDUnitTest:
 			inst0_stream = self.emu.avd_cm3_cmd_decode(path)
 
 			sl = slices[i]
-			if (self.args.debug_mode) and (not self.args.show_headers):
-				print(sl.show_slice_header().strip())
+			self.show_mini_header(sl)
 			if (self.args.show_headers):
 				print(sl)
 
