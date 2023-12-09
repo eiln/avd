@@ -11,13 +11,16 @@ import subprocess
 class AVDH265Slice(AVDSlice):
 	def __init__(self):
 		super().__init__()
-		self._banned_keys = ["payload", "nal_unit_type", "idx", "nal_offset"]
+		self._banned_keys = ["payload", "nal_unit_type", "idx", "nal_offset", "slices", "payload_addr"]
 		self._reprwidth = 39
 		self.mode = "h265"
+		self.payload_addr = 0xdeadbeef
 
 	def __repr__(self):
 		s = self.show_slice_header()
 		s += self.show_entries()
+		for i,sl in enumerate(self.slices):
+			s += '    '.join(str(sl).splitlines(True))
 		return s
 
 	def show_slice_header(self):
@@ -49,6 +52,9 @@ class AVDH265Slice(AVDSlice):
 
 	def get_payload_total_size(self):
 		return len(self.get_payload())
+
+	def get_payload_addr(self):
+		return self.payload_addr
 
 class AVDH265Parser(AVDParser):
 	def __init__(self):
@@ -119,8 +125,9 @@ class AVDH265Parser(AVDParser):
 		pps_list = [None] * HEVC_MAX_PPS_COUNT
 		slices = []
 		for i,unit in enumerate(units):
-			unit.idx = slice_idx
+			unit.idx = 0
 			unit.payload = payloads[i]
+			unit.slices = []
 
 			if (unit.nal_unit_type == HEVC_NAL_VPS):
 				assert(unit.vps_video_parameter_set_id < HEVC_MAX_VPS_COUNT)
@@ -139,8 +146,13 @@ class AVDH265Parser(AVDParser):
 			elif (unit.nal_unit_type in [HEVC_NAL_TRAIL_R, HEVC_NAL_TRAIL_N, HEVC_NAL_TSA_N,HEVC_NAL_TSA_R, HEVC_NAL_STSA_N, HEVC_NAL_STSA_R, HEVC_NAL_BLA_W_LP, HEVC_NAL_BLA_W_RADL, HEVC_NAL_BLA_N_LP, HEVC_NAL_IDR_W_RADL, HEVC_NAL_IDR_N_LP, HEVC_NAL_CRA_NUT, HEVC_NAL_RADL_N, HEVC_NAL_RADL_R, HEVC_NAL_RASL_N, HEVC_NAL_RASL_R]):
 				unit.pps = pps_list[unit.slice_pic_parameter_set_id]
 				unit.nal_offset = offsets[i]
-				slices.append(unit)
-				slice_idx += 1
+				if (unit.first_slice_segment_in_pic_flag == 0):
+					unit.idx = len(slices[-1].slices)
+					slices[-1].slices.append(unit)
+				else:
+					unit.idx = slice_idx
+					slices.append(unit)
+					slice_idx += 1
 			else:
 				continue
 		return vps_list, sps_list, pps_list, slices

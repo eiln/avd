@@ -296,74 +296,73 @@ class AVDH265HalV3(AVDHal):
 			if ((not ref.rasl) and (not ctx.last_intra) and (cond)):
 				push(ctx.sps_tile_addrs[ref.idx] >> 8, "slc_bd4_sps_tile_addr2_lsb8")
 
-	def set_coded_slice(self, ctx, offset, size, is_primary):
+	def set_coded_slice(self, sl, offset, size, is_primary):
 		push = self.push
 		push(0x2d800000 | boolify(is_primary) << 14 | 0x2000, "cm3_cmd_set_coded_slice")
-		push(ctx.slice_data_addr + offset, "slc_bd8_slice_addr")
+		push(sl.payload_addr + offset + sl.get_payload_offset(), "slc_bd8_slice_addr")
 		push(size, "slc_bdc_slice_size")
 		return size
 
-	def set_slice(self, ctx, sl):
+	def set_slice(self, ctx, sl, pos, last):
 		push = self.push
 		sps = ctx.get_sps(sl)
 		pps = ctx.get_pps(sl)
 
-		if (pps.tiles_enabled_flag):
-			col_bd = [0] * (pps.num_tile_columns + 1)
-			row_bd = [0] * (pps.num_tile_rows + 1)
-			for i in range(pps.num_tile_columns):
-				col_bd[i + 1] = col_bd[i] + pps.column_width[i]
-			for i in range(pps.num_tile_rows):
-				row_bd[i + 1] = row_bd[i] + pps.row_height[i]
-
-		offset = sl.get_payload_offset()
-		if ((not pps.tiles_enabled_flag) and (not pps.entropy_coding_sync_enabled_flag)):
-			size = sl.get_payload_size()
-		elif ((not pps.tiles_enabled_flag) and (pps.entropy_coding_sync_enabled_flag)):
-			size = sl.get_payload_size()
-		elif ((pps.tiles_enabled_flag) and (not pps.entropy_coding_sync_enabled_flag)):
+		offset = 0
+		size = sl.get_payload_size()
+		if ((pps.tiles_enabled_flag) and (sl.num_entry_point_offsets > 0)):
 			size = sl.entry_point_offset[0]
-		else:
-			raise ValueError("todo")
-		offset += self.set_coded_slice(ctx, offset, size, 1)
-		push(0x2c000000, "cm3_cmd_exec_mb_vp")
-
-		self.set_slice_dqtblk(ctx, sl)
+		start = offset + sl.get_payload_offset()
+		offset += self.set_coded_slice(sl, offset, size, 1)
 
 		if (pps.tiles_enabled_flag):
-			c = (row_bd[0] & 0xffff) << 12 | col_bd[0] & 0xffff
-			x = 0 << 24 | ((row_bd[0 + 1] - 1) & 0xffff) << 12 | ((col_bd[0 + 1] - 1) & 0xffff)
+			sx = pos // pps.num_tile_rows
+			sy = pos % pps.num_tile_columns
+			c = (pps.row_bd[sx] & 0xffff) << 12 | pps.col_bd[sy] & 0xffff
+			mx = sy << 24 | ((pps.row_bd[sx + 1] - 1) & 0xffff) << 12 | ((pps.col_bd[sy + 1] - 1) & 0xffff)
 		else:
 			c = 0
-			x = ((sps.ctb_height - 1) & 0xffff) << 12 | (sps.ctb_width - 1) & 0xffff
+			mx = ((sps.ctb_height - 1) & 0xffff) << 12 | (sps.ctb_width - 1) & 0xffff
+		push(0x2c000000 | c, "cm3_cmd_exec_mb_vp")
+		self.set_slice_dqtblk(ctx, sl)
 		push(0x2a000000 | c, "cm3_cmd_set_mb_dims")
-		push(x, "cm3_set_mb_dims")
+		push(mx, "cm3_set_mb_dims")
 		self.set_slice_mv(ctx, sl)
-		push(0x1000000 | c, "cm3_cmd_set_mb_dims")
+		push(0x01000000 | c, "cm3_cmd_set_mb_dims")
+		pos += 1
 
-		if (pps.tiles_enabled_flag and pps.entropy_coding_sync_enabled_flag == 0):
-			for n in range(1, sl.num_entry_point_offsets + 1):  # We did tile #0 above
+		if ((pps.tiles_enabled_flag) and (sl.num_entry_point_offsets > 0)):
+			for n in range(sl.num_entry_point_offsets + 1 - 1):  # We did tile #0 above
 				push(0x2b000000, "cm3_cmd_inst_fifo_start")
-				if (n != sl.num_entry_point_offsets):
-					size = sl.entry_point_offset[n]
+				if (n != sl.num_entry_point_offsets - 1):
+					size = sl.entry_point_offset[n + 1]
 				else:
-					size = sl.get_payload_total_size() - offset
-				offset += self.set_coded_slice(ctx, offset, size, 0)
+					size = sl.get_payload_total_size() - offset - start
+				offset += self.set_coded_slice(sl, offset, size, 0)
 
-				row = n // pps.num_tile_rows
-				col = n % pps.num_tile_columns
-				x = ((row_bd[row + 1] - 1) & 0xffff) << 12 | (col_bd[col + 1] - 1) & 0xffff
-				x |= col << 24
-				if (row > 0 and col > 0): # ??
-					x |= 0x80000000
-				if (row == 1):
-					x |= 0x40000000
-				push(0x2a000000 | (row_bd[row] & 0xffff) << 12 | col_bd[col] & 0xffff, "cm3_cmd_set_mb_dims")
-				push(x, "cm3_cmd_set_mb_dims")
-				push(0x1000000  | (row_bd[row] & 0xffff) << 12 | col_bd[col] & 0xffff, "cm3_cmd_set_mb_dims")
+				sx = pos // pps.num_tile_rows
+				sy = pos % pps.num_tile_columns
+				mx = ((pps.row_bd[sx + 1] - 1) & 0xffff) << 12 | (pps.col_bd[sy + 1] - 1) & 0xffff
+				mx |= sy << 24
+				push(0x2a000000 | (pps.row_bd[sx] & 0xffff) << 12 | pps.col_bd[sy] & 0xffff, "cm3_cmd_set_tile_dims")
+				push(mx, "cm3_set_tile_dims")
+				push(0x01000000 | (pps.row_bd[sx] & 0xffff) << 12 | pps.col_bd[sy] & 0xffff, "cm3_set_tile_dims")
+				pos += 1
 
-		push(0x2b000000 | 0x400, "cm3_cmd_inst_fifo_end")
+		push(0x2b000000 | boolify(last) << 10, "cm3_cmd_inst_fifo_end")
+		return pos
+
+	def set_slices(self, ctx, sl):
+		pos = 0
+		count = len(sl.slices)
+		pos = self.set_slice(ctx, sl, pos, count == 0)
+		count -= 1
+		if ((sl.first_slice_segment_in_pic_flag) and len(sl.slices)):
+			for i,seg in enumerate(sl.slices):
+				pos = self.set_slice(ctx, seg, pos, count == 0)
+				count -= 1
+		ctx.pos = pos  # For driver-side submission (need decode command for every slice+tile)
 
 	def set_insn(self, ctx, sl):
 		self.set_header(ctx, sl)
-		self.set_slice(ctx, sl)
+		self.set_slices(ctx, sl)

@@ -69,9 +69,22 @@ class AVDH265Decoder(AVDDecoder):
 		ctx.poc = -1
 		self.allocate_fifo()
 
+	def refresh_pps(self, sl):
+		ctx = self.ctx
+		pps = ctx.get_pps(sl)
+		if (pps.tiles_enabled_flag):
+			pps.col_bd = [0] * (pps.num_tile_columns + 1)
+			pps.row_bd = [0] * (pps.num_tile_rows + 1)
+			for i in range(pps.num_tile_columns):
+				pps.col_bd[i + 1] = pps.col_bd[i] + pps.column_width[i]
+			for i in range(pps.num_tile_rows):
+				pps.row_bd[i + 1] = pps.row_bd[i] + pps.row_height[i]
+
 	def refresh_sps(self, sl):
 		ctx = self.ctx
 		pps = ctx.get_pps(sl)
+		self.refresh_pps(sl)
+
 		sps_id = pps.pps_seq_parameter_set_id
 		if (sps_id == ctx.cur_sps_id):
 			return
@@ -177,6 +190,21 @@ class AVDH265Decoder(AVDDecoder):
 			pic = AVDH265Picture(addr=ctx.rvra_base_addrs[i], idx=i, poc=-1, flags=0, type=-1, lsb7=True, rasl=0, access_idx=-1)
 			ctx.dpb_pool.append(pic)
 			self.log(f"DPB Pool: {pic}")
+
+	def realloc_rbsp_size(self, sl):
+		ctx = self.ctx
+		size = len(sl.get_payload())
+		for seg in sl.slices:
+			size += len(seg.get_payload())
+		if (size > ctx.slice_data_size):
+			self.range_free(name="slice_data")
+			ctx.slice_data_addr = self.range_alloc(size, align=0x4000, name="slice_data")
+			ctx.slice_data_size = size
+		sl.payload_addr = ctx.slice_data_addr
+		offset = len(sl.get_payload())
+		for seg in sl.slices:
+			seg.payload_addr = ctx.slice_data_addr + offset
+			offset += len(seg.get_payload())
 
 	def refresh(self, sl):
 		self.refresh_sps(sl)
