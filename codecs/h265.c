@@ -1249,6 +1249,9 @@ static int h265_decode_nal_pps(struct h265_context *s, struct hevc_pps *pps)
     pps->weighted_pred_flag   = get_bits1(gb);
     pps->weighted_bipred_flag = get_bits1(gb);
 
+    pps->num_tile_columns = 1;
+    pps->num_tile_rows = 1;
+
     pps->transquant_bypass_enabled_flag   = get_bits1(gb);
     pps->tiles_enabled_flag               = get_bits1(gb);
     pps->entropy_coding_sync_enabled_flag = get_bits1(gb);

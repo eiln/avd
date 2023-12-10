@@ -387,9 +387,9 @@ void h265_print_nal_pps(struct hevc_pps *pps)
     h265_field("transquant_bypass_enabled_flag", pps->transquant_bypass_enabled_flag);
     h265_field("tiles_enabled_flag", pps->tiles_enabled_flag);
     h265_field("entropy_coding_sync_enabled_flag", pps->entropy_coding_sync_enabled_flag);
+    h265_field("num_tile_columns", pps->num_tile_columns); // print anyway
+    h265_field("num_tile_rows", pps->num_tile_rows); // ""
     if (pps->tiles_enabled_flag) {
-        h265_field("num_tile_columns", pps->num_tile_columns);
-        h265_field("num_tile_rows", pps->num_tile_rows);
         h265_field("uniform_spacing_flag", pps->uniform_spacing_flag);
         for (i = 0; i < pps->num_tile_columns; i++)
             h265_field("column_width[%d]", i, pps->column_width[i]);
