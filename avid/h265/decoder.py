@@ -335,22 +335,25 @@ class AVDH265Decoder(AVDDecoder):
 		ctx = self.ctx; sl = self.ctx.active_sl
 		ctx.poc = sl.pic_order_cnt
 		self.refresh(sl)
+
+		assert(not sl.dependent_slice_segment_flag)
 		sl.pic = self.set_new_ref(sl)
 		self.log(f"Curr: {sl.pic}")
 		if (sl.first_slice_segment_in_pic_flag):
 			self.do_frame_rps(sl)
-		if ((not sl.dependent_slice_segment_flag) and (sl.slice_type != HEVC_SLICE_I)):
+		if (sl.slice_type != HEVC_SLICE_I):
 			sl.reflist = self.construct_ref_list(sl)
 		for x in ctx.dpb_pool:
 			self.log(f"DPB Pool: {x}")
 
 		for s in sl.slices:
-			if (s.slice_type != HEVC_SLICE_I):
-				s.pic = self.set_new_ref(s)
-			if (sl.first_slice_segment_in_pic_flag):
-				self.do_frame_rps(s)
-			if ((not s.dependent_slice_segment_flag) and (s.slice_type != HEVC_SLICE_I)):
-				s.reflist = self.construct_ref_list(s)
+			if (not s.dependent_slice_segment_flag):
+				if (s.slice_type != HEVC_SLICE_I):
+					s.pic = self.set_new_ref(s)
+				if (sl.first_slice_segment_in_pic_flag):
+					self.do_frame_rps(s)
+				if (s.slice_type != HEVC_SLICE_I):
+					s.reflist = self.construct_ref_list(s)
 
 	def finish_slice(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
