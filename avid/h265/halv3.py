@@ -11,9 +11,11 @@ class AVDH265HalV3(AVDHal):
 		super().__init__()
 
 	def get_cond(self, ctx, sl):
-		cond = (ctx.last_intra_nal_type in [HEVC_NAL_IDR_N_LP, HEVC_NAL_CRA_NUT])
-		cond = (sl.slice_type == HEVC_SLICE_B) or cond
-		# !HEVC_NAL_IDR_W_RADL
+		pps = ctx.get_pps(sl)
+		has_slices = (((sl.first_slice_segment_in_pic_flag) and len(sl.slices)) or (not sl.first_slice_segment_in_pic_flag))
+		has_tiles = (pps.tiles_enabled_flag) and (sl.num_entry_point_offsets > 0)
+		cond = (not has_slices) and (not has_tiles)
+		cond = cond or (sl.slice_type == HEVC_SLICE_B)
 		return cond
 
 	def set_refs(self, ctx, sl):
@@ -257,10 +259,14 @@ class AVDH265HalV3(AVDHal):
 
 			self.set_weights(ctx, sl)
 
-	def set_slice_mv(self, ctx, sl):
+	def set_slice_mv(self, ctx, sl, is_dep):
 		push = self.push
-
 		cond = self.get_cond(ctx, sl)
+		cond = cond and (not ctx.last_intra)
+		cond = cond or sl.slice_type == HEVC_SLICE_B
+		cond = cond and (not is_dep)
+		cond = cond and (not sl.first_slice_segment_in_pic_flag == 0)
+		#print(cond)
 
 		x = 0
 		if   (sl.slice_type == HEVC_SLICE_I):
