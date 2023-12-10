@@ -6,6 +6,8 @@ from ..hal import AVDHal
 from ..utils import *
 from .types import *
 
+def HAS_TILES(sl): return boolify((sl.pps.tiles_enabled_flag) and (sl.num_entry_point_offsets > 0))
+
 class AVDH265HalV3(AVDHal):
 	def __init__(self):
 		super().__init__()
@@ -286,86 +288,135 @@ class AVDH265HalV3(AVDHal):
 				x |= sl.num_ref_idx_l1_active_minus1 << 7
 			x |= sl.num_ref_idx_l0_active_minus1 << 11
 
-			if (cond):
+			if (self.get_cond(ctx, sl) or is_dep):
 				x |= set_bit(15)
 			if (sl.slice_type == HEVC_SLICE_P):
 				n = 0
 			else:
 				n = not sl.collocated_from_l0_flag
 			ref = sl.reflist[n][0]
-			if ((not ref.rasl) and (not ctx.last_intra) and (cond)):
+			if ((not ref.rasl) and (cond)):
 				x |= set_bit(18)
 
 		push(0x2d000000 | x, "slc_a8c_cmd_ref_type")
 
 		if (sl.slice_type == HEVC_SLICE_P) or (sl.slice_type == HEVC_SLICE_B):
-			if ((not ref.rasl) and (not ctx.last_intra) and (cond)):
+			if ((not ref.rasl) and (cond)):
 				push(ctx.sps_tile_addrs[ref.idx] >> 8, "slc_bd4_sps_tile_addr2_lsb8")
 
-	def set_coded_slice(self, sl, offset, size, is_primary):
+	def set_coded_slice(self, sl, offset, size, t):
 		push = self.push
-		push(0x2d800000 | boolify(is_primary) << 14 | 0x2000, "cm3_cmd_set_coded_slice")
+		push(0x2d800000 | t << 13, "cm3_cmd_set_coded_slice")
 		push(sl.payload_addr + offset + sl.get_payload_offset(), "slc_bd8_slice_addr")
 		push(size, "slc_bdc_slice_size")
 		return size
 
-	def set_slice(self, ctx, sl, pos, last):
+	def set_slice(self, ctx, sl, pos, c0x, has_tiles, last):
 		push = self.push
 		sps = ctx.get_sps(sl)
 		pps = ctx.get_pps(sl)
 
-		offset = 0
 		size = sl.get_payload_size()
-		if ((pps.tiles_enabled_flag) and (sl.num_entry_point_offsets > 0)):
+		if (HAS_TILES(sl)):
 			size = sl.entry_point_offset[0]
-		start = offset + sl.get_payload_offset()
-		offset += self.set_coded_slice(sl, offset, size, 1)
+		offset = 0
+		start = offset + sl.get_payload_offset()  # hack to calc last entrypoint offset
+
+		t = 3
+		if (sl.first_slice_segment_in_pic_flag):
+			t = 3
+			assert(not sl.dependent_slice_segment_flag)
+		elif (sl.dependent_slice_segment_flag):
+			t = 0
+		elif (not has_tiles):
+			t = 2
+		offset += self.set_coded_slice(sl, offset, size, t)
 
 		if (pps.tiles_enabled_flag):
-			sx = pos // pps.num_tile_rows
-			sy = pos % pps.num_tile_columns
-			c = (pps.row_bd[sx] & 0xffff) << 12 | pps.col_bd[sy] & 0xffff
-			mx = sy << 24 | ((pps.row_bd[sx + 1] - 1) & 0xffff) << 12 | ((pps.col_bd[sy + 1] - 1) & 0xffff)
-		else:
-			c = 0
-			mx = ((sps.ctb_height - 1) & 0xffff) << 12 | (sps.ctb_width - 1) & 0xffff
-		push(0x2c000000 | c, "cm3_cmd_exec_mb_vp")
-		self.set_slice_dqtblk(ctx, sl)
-		push(0x2a000000 | c, "cm3_cmd_set_mb_dims")
-		push(mx, "cm3_set_mb_dims")
-		self.set_slice_mv(ctx, sl)
-		push(0x01000000 | c, "cm3_cmd_set_mb_dims")
-		pos += 1
+			col_bd = [0] * (pps.num_tile_columns + 1)
+			row_bd = [0] * (pps.num_tile_rows + 1)
+			for i in range(pps.num_tile_columns):
+				col_bd[i + 1] = col_bd[i] + pps.column_width[i]
+			for i in range(pps.num_tile_rows):
+				row_bd[i + 1] = row_bd[i] + pps.row_height[i]
 
-		if ((pps.tiles_enabled_flag) and (sl.num_entry_point_offsets > 0)):
+		sx = pos // pps.num_tile_rows
+		sy = pos % pps.num_tile_columns
+		if (pps.tiles_enabled_flag):
+			mx = (row_bd[sx] & 0xffff) << 12 | col_bd[sy] & 0xffff
+		elif (sl.first_slice_segment_in_pic_flag == 0 and pps.entropy_coding_sync_enabled_flag):
+			mx = ((sl.slice_segment_address // sps.ctb_width) & 0xffff) << 12 | (sl.slice_segment_address % sps.ctb_width) & 0xffff
+		else:
+			mx = pos << 13
+
+		if (sl.dependent_slice_segment_flag):
+			cx = c0x  # if it's a dependent slice, reuse the last slice's entropy
+		else:
+			cx = mx   # else, move up
+		push(0x2c000000 | cx, "cm3_cmd_set_cabac_xy")  # entropy pos
+
+		if (sl.dependent_slice_segment_flag):
+			self.set_slice_dqtblk(ctx, ctx.active_sl)
+		else:
+			self.set_slice_dqtblk(ctx, sl)
+
+		if (has_tiles):  # tile || first slice; tiles change window so re-set it
+			push(0x2a000000 | cx, "cm3_cmd_set_ctb_xy")
+			if (pps.tiles_enabled_flag):
+				x = sy << 24 | ((row_bd[sx + 1] - 1) & 0xffff) << 12 | ((col_bd[sy + 1] - 1) & 0xffff)
+			else:
+				x = sy << 24 | ((sps.ctb_height - 1) & 0xffff) << 12 | (sps.ctb_width - 1) & 0xffff
+			push(x, "cm3_set_ctb_xy")  # ctb pos
+
+		if (sl.dependent_slice_segment_flag):
+			self.set_slice_mv(ctx, ctx.active_sl, 1)
+		else:
+			self.set_slice_mv(ctx, sl, 0)
+		push(0x01000000 | mx, "cm3_set_mv_xy")  # motion vector pos
+		if (not (sl.first_slice_segment_in_pic_flag == 0 and pps.entropy_coding_sync_enabled_flag)):
+			pos += 1
+
+		if (HAS_TILES(sl)):
 			for n in range(sl.num_entry_point_offsets + 1 - 1):  # We did tile #0 above
 				push(0x2b000000, "cm3_cmd_inst_fifo_start")
 				if (n != sl.num_entry_point_offsets - 1):
 					size = sl.entry_point_offset[n + 1]
 				else:
 					size = sl.get_payload_total_size() - offset - start
-				offset += self.set_coded_slice(sl, offset, size, 0)
+				offset += self.set_coded_slice(sl, offset, size, 1)
 
 				sx = pos // pps.num_tile_rows
 				sy = pos % pps.num_tile_columns
-				mx = ((pps.row_bd[sx + 1] - 1) & 0xffff) << 12 | (pps.col_bd[sy + 1] - 1) & 0xffff
-				mx |= sy << 24
-				push(0x2a000000 | (pps.row_bd[sx] & 0xffff) << 12 | pps.col_bd[sy] & 0xffff, "cm3_cmd_set_tile_dims")
-				push(mx, "cm3_set_tile_dims")
-				push(0x01000000 | (pps.row_bd[sx] & 0xffff) << 12 | pps.col_bd[sy] & 0xffff, "cm3_set_tile_dims")
+				ax = (row_bd[sx] & 0xffff) << 12 | col_bd[sy] & 0xffff
+				bx = ((row_bd[sx + 1] - 1) & 0xffff) << 12 | (col_bd[sy + 1] - 1) & 0xffff
+				bx |= sy << 24
+				if (has_tiles):
+					push(0x2a000000 | ax, "cm3_cmd_set_tile_ax")
+					push(bx, "cm3_set_tile_bx")
+				push(0x01000000 | ax, "cm3_set_tile_ax")
 				pos += 1
 
 		push(0x2b000000 | boolify(last) << 10, "cm3_cmd_inst_fifo_end")
-		return pos
+
+		return pos, cx
 
 	def set_slices(self, ctx, sl):
-		pos = 0
+		sps = ctx.get_sps(sl)
+		pps = ctx.get_pps(sl)
+
+		has_tiles = 0
+		if ((sl.first_slice_segment_in_pic_flag) and len(sl.slices)):
+			for i,s in enumerate(sl.slices):
+				has_tiles |= s.pps.tiles_enabled_flag
+
 		count = len(sl.slices)
-		pos = self.set_slice(ctx, sl, pos, count == 0)
+		pos = 0
+		c0x = -1
+		pos, c0x = self.set_slice(ctx, sl, pos, c0x, 1, last=count == 0)  # always set ctb on first slice
 		count -= 1
 		if ((sl.first_slice_segment_in_pic_flag) and len(sl.slices)):
-			for i,seg in enumerate(sl.slices):
-				pos = self.set_slice(ctx, seg, pos, count == 0)
+			for i,s in enumerate(sl.slices):
+				pos, c0x = self.set_slice(ctx, s, pos, c0x, has_tiles, last=count == 0)
 				count -= 1
 		ctx.pos = pos  # For driver-side submission (need decode command for every slice+tile)
 
