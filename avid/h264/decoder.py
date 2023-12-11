@@ -170,13 +170,60 @@ class AVDH264Decoder(AVDDecoder):
 		for n in range(ctx.sps_tile_count):
 			ctx.sps_tile_addrs[n] = self.range_alloc(sps_tile_size, name="sps_tile%d" % n)
 
+		# Intermediate work tile group #0, 5 tiles based on hw cache line i.e. width stride 16
 		pps_tile_count = 5
 		ctx.pps_tile_addrs = [0 for n in range(pps_tile_count)]
 		for n in range(pps_tile_count):
-			size = 0x8000
-			if (n == 2 and ctx.fmt.in_width > 2048):
-				size = 0xc000
-			ctx.pps_tile_addrs[n] = self.range_alloc(size, name="pps_tile%d" % n)
+			if (n == 0):
+				# Tile #0: I could not tell you what this means, but it's overwritten on intra frames.
+				# Worst 4096x4096 case it still uses <0x8000, which we have to anyway to make tests pass
+				"""
+				0080c000: 04822000 10000000 38000000 38000000 00000000 00880000 00000000 38000000
+				0080c020: 38000000 00000000 00880000 00000000 38000000 38000000 00000000 08800007
+				0080c040: 02000000 30000000 38000000 00000000 00000000 00000000 00000000 00000000
+				"""
+				size = 0x8000
+			if (n == 1):
+				# Tile #1: Y 1x16, Cb 1x8, Cr 1x8 per row
+				"""
+				00814000: 51515151 51515151 51515151 51515151 5a5a5a5a 5a5a5a5a f0f0f0f0 f0f0f0f0 ] row
+				00814020: 51515151 51515151 51515151 51515151 5a5a5a5a 5a5a5a5a f0f0f0f0 f0f0f0f0
+				00814040: 51515151 51515151 51515151 51515151 5a5a5a5a 5a5a5a5a f0f0f0f0 f0f0f0f0
+				00814060: 51515151 51515151 51515151 51515151 5a5a5a5a 5a5a5a5a f0f0f0f0 f0f0f0f0
+				"""
+				size = (1*16 + 1*8 + 1*8) * (round_up(ctx.width, 16) // 16)
+			elif (n == 2):
+				# Tile #2: Y 2x32, Cb 1x32, Cr 1x32 per row
+				"""
+				0081c000: 51515151 51515151 51515151 51515151 51515151 51515151 51515151 51515151 ] row
+				0081c020: 51515151 51515151 51515151 51515151 51515151 51515151 51515151 51515151 ]
+				0081c040: 5a5a5a5a 5a5a5a5a 5a5a5a5a 5a5a5a5a 5a5a5a5a 5a5a5a5a 5a5a5a5a 5a5a5a5a ]
+				0081c060: f0f0f0f0 f0f0f0f0 f0f0f0f0 f0f0f0f0 f0f0f0f0 f0f0f0f0 f0f0f0f0 f0f0f0f0 ]
+				"""
+				size = (2*32 + 1*32 + 1*32) * (round_up(ctx.width, 16) // 16)
+				# macOS overallocates a lot so we have to do this to make tests pass
+				if (ctx.fmt.in_width > 2048):
+					size = 0xc000
+			elif (n == 3):
+				# Tile #3: No idea what this means, I think it's entropy. 32 bytes per row
+				"""
+				00824000: c0000000 c0000000 00000000 58000000 04000000 00000000 04000000 00000000 ] row
+				00824020: c0000000 c0000000 00000000 50000000 04000000 00000000 04000000 00000000
+				00824040: 40000000 40000000 00000000 50000000 00000000 00000000 00000000 00000000
+				00824060: c0000000 c0000000 00000000 50000000 04000000 00000000 04000000 00000000
+				"""
+				size = (1*32) * (round_up(ctx.width, 16) // 16)
+			elif (n == 4):
+				# Tile #4: Ditto. I think it's reference frame entropy.
+				"""
+				0082c000: c0000000 c0000000 c0000000 c0000000 c0000000 c0000000 c0000000 c0000000 ] row
+				0082c020: c0000000 c0000000 c0000000 c0000000 c0000000 c0000000 c0000000 c0000000
+				0082c040: 40000000 40000000 40000000 40000000 40000000 40000000 40000000 40000000
+				0082c060: c0000000 c0000000 c0000000 c0000000 c0000000 c0000000 c0000000 c0000000
+				"""
+				size = (1*32) * (round_up(ctx.width, 16) // 16)
+			size = max(size, 0x8000)
+			ctx.pps_tile_addrs[n] = self.range_alloc(size, align=0x4000, name="pps_tile%d" % n)
 
 		for n in range(ctx.rvra_count - 1):
 			ctx.rvra_base_addrs[n + 1] = self.range_alloc(rvra_total_size, align=0x4000, name="rvra1_%d" % n)
