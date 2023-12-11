@@ -98,7 +98,7 @@ class AVDH264Decoder(AVDDecoder):
 
 		stride = round_up(sps.bit_depth_luma_minus8 + 8, 8) // 8
 		ctx.fmt = AVDOutputFormat(
-			in_width         = ((round_up(ctx.width, 64) >> 4) << 4) * stride,
+			in_width         = ((round_up(ctx.width * stride, 64) >> 4) << 4),
 			in_height        = (round_up(ctx.height, 16) >> 4) << 4,
 			out_width        = ctx.orig_width,
 			out_height       = ctx.orig_height,
