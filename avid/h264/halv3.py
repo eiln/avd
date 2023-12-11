@@ -256,7 +256,7 @@ class AVDH264HalV3(AVDHal):
 		push(0x2c000000, "cm3_cmd_exec_mb_vp")
 		# ---- FW BP -----
 
-		push(0x2d900000 | ((26 + pps.pic_init_qp_minus26 + sl.slice_qp_delta) * 0x400), "slc_a70_cmd_quant_param")
+		push(0x2d900000 | ((26 + pps.pic_init_qp_minus26 + sl.slice_qp_delta) * 0x400) & 0x1fc00, "slc_a70_cmd_quant_param")
 
 		x = 0
 		if (sl.disable_deblocking_filter_idc == 0):

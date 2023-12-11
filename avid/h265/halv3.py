@@ -228,7 +228,7 @@ class AVDH265HalV3(AVDHal):
 		sps = ctx.get_sps(sl)
 		pps = ctx.get_pps(sl)
 
-		x = (26 + pps.pic_init_qp_minus26 + sl.slice_qp_delta) << 10
+		x = ((26 + pps.pic_init_qp_minus26 + sl.slice_qp_delta) << 10) & 0x1fc00
 		x |= swrap(pps.pps_cb_qp_offset + sl.slice_cb_qp_offset, 32) << 5
 		x |= swrap(pps.pps_cr_qp_offset + sl.slice_cr_qp_offset, 32)
 		push(0x2d900000 | x, "slc_bcc_cmd_quantization")
