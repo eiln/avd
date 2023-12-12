@@ -35,9 +35,10 @@ class AVDDecoder:
 		self.last_iova = 0x0
 		self.used = []
 
-	def log(self, x):
+	def log(self, x, cl=""):
+		prefix = f"[{cl}]" if cl else cl
 		if (not self.stfu):
-			print(f"[AVD] {x}")
+			print(f"[AVD]{prefix} {x}")
 
 	def reset_allocator(self):
 		self.last_iova = 0x0
