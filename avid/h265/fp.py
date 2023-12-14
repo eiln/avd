@@ -127,19 +127,9 @@ class AVDH265V3FakeFrameParams(AVDFakeFrameParams):
 		obj["hdr_194_ref3_addr_lsb7"] = [0] * 8
 
 		obj["slc_a90_cmd_ref_list"] = [0] * 30
-		obj["slc_b08_cmd_weights_denom"] = 0
 		obj["slc_b0c_cmd_weights_weights"] = [0] * 96
 		obj["slc_b6c_cmd_weights_offsets"] = [0] * 96
-
-		obj["slc_bd4_sps_tile_addr2_lsb8"] = 0
 		obj["hdr_dc_pps_tile_addr_lsb8"] = [0] * 12
-		obj["hdr_bc_sps_tile_addr_lsb8"] = 0
-
-		obj["hdr_38_sps_scl_dims"] = 0
-		obj["hdr_3c_sps_scl_dims"] = 0
-		obj["hdr_40_sps_scl_dims"] = 0
-		obj["hdr_44_sps_scl_dims"] = 0
-		obj["hdr_48_sps_scl_dims"] = 0
 
 		obj["scl_22c_seq_scaling_matrix_4x4"] = [0] * (6 * 16 // 4)
 		obj["scl_28c_seq_scaling_matrix_8x8"] = [0] * (6 * 64 // 4)

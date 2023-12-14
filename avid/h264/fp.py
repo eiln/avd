@@ -126,16 +126,12 @@ class AVDH264V3FakeFrameParams(AVDFakeFrameParams):
 		obj["hdr_9c_pps_tile_addr_lsb8"] = [0] * 8
 		obj["hdr_c0_curr_ref_addr_lsb7"] = [0] * 4
 		obj["hdr_d0_ref_hdr"] = [0] * 16
-		obj["hdr_bc_sps_tile_addr_lsb8"] = 0
-		obj["slc_a78_sps_tile_addr2_lsb8"] = 0
 
 		obj["hdr_110_ref0_addr_lsb7"] = [0] * 16
 		obj["hdr_150_ref1_addr_lsb7"] = [0] * 16
 		obj["hdr_190_ref2_addr_lsb7"] = [0] * 16
 		obj["hdr_1d0_ref3_addr_lsb7"] = [0] * 16
 
-		obj["hdr_30_seq_scaling_list_dims"] = 0
-		obj["hdr_4c_pic_scaling_list_dims"] = 0
 		obj["scl_28c_seq_scaling_matrix_4x4"] = [0] * (6 * 16 // 4)
 		obj["scl_2ec_seq_scaling_matrix_8x8"] = [0] * (6 * 64 // 4)
 		obj["scl_46c_pic_scaling_matrix_4x4"] = [0] * (6 * 16 // 4)
@@ -143,7 +139,6 @@ class AVDH264V3FakeFrameParams(AVDFakeFrameParams):
 
 		obj["slc_6e8_cmd_ref_list_0"] = [0] * 16
 		obj["slc_728_cmd_ref_list_1"] = [0] * 16
-		obj["slc_76c_cmd_weights_denom"] = 0
 		obj["slc_770_cmd_weights_weights"] = [0] * 96
 		obj["slc_8f0_cmd_weights_offsets"] = [0] * 96
 		return obj
