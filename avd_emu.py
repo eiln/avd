@@ -169,7 +169,7 @@ class AVDEmulator:
 		cmd[ 5] = tile_count
 		cmd[ 6] = 0x0
 		cmd[ 7] = 0x108ef38 + (AVD_CM3_FIFO_WIDTH * (fifo1_idx % AVD_CM3_FIFO_COUNT))
-		cmd[ 8] = fifo1_iova + 0x288
+		cmd[ 8] = fifo1_iova + 0x228
 		cmd[ 9] = 0x108ef5c + (AVD_CM3_FIFO_WIDTH * (fifo1_idx % AVD_CM3_FIFO_COUNT))
 		cmd[10] = fifo1_iova + 0x60c
 		cmd[11] = fifo1_iova + 0xa84
