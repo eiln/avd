@@ -44,7 +44,13 @@ class AVDUnitTest:
 			else:
 				name, count = cand, None
 			x0 = getattr(getattr(fp0, name[:3]), name)
-			x1 = fp1[name]
+			if (not (hasattr(fp1, name))):
+				if (isinstance(x0, ListContainer)):
+					x1 = [0] * len(x0)
+				else:
+					x1 = 0
+			else:
+				x1 = fp1[name]
 			if (isinstance(x0, ListContainer)):
 				num = len(x0) if not count else count
 				for n in range(num):
