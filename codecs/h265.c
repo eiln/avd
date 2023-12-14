@@ -544,16 +544,16 @@ static void set_default_scaling_list_data(ScalingList *sl)
 static int hevc_decode_scaling_list(struct bitstream *gb,
                                     ScalingList *sl, const struct hevc_sps *sps)
 {
-    uint8_t scaling_list_pred_mode_flag;
     uint8_t scaling_list_dc_coef[2][6];
     int size_id, matrix_id, pos;
     int i;
 
     for (size_id = 0; size_id < 4; size_id++) {
         for (matrix_id = 0; matrix_id < 6; matrix_id += ((size_id == 3) ? 3 : 1)) {
-            scaling_list_pred_mode_flag = get_bits1(gb);
-            if (!scaling_list_pred_mode_flag) {
+            sl->scaling_list_pred_mode_flag[size_id][matrix_id] = get_bits1(gb);
+            if (!sl->scaling_list_pred_mode_flag[size_id][matrix_id]) {
                 unsigned int delta = get_ue_golomb_long(gb);
+                sl->scaling_list_pred_matrix_id_delta[size_id][matrix_id] = delta;
                 /* Only need to handle non-zero delta. Zero means default,
                  * which should already be in the arrays. */
                 if (delta) {

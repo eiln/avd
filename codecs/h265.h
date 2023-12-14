@@ -147,6 +147,10 @@ typedef struct ScalingList {
      * and size ID 3 only has 2 arrays, not 6. */
     uint8_t sl[4][6][64];
     uint8_t sl_dc[2][6];
+    uint8_t scaling_list_pred_mode_flag[4][6];
+    uint8_t scaling_list_pred_matrix_id_delta[4][6];
+    //int16_t scaling_list_dc_coef_minus8[4][6];
+    //int8_t scaling_list_delta_coeff[4][6][64];
 } ScalingList;
 
 struct hevc_vui {

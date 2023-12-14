@@ -171,7 +171,20 @@ void h265_print_nal_vps(struct hevc_vps *vps)
 
 static void h265_print_scaling_list(ScalingList *sl)
 {
-    (void)sl;
+    int size_id, matrix_id;
+    int i;
+
+    for (size_id = 0; size_id < 4; size_id++) {
+        for (matrix_id = 0; matrix_id < 6; matrix_id += ((size_id == 3) ? 3 : 1)) {
+            h265_fieldt("scaling_list_pred_mode_flag[%d][%d]", size_id, matrix_id, sl->scaling_list_pred_mode_flag[size_id][matrix_id]);
+            if (!sl->scaling_list_pred_mode_flag[size_id][matrix_id])
+                h265_fieldt("scaling_list_pred_matrix_id_delta[%d][%d]", size_id, matrix_id, sl->scaling_list_pred_matrix_id_delta[size_id][matrix_id]);
+            for (i = 0; i < ((size_id == 0) ? 16 : 64); i++) {
+                int size = 1 << (size_id + 2);
+                h265_fieldt("seq_scaling_list_%dx%d[%d][%d]", size, size, matrix_id, i, sl->sl[size_id][matrix_id][i]);
+            }
+        }
+    }
 }
 
 static void h265_print_st_rps(struct h265_context *s, struct hevc_short_term_rps *rps)
