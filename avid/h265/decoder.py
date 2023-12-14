@@ -15,7 +15,7 @@ class AVDH265Ctx(dotdict):
 		return sl.pps
 
 	def get_sps(self, sl):
-		return self.sps_list[self.get_pps(sl).pps_seq_parameter_set_id]
+		return sl.sps
 
 	def rvra_offset(self, idx):
 		if   (idx == 0): return self.rvra_size0
@@ -59,24 +59,6 @@ class AVDH265Decoder(AVDDecoder):
 		if (sps_id == ctx.cur_sps_id):
 			return
 		sps = ctx.sps_list[sps_id]
-
-		sps.width = sps.pic_width_in_luma_samples
-		sps.height = sps.pic_height_in_luma_samples
-
-		sps.log2_ctb_size = sps.log2_min_cb_size + sps.log2_diff_max_min_coding_block_size
-		sps.log2_min_pu_size = sps.log2_min_cb_size - 1
-
-		sps.ctb_width  = sps.width + ((1 << sps.log2_ctb_size) - 1) >> sps.log2_ctb_size
-		sps.ctb_height = (sps.height + (1 << sps.log2_ctb_size) - 1) >> sps.log2_ctb_size
-		sps.ctb_size   = sps.ctb_width * sps.ctb_height
-
-		sps.min_cb_width  = sps.width  >> sps.log2_min_cb_size
-		sps.min_cb_height = sps.height >> sps.log2_min_cb_size
-		sps.min_tb_width  = sps.width  >> sps.log2_min_tb_size
-		sps.min_tb_height = sps.height >> sps.log2_min_tb_size
-		sps.min_pu_width  = sps.width  >> sps.log2_min_pu_size
-		sps.min_pu_height = sps.height >> sps.log2_min_pu_size
-		sps.tb_mask       = (1 << (sps.log2_ctb_size - sps.log2_min_tb_size)) - 1
 
 		# TODO multiple slices with pointing to different SPSs, sigh
 		width = sps.pic_width_in_luma_samples

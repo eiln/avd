@@ -145,6 +145,7 @@ class AVDH265Parser(AVDParser):
 				continue
 			elif (unit.nal_unit_type in [HEVC_NAL_TRAIL_R, HEVC_NAL_TRAIL_N, HEVC_NAL_TSA_N,HEVC_NAL_TSA_R, HEVC_NAL_STSA_N, HEVC_NAL_STSA_R, HEVC_NAL_BLA_W_LP, HEVC_NAL_BLA_W_RADL, HEVC_NAL_BLA_N_LP, HEVC_NAL_IDR_W_RADL, HEVC_NAL_IDR_N_LP, HEVC_NAL_CRA_NUT, HEVC_NAL_RADL_N, HEVC_NAL_RADL_R, HEVC_NAL_RASL_N, HEVC_NAL_RASL_R]):
 				unit.pps = pps_list[unit.slice_pic_parameter_set_id]
+				unit.sps = sps_list[unit.pps.pps_seq_parameter_set_id]
 				unit.nal_offset = offsets[i]
 				if (unit.first_slice_segment_in_pic_flag == 0):
 					unit.idx = len(slices[-1].slices)

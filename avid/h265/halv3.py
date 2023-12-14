@@ -316,6 +316,12 @@ class AVDH265HalV3(AVDHal):
 		sps = ctx.get_sps(sl)
 		pps = ctx.get_pps(sl)
 
+		sps.width = sps.pic_width_in_luma_samples
+		sps.height = sps.pic_height_in_luma_samples
+		sps.log2_ctb_size = sps.log2_min_cb_size + sps.log2_diff_max_min_coding_block_size
+		sps.ctb_width  = sps.width + ((1 << sps.log2_ctb_size) - 1) >> sps.log2_ctb_size
+		sps.ctb_height = (sps.height + (1 << sps.log2_ctb_size) - 1) >> sps.log2_ctb_size
+
 		size = sl.get_payload_size()
 		if (HAS_TILES(sl)):
 			size = sl.entry_point_offset[0]
