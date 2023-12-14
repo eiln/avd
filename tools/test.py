@@ -277,10 +277,16 @@ class AVDH265UnitTest(AVDUnitTest):
 			"hdr_98_const_30",
 
 			"hdr_38_sps_scl_dims",
-			"hdr_3c_sps_scl_dims",
-			"hdr_40_sps_scl_dims",
-			"hdr_44_sps_scl_dims",
-			"hdr_48_sps_scl_dims",
+			"hdr_3c_sps_scl_delta_coeff",
+			"hdr_40_sps_scl_delta_coeff",
+			"hdr_44_sps_scl_delta_coeff",
+			"hdr_48_sps_scl_delta_coeff",
+
+			"hdr_7c_pps_scl_dims",
+			"hdr_80_pps_scl_delta_coeff",
+			"hdr_84_pps_scl_delta_coeff",
+			"hdr_88_pps_scl_delta_coeff",
+			"hdr_8c_pps_scl_delta_coeff",
 
 			"scl_22c_seq_scaling_matrix_4x4",
 			"scl_28c_seq_scaling_matrix_8x8",

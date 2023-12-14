@@ -20,9 +20,17 @@ class AVDH265HalV3(AVDHal):
 		cond = cond or (sl.slice_type == HEVC_SLICE_B)
 		return cond
 
-	def set_scaling_list(self, ctx, sl, list_4x4, list_8x8, list_16x16, list_32x32, is_sps):
+	def set_scaling_list(self, ctx, sl, list_4x4, list_8x8, list_16x16, list_32x32, dc_coef, is_sps):
 		push = self.push
 		sps = ctx.get_sps(sl)
+
+		for i in range(2):
+			for j in range(2):
+				x =  dc_coef[i][j*3 + 0] << 16
+				x |= dc_coef[i][j*3 + 1] << 8
+				x |= dc_coef[i][j*3 + 2] << 0
+				push(x, "hdr_%x_sps_scl_delta_coeff" % (0x3c + (i*2 + j)*4) if is_sps
+						else "hdr_%x_pps_scl_delta_coeff" % (0x80 + (i*2 + j)*4))
 
 		for i in range(6): # 4x4: transposed in stride 4
 			if ((sps.seq_scaling_list_pred_mode_flag[0][i]) or (sps.seq_scaling_list_pred_matrix_id_delta[0][i])) or not is_sps:
@@ -77,24 +85,15 @@ class AVDH265HalV3(AVDHal):
 			push(0x0, "cm3_mark_end_section")
 
 		if (pps.pps_scaling_list_data_present_flag):
-			push(0x127ffff, "hdr_30_sps_scl_dims")
-			push(0x20606, "hdr_3c_sps_scl_dims")
-			push(0x80a0a, "hdr_40_sps_scl_dims")
-			push(0xc0000, "hdr_44_sps_scl_dims")
-			push(0x100000, "hdr_48_sps_scl_dims")
-		elif (sps.scaling_list_enable_flag):
-			push(0x127b377, "hdr_7c_pps_scl_dims")
-			push(0x10200, "hdr_80_pps_scl_dims")
-			push(0x17fff, "hdr_84_pps_scl_dims")
-			push(0x10000, "hdr_88_pps_scl_dims")
-			push(0x100000, "hdr_8c_pps_scl_dims")
-
-		if (pps.pps_scaling_list_data_present_flag):
+			push(0x127ffff, "hdr_7c_pps_scl_dims")
 			self.set_scaling_list(ctx, sl, pps.pic_scaling_list_4x4, pps.pic_scaling_list_8x8,
-				pps.pic_scaling_list_16x16, pps.pic_scaling_list_32x32, 0)
+				pps.pic_scaling_list_16x16, pps.pic_scaling_list_32x32,
+				pps.pic_scaling_list_delta_coeff, 0)
 		elif (sps.scaling_list_enable_flag):
+			push(0x127b377, "hdr_38_sps_scl_dims")
 			self.set_scaling_list(ctx, sl, sps.seq_scaling_list_4x4, sps.seq_scaling_list_8x8,
-				sps.seq_scaling_list_16x16, sps.seq_scaling_list_32x32, 1)
+				sps.seq_scaling_list_16x16, sps.seq_scaling_list_32x32,
+				sps.seq_scaling_list_delta_coeff, 1)
 
 	def set_refs(self, ctx, sl):
 		push = self.push

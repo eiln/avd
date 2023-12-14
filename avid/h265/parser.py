@@ -87,7 +87,7 @@ class AVDH265Parser(AVDParser):
 			("seq_scaling_list_8x8", (6, 64)),
 			("seq_scaling_list_16x16", (6, 64)),
 			("seq_scaling_list_32x32", (6, 64)),
-			("seq_scaling_list_delta_coeff", (4, 6)),
+			("seq_scaling_list_delta_coeff", (2, 6)),
 
 			("pic_scaling_list_pred_mode_flag", (4, 6)),
 			("pic_scaling_list_pred_matrix_id_delta", (4, 6)),
@@ -95,7 +95,7 @@ class AVDH265Parser(AVDParser):
 			("pic_scaling_list_8x8", (6, 64)),
 			("pic_scaling_list_16x16", (6, 64)),
 			("pic_scaling_list_32x32", (6, 64)),
-			("pic_scaling_list_delta_coeff", (4, 6)),
+			("pic_scaling_list_delta_coeff", (2, 6)),
 
 			("entry_point_offset", HEVC_MAX_ENTRY_POINT_OFFSETS),
 			("column_width", HEVC_MAX_TILE_COLUMNS),
