@@ -20,9 +20,9 @@ class AVDH265HalV3(AVDHal):
 		cond = cond or (sl.slice_type == HEVC_SLICE_B)
 		return cond
 
-	def set_scaling_list(self, ctx, sl, list_4x4, list_8x8, list_16x16, list_32x32, dc_coef, is_sps):
+	def set_scaling_list(self, ctx, sl, list_4x4, list_8x8, list_16x16, list_32x32,
+							   mask, dc_coef, is_sps):
 		push = self.push
-		sps = ctx.get_sps(sl)
 
 		for i in range(2):
 			for j in range(2):
@@ -33,7 +33,7 @@ class AVDH265HalV3(AVDHal):
 						else "hdr_%x_pps_scl_delta_coeff" % (0x80 + (i*2 + j)*4))
 
 		for i in range(6): # 4x4: transposed in stride 4
-			if ((sps.seq_scaling_list_pred_mode_flag[0][i]) or (sps.seq_scaling_list_pred_matrix_id_delta[0][i])) or not is_sps:
+			if (mask & (1 << (0*6 + i))):
 				for j in range(16 // 4):
 					x = 0
 					x |= list_4x4[i][j + 0*4] << 24
@@ -43,7 +43,7 @@ class AVDH265HalV3(AVDHal):
 					push(x, "scl_22c_seq_scaling_matrix_4x4" if is_sps else "scl_610_pic_scaling_matrix_4x4", i*(16 // 4) + j)
 
 		for i in range(6): # 8x8: transposed in stride 8
-			if ((sps.seq_scaling_list_pred_mode_flag[1][i]) or (sps.seq_scaling_list_pred_matrix_id_delta[1][i])) or not is_sps:
+			if (mask & (1 << (1*6 + i))):
 				for j in range(2):
 					for k in range(8):
 						x = 0
@@ -54,7 +54,7 @@ class AVDH265HalV3(AVDHal):
 						push(x, "scl_28c_seq_scaling_matrix_8x8" if is_sps else "scl_670_pic_scaling_matrix_8x8", i*(64 // 4) + j*8 + k)
 
 		for i in range(6): # 16x16: transposed in stride 8
-			if ((sps.seq_scaling_list_pred_mode_flag[2][i]) or (sps.seq_scaling_list_pred_matrix_id_delta[2][i])) or not is_sps:
+			if (mask & (1 << (2*6 + i))):
 				for j in range(2):
 					for k in range(8):
 						x = 0
@@ -66,7 +66,7 @@ class AVDH265HalV3(AVDHal):
 
 		for i in range(6): # 32x32: transposed in stride 8
 			if (i not in [0, 3]): continue
-			if (sps.seq_scaling_list_pred_mode_flag[3][i]) or 1: # Sets unconditionally?
+			if (mask & (1 << (3*6 + i))):
 				for j in range(2):
 					for k in range(8):
 						x = 0
@@ -84,15 +84,26 @@ class AVDH265HalV3(AVDHal):
 		if (not (sps.scaling_list_enable_flag or pps.pps_scaling_list_data_present_flag)):
 			push(0x0, "cm3_mark_end_section")
 
+		mask = 0
+		if (pps.pps_scaling_list_data_present_flag): # Takes precedence if both SPS/PPS
+			for i in range(4):
+				for j in range(6):
+					mask |= set_bit(i*6 + j)  # Set unconditionally
+		elif (sps.scaling_list_enable_flag):
+			for i in range(4):
+				for j in range(6):
+					if (((sps.seq_scaling_list_pred_mode_flag[i][j]) or (sps.seq_scaling_list_pred_matrix_id_delta[i][j])) or (i == 3)):
+						mask |= set_bit(i*6 + j)  # Set if !default || size_id == 3
+
 		if (pps.pps_scaling_list_data_present_flag):
 			push(0x127ffff, "hdr_7c_pps_scl_dims")
 			self.set_scaling_list(ctx, sl, pps.pic_scaling_list_4x4, pps.pic_scaling_list_8x8,
-				pps.pic_scaling_list_16x16, pps.pic_scaling_list_32x32,
+				pps.pic_scaling_list_16x16, pps.pic_scaling_list_32x32, mask,
 				pps.pic_scaling_list_delta_coeff, 0)
 		elif (sps.scaling_list_enable_flag):
 			push(0x127b377, "hdr_38_sps_scl_dims")
 			self.set_scaling_list(ctx, sl, sps.seq_scaling_list_4x4, sps.seq_scaling_list_8x8,
-				sps.seq_scaling_list_16x16, sps.seq_scaling_list_32x32,
+				sps.seq_scaling_list_16x16, sps.seq_scaling_list_32x32, mask,
 				sps.seq_scaling_list_delta_coeff, 1)
 
 	def set_refs(self, ctx, sl):
