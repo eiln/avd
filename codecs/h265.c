@@ -518,9 +518,11 @@ static void set_default_scaling_list_data(ScalingList *sl)
     for (matrixId = 0; matrixId < 6; matrixId++) {
         // 4x4 default is 16
         memset(sl->sl[0][matrixId], 16, 16);
-        sl->sl_dc[0][matrixId] = 16; // default for 16x16
-        sl->sl_dc[1][matrixId] = 16; // default for 32x32
+        //sl->sl_dc[0][matrixId] = 16; // default for 16x16
+        //sl->sl_dc[1][matrixId] = 16; // default for 32x32
     }
+    sl->sl_dc[1][3] = 16;
+
     memcpy(sl->sl[1][0], default_scaling_list_intra, 64);
     memcpy(sl->sl[1][1], default_scaling_list_intra, 64);
     memcpy(sl->sl[1][2], default_scaling_list_intra, 64);
