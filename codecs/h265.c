@@ -541,8 +541,7 @@ static void set_default_scaling_list_data(ScalingList *sl)
     memcpy(sl->sl[3][5], default_scaling_list_inter, 64);
 }
 
-static int hevc_decode_scaling_list(struct bitstream *gb,
-                                    ScalingList *sl, const struct hevc_sps *sps)
+static int hevc_decode_scaling_list(struct bitstream *gb, ScalingList *sl, int chroma_idc)
 {
     uint8_t scaling_list_dc_coef[2][6];
     int size_id, matrix_id, pos;
@@ -601,7 +600,7 @@ static int hevc_decode_scaling_list(struct bitstream *gb,
         }
     }
 
-    if (sps->chroma_format_idc == 3) {
+    if (chroma_idc == 3) {
         for (i = 0; i < 64; i++) {
             sl->sl[3][1][i] = sl->sl[2][1][i];
             sl->sl[3][2][i] = sl->sl[2][2][i];
@@ -879,10 +878,9 @@ static int h265_decode_nal_sps(struct h265_context *s, struct hevc_sps *sps)
     sps->scaling_list_enable_flag = get_bits1(gb);
     if (sps->scaling_list_enable_flag) {
         set_default_scaling_list_data(&sps->scaling_list);
-
         sps->sps_scaling_list_data_present_flag = get_bits1(gb);
         if (sps->sps_scaling_list_data_present_flag) {
-            ret = hevc_decode_scaling_list(gb, &sps->scaling_list, sps);
+            ret = hevc_decode_scaling_list(gb, &sps->scaling_list, sps->chroma_format_idc);
             if (ret < 0)
                 return ret;
         }
@@ -1344,7 +1342,7 @@ static int h265_decode_nal_pps(struct h265_context *s, struct hevc_pps *pps)
     pps->pps_scaling_list_data_present_flag = get_bits1(gb);
     if (pps->pps_scaling_list_data_present_flag) {
         set_default_scaling_list_data(&pps->scaling_list);
-        ret = hevc_decode_scaling_list(gb, &pps->scaling_list, sps);
+        ret = hevc_decode_scaling_list(gb, &pps->scaling_list, sps->chroma_format_idc);
         if (ret < 0)
             goto err;
     }
