@@ -81,6 +81,14 @@ class AVDH265Parser(AVDParser):
 			("st_rps_poc", HEVC_MAX_SHORT_TERM_REF_PIC_SETS),
 			("st_rps_used", HEVC_MAX_SHORT_TERM_REF_PIC_SETS),
 
+			("seq_scaling_list_pred_mode_flag", (4, 6)),
+			("seq_scaling_list_pred_matrix_id_delta", (4, 6)),
+			("seq_scaling_list_4x4", (6, 16)),
+			("seq_scaling_list_8x8", (6, 64)),
+			("seq_scaling_list_16x16", (6, 64)),
+			("seq_scaling_list_32x32", (6, 64)),
+			("seq_scaling_list_delta_coeff", (4, 6)),
+
 			("entry_point_offset", HEVC_MAX_ENTRY_POINT_OFFSETS),
 			("column_width", HEVC_MAX_TILE_COLUMNS),
 			("row_height", HEVC_MAX_TILE_ROWS),

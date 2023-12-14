@@ -26,11 +26,11 @@ class AVDH265V3InstHeader(AVDFrameParams):
 		"hdr_2c_sps_txfm" / u32,
 		"hdr_30_sps_pcm" / u32,
 		"hdr_34_sps_flags" / u32,
-		"hdr_38_zero" / ExprValidator(u32, obj_ == 0),
-		"hdr_3c_zero" / ExprValidator(u32, obj_ == 0),
-		"hdr_40_zero" / ExprValidator(u32, obj_ == 0),
-		"hdr_44_zero" / ExprValidator(u32, obj_ == 0),
-		"hdr_48_zero" / ExprValidator(u32, obj_ == 0),
+		"hdr_38_sps_scl_dims" / u32,
+		"hdr_3c_sps_scl_dims" / u32,
+		"hdr_40_sps_scl_dims" / u32,
+		"hdr_44_sps_scl_dims" / u32,
+		"hdr_48_sps_scl_dims" / u32,
 
 		"hdr_4c_cmd_start_hdr" / ExprValidator(u32, obj_ & 0x2db00000 == 0x2db00000),
 		"hdr_50_mode" / ExprValidator(u32, obj_ == 0),
@@ -71,29 +71,16 @@ class AVDH265V3InstHeader(AVDFrameParams):
 	def __init__(self):
 		super().__init__()
 
-class AVDH265V3DumbFuckingWasteOfMemory(AVDFrameParams):
-	"""
-	000001c0: 00000008 00010001 00020000 00000000   ................
-	000001f0: 00000000 00000001 00000000 00000000   ................
-	00000220: 00000000 00000000 03de28b5 00000000   .........(......
-	00000600: 00000000 00000000 00000000 03de28b5   .............(..
-	000009f0: 00764099 00000000 00000000 00000000   .@v.............
-	00000a60: 00000000 00000000 00000000 00124111   .............A..
-	00000a80: 00000000 015e0e0d 2d049056 2dc00000   ......^.V..-...-
-	00000a90: 2dc00011 2dc00022 2dc00103 00000000   ...-"..-...-....
-	00000b00: 00000000 00000000 2dd00000 00000000   ...........-....
-	00000bc0: 00000000 00000000 00000000 2d905c00   .............\.-
-	00000bd0: 2da500c0 000076c0 0074400d 00000117   ...-.v...@t.....
-	00000be0: 01000000 00000000 00000000 00000000   ................
-	00034ce0: 00000000 00261239 00000000 00000000   ....9.&.........
-	00034cf0: 010f0000 000e000f 0074400d 00000117   .........@t.....
-	"""
+class AVDH265V3DFWScalingList(AVDFrameParams):
 	subcon = Struct(
-		"dfw_200_pad" / ZPadding(0x20),
-		"dfw_200_pad" / ZPadding(0x8),
-		"dfw_228_ipc" / ExprValidator(u32, obj_ == 0x3de28b5),
-		"dfw_22c_ipc" / ZPadding(0x60c - 0x22c),
-		"dfw_60c_ipc" / ExprValidator(u32, obj_ == 0x3de28b5),
+		"scl_dfw_200_pad" / ZPadding(0x20),
+		"scl_dfw_200_pad" / ZPadding(0x8),
+		"scl_228_seq_list_pio_src" / ExprValidator(u32, obj_ == 0x3de28b5),
+		"scl_22c_seq_scaling_matrix_4x4" / Array(6 * 16 // 4, u32),
+		"scl_28c_seq_scaling_matrix_8x8" / Array(6 * 64 // 4, u32),
+		"scl_40c_seq_scaling_matrix_16x16" / Array(6 * 64 // 4, u32),
+		"scl_58c_seq_scaling_matrix_32x32" / Array(2 * 64 // 4, u32),
+		"scl_60c_pio_src" / ExprValidator(u32, obj_ == 0x3de28b5),
 		"dfw_610_pad" / ZPadding(0x9f0 - 0x610),
 		"dfw_9f0_ipc" / ExprValidator(u32, obj_ == 0x764099),
 		"dfw_9f4_ipc" / ZPadding(0xa6c - 0x9f4),
@@ -134,7 +121,6 @@ class AVDH265V3FakeFrameParams(AVDFakeFrameParams):
 
 		obj["hdr_104_curr_ref_addr_lsb7"] = [0] * 4
 		obj["hdr_114_ref_hdr"] = [0] * 8
-
 		obj["hdr_134_ref0_addr_lsb7"] = [0] * 8
 		obj["hdr_154_ref1_addr_lsb7"] = [0] * 8
 		obj["hdr_174_ref2_addr_lsb7"] = [0] * 8
@@ -148,13 +134,26 @@ class AVDH265V3FakeFrameParams(AVDFakeFrameParams):
 		obj["slc_bd4_sps_tile_addr2_lsb8"] = 0
 		obj["hdr_dc_pps_tile_addr_lsb8"] = [0] * 12
 		obj["hdr_bc_sps_tile_addr_lsb8"] = 0
+
+		obj["hdr_38_sps_scl_dims"] = 0
+		obj["hdr_3c_sps_scl_dims"] = 0
+		obj["hdr_40_sps_scl_dims"] = 0
+		obj["hdr_44_sps_scl_dims"] = 0
+		obj["hdr_48_sps_scl_dims"] = 0
+
+		obj["scl_22c_seq_scaling_matrix_4x4"] = [0] * (6 * 16 // 4)
+		obj["scl_28c_seq_scaling_matrix_8x8"] = [0] * (6 * 64 // 4)
+		obj["scl_40c_seq_scaling_matrix_16x16"] = [0] * (6 * 64 // 4)
+		obj["scl_58c_seq_scaling_matrix_32x32"] = [0] * (2 * 64 // 4)
+		obj["scl_46c_pic_scaling_matrix_4x4"] = [0] * (6 * 16 // 4)
+		obj["scl_4cc_pic_scaling_matrix_8x8"] = [0] * (6 * 64 // 4)
 		return obj
 
 class AVDH265V3FrameParams(AVDFrameParams):
 	subcon = Struct(
 		"pio" / AVDH265V3PiodmaHeader,
 		"hdr" / AVDH265V3InstHeader,
-		"dfw" / AVDH265V3DumbFuckingWasteOfMemory,
+		"scl" / AVDH265V3DFWScalingList,
 		"slc" / AVDH265V3Slice,
 	)
 	_ffpcls = AVDH265V3FakeFrameParams
@@ -162,4 +161,4 @@ class AVDH265V3FrameParams(AVDFrameParams):
 		super().__init__()
 
 	def __str__(self):
-		return ''.join([str(getattr(self, x)) for x in ["pio", "hdr", "slc"]])
+		return ''.join([str(getattr(self, x)) for x in ["pio", "hdr", "scl", "slc"]])
