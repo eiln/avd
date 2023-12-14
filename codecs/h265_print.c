@@ -169,19 +169,24 @@ void h265_print_nal_vps(struct hevc_vps *vps)
     }
 }
 
-static void h265_print_scaling_list(ScalingList *sl)
+static void h265_print_scaling_list(ScalingList *sl, const char *which)
 {
     int size_id, matrix_id;
     int i;
 
     for (size_id = 0; size_id < 4; size_id++) {
         for (matrix_id = 0; matrix_id < 6; matrix_id += ((size_id == 3) ? 3 : 1)) {
-            h265_fieldt("scaling_list_pred_mode_flag[%d][%d]", size_id, matrix_id, sl->scaling_list_pred_mode_flag[size_id][matrix_id]);
+            h265_fieldt("%s_scaling_list_pred_mode_flag[%d][%d]",
+                which, size_id, matrix_id,
+                sl->scaling_list_pred_mode_flag[size_id][matrix_id]);
             if (!sl->scaling_list_pred_mode_flag[size_id][matrix_id])
-                h265_fieldt("scaling_list_pred_matrix_id_delta[%d][%d]", size_id, matrix_id, sl->scaling_list_pred_matrix_id_delta[size_id][matrix_id]);
+                h265_fieldt("%s_scaling_list_pred_matrix_id_delta[%d][%d]",
+                    which, size_id, matrix_id,
+                    sl->scaling_list_pred_matrix_id_delta[size_id][matrix_id]);
             for (i = 0; i < ((size_id == 0) ? 16 : 64); i++) {
                 int size = 1 << (size_id + 2);
-                h265_fieldt("seq_scaling_list_%dx%d[%d][%d]", size, size, matrix_id, i, sl->sl[size_id][matrix_id][i]);
+                h265_fieldt("%s_scaling_list_%dx%d[%d][%d]",
+                    which, size, size, matrix_id, i, sl->sl[size_id][matrix_id][i]);
             }
         }
     }
@@ -312,7 +317,7 @@ void h265_print_nal_sps(struct hevc_sps *sps)
 
     h265_field("scaling_list_enable_flag", sps->scaling_list_enable_flag);
     if (sps->scaling_list_enable_flag)
-        h265_print_scaling_list(&sps->scaling_list);
+        h265_print_scaling_list(&sps->scaling_list, "seq");
 
     h265_field("amp_enabled_flag", sps->amp_enabled_flag);
     h265_field("sample_adaptive_offset_enabled_flag", sps->sample_adaptive_offset_enabled_flag);
@@ -424,7 +429,7 @@ void h265_print_nal_pps(struct hevc_pps *pps)
 
     h265_field("pps_scaling_list_data_present_flag", pps->pps_scaling_list_data_present_flag);
     if (pps->pps_scaling_list_data_present_flag)
-        h265_print_scaling_list(&pps->scaling_list);
+        h265_print_scaling_list(&pps->scaling_list, "pic");
 
     h265_field("lists_modification_present_flag", pps->lists_modification_present_flag);
     h265_field("log2_parallel_merge_level", pps->log2_parallel_merge_level);
