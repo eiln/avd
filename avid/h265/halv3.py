@@ -20,75 +20,81 @@ class AVDH265HalV3(AVDHal):
 		cond = cond or (sl.slice_type == HEVC_SLICE_B)
 		return cond
 
-	def set_scaling_list(self, ctx, sl):
+	def set_scaling_list(self, ctx, sl, list_4x4, list_8x8, list_16x16, list_32x32, is_sps):
+		push = self.push
+		sps = ctx.get_sps(sl)
+
+		for i in range(6): # 4x4: transposed in stride 4
+			if ((sps.seq_scaling_list_pred_mode_flag[0][i]) or (sps.seq_scaling_list_pred_matrix_id_delta[0][i])) or not is_sps:
+				for j in range(16 // 4):
+					x = 0
+					x |= list_4x4[i][j + 0*4] << 24
+					x |= list_4x4[i][j + 1*4] << 16
+					x |= list_4x4[i][j + 2*4] << 8
+					x |= list_4x4[i][j + 3*4] << 0
+					push(x, "scl_22c_seq_scaling_matrix_4x4" if is_sps else "scl_610_pic_scaling_matrix_4x4", i*(16 // 4) + j)
+
+		for i in range(6): # 8x8: transposed in stride 8
+			if ((sps.seq_scaling_list_pred_mode_flag[1][i]) or (sps.seq_scaling_list_pred_matrix_id_delta[1][i])) or not is_sps:
+				for j in range(2):
+					for k in range(8):
+						x = 0
+						x |= list_8x8[i][j*32 + k + 0*8] << 24
+						x |= list_8x8[i][j*32 + k + 1*8] << 16
+						x |= list_8x8[i][j*32 + k + 2*8] << 8
+						x |= list_8x8[i][j*32 + k + 3*8] << 0
+						push(x, "scl_28c_seq_scaling_matrix_8x8" if is_sps else "scl_670_pic_scaling_matrix_8x8", i*(64 // 4) + j*8 + k)
+
+		for i in range(6): # 16x16: transposed in stride 8
+			if ((sps.seq_scaling_list_pred_mode_flag[2][i]) or (sps.seq_scaling_list_pred_matrix_id_delta[2][i])) or not is_sps:
+				for j in range(2):
+					for k in range(8):
+						x = 0
+						x |= list_16x16[i][j*32 + k + 0*8] << 24
+						x |= list_16x16[i][j*32 + k + 1*8] << 16
+						x |= list_16x16[i][j*32 + k + 2*8] << 8
+						x |= list_16x16[i][j*32 + k + 3*8] << 0
+						push(x, "scl_40c_seq_scaling_matrix_16x16" if is_sps else "scl_7f0_pic_scaling_matrix_16x16", i*(64 // 4) + j*8 + k)
+
+		for i in range(6): # 32x32: transposed in stride 8
+			if (i not in [0, 3]): continue
+			if (sps.seq_scaling_list_pred_mode_flag[3][i]) or 1: # Sets unconditionally?
+				for j in range(2):
+					for k in range(8):
+						x = 0
+						x |= list_32x32[i][j*32 + k + 0*8] << 24
+						x |= list_32x32[i][j*32 + k + 1*8] << 16
+						x |= list_32x32[i][j*32 + k + 2*8] << 8
+						x |= list_32x32[i][j*32 + k + 3*8] << 0
+						push(x, "scl_58c_seq_scaling_matrix_32x32" if is_sps else "scl_970_pic_scaling_matrix_32x32", boolify(i)*(64 // 4) + j*8 + k)
+
+	def set_scaling_lists(self, ctx, sl):
 		push = self.push
 		sps = ctx.get_sps(sl)
 		pps = ctx.get_pps(sl)
 
-		x = 0
-		if (sps.scaling_list_enable_flag):
-			x |= 0x1000000
-		else:
-			push(x, "hdr_30_sps_scl_dims")
-			return
+		if (not (sps.scaling_list_enable_flag or pps.pps_scaling_list_data_present_flag)):
+			push(0x0, "cm3_mark_end_section")
 
-		if (sps.scaling_list_enable_flag):
-			x |= 0x27b377
-		if (sps.scaling_list_enable_flag):
-			push(x, "hdr_30_sps_scl_dims")
-			push(0x10200, "hdr_3c_sps_scl_dims")
-			push(0x17fff, "hdr_40_sps_scl_dims")
-			push(0x10000, "hdr_44_sps_scl_dims")
+		if (pps.pps_scaling_list_data_present_flag):
+			push(0x127ffff, "hdr_30_sps_scl_dims")
+			push(0x20606, "hdr_3c_sps_scl_dims")
+			push(0x80a0a, "hdr_40_sps_scl_dims")
+			push(0xc0000, "hdr_44_sps_scl_dims")
 			push(0x100000, "hdr_48_sps_scl_dims")
+		elif (sps.scaling_list_enable_flag):
+			push(0x127b377, "hdr_7c_pps_scl_dims")
+			push(0x10200, "hdr_80_pps_scl_dims")
+			push(0x17fff, "hdr_84_pps_scl_dims")
+			push(0x10000, "hdr_88_pps_scl_dims")
+			push(0x100000, "hdr_8c_pps_scl_dims")
 
-		if (sps.scaling_list_enable_flag):
-			for i in range(6): # 4x4: transposed in stride 4
-				if ((sps.scaling_list_pred_mode_flag[0][i]) or (sps.scaling_list_pred_matrix_id_delta[0][i])):
-					for j in range(16 // 4):  # transposed
-						x = 0
-						x |= sps.seq_scaling_list_4x4[i][j + 0*4] << 24
-						x |= sps.seq_scaling_list_4x4[i][j + 1*4] << 16
-						x |= sps.seq_scaling_list_4x4[i][j + 2*4] << 8
-						x |= sps.seq_scaling_list_4x4[i][j + 3*4] << 0
-						push(x, "scl_22c_seq_scaling_matrix_4x4", i*(16 // 4) + j)
-
-			for i in range(6): # 8x8: row odd/even swap in stride 8
-				if ((sps.scaling_list_pred_mode_flag[1][i]) or (sps.scaling_list_pred_matrix_id_delta[1][i])):
-					for j in range(64 // 4):
-						n = j
-						if (j < 8):
-							j = j * 2
-						else:
-							j = (j - 8) * 2 + 1
-						x = 0
-						x |= sps.seq_scaling_list_8x8[i][j*4 + 0] << 24
-						x |= sps.seq_scaling_list_8x8[i][j*4 + 1] << 16
-						x |= sps.seq_scaling_list_8x8[i][j*4 + 2] << 8
-						x |= sps.seq_scaling_list_8x8[i][j*4 + 3] << 0
-						push(x, "scl_28c_seq_scaling_matrix_8x8", i*(64 // 4) + n)
-
-			for i in range(6): # 16x16: transposed in stride 8
-				if ((sps.scaling_list_pred_mode_flag[2][i]) or (sps.scaling_list_pred_matrix_id_delta[2][i])):
-					for j in range(2):
-						for k in range(8):
-							x = 0
-							x |= sps.seq_scaling_list_16x16[i][j*32 + k + 0*8] << 24
-							x |= sps.seq_scaling_list_16x16[i][j*32 + k + 1*8] << 16
-							x |= sps.seq_scaling_list_16x16[i][j*32 + k + 2*8] << 8
-							x |= sps.seq_scaling_list_16x16[i][j*32 + k + 3*8] << 0
-							push(x, "scl_40c_seq_scaling_matrix_16x16", i*(64 // 4) + j*8 + k)
-
-			for i in range(6): # 32x32: transposed in stride 8
-				if (i not in [0, 3]): continue
-				if (sps.scaling_list_pred_mode_flag[3][i]) or 1: # Sets unconditionally?
-					for j in range(2):
-						for k in range(8):
-							x = 0
-							x |= sps.seq_scaling_list_32x32[i][j*32 + k + 0*8] << 24
-							x |= sps.seq_scaling_list_32x32[i][j*32 + k + 1*8] << 16
-							x |= sps.seq_scaling_list_32x32[i][j*32 + k + 2*8] << 8
-							x |= sps.seq_scaling_list_32x32[i][j*32 + k + 3*8] << 0
-							push(x, "scl_58c_seq_scaling_matrix_32x32", boolify(i)*(64 // 4) + j*8 + k)
+		if (pps.pps_scaling_list_data_present_flag):
+			self.set_scaling_list(ctx, sl, pps.pic_scaling_list_4x4, pps.pic_scaling_list_8x8,
+				pps.pic_scaling_list_16x16, pps.pic_scaling_list_32x32, 0)
+		elif (sps.scaling_list_enable_flag):
+			self.set_scaling_list(ctx, sl, sps.seq_scaling_list_4x4, sps.seq_scaling_list_8x8,
+				sps.seq_scaling_list_16x16, sps.seq_scaling_list_32x32, 1)
 
 	def set_refs(self, ctx, sl):
 		push = self.push
@@ -247,8 +253,7 @@ class AVDH265HalV3(AVDHal):
 		if (not IS_INTRA(sl)):
 			self.set_refs(ctx, sl)
 
-		self.set_scaling_list(ctx, sl)
-		#push(0x0, "cm3_mark_end_section")
+		self.set_scaling_lists(ctx, sl)
 
 	def set_weights(self, ctx, sl):
 		push = self.push

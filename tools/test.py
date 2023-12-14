@@ -286,6 +286,10 @@ class AVDH265UnitTest(AVDUnitTest):
 			"scl_28c_seq_scaling_matrix_8x8",
 			"scl_40c_seq_scaling_matrix_16x16",
 			"scl_58c_seq_scaling_matrix_32x32",
+			"scl_610_pic_scaling_matrix_4x4",
+			"scl_670_pic_scaling_matrix_8x8",
+			"scl_7f0_pic_scaling_matrix_16x16",
+			"scl_970_pic_scaling_matrix_32x32",
 
 			"hdr_dc_pps_tile_addr_lsb8",
 			#"hdr_104_curr_ref_addr_lsb7",
