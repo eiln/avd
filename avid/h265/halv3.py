@@ -6,8 +6,6 @@ from ..hal import AVDHal
 from ..utils import *
 from .types import *
 
-def HAS_TILES(sl): return boolify((sl.pps.tiles_enabled_flag) and (sl.num_entry_point_offsets > 0))
-
 class AVDH265HalV3(AVDHal):
 	def __init__(self):
 		super().__init__()
@@ -407,6 +405,7 @@ class AVDH265HalV3(AVDHal):
 		push = self.push
 		sps = ctx.get_sps(sl)
 		pps = ctx.get_pps(sl)
+		s = self.s
 
 		sps.width = sps.pic_width_in_luma_samples
 		sps.height = sps.pic_height_in_luma_samples
@@ -414,12 +413,14 @@ class AVDH265HalV3(AVDHal):
 		sps.ctb_width  = sps.width + ((1 << sps.log2_ctb_size) - 1) >> sps.log2_ctb_size
 		sps.ctb_height = (sps.height + (1 << sps.log2_ctb_size) - 1) >> sps.log2_ctb_size
 
-		size = sl.get_payload_size()
-		if (HAS_TILES(sl)):
+		if ((sl.pps.tiles_enabled_flag) and (sl.num_entry_point_offsets > 0)):
 			size = sl.entry_point_offset[0]
+		else:
+			size = sl.get_payload_size()
 		offset = 0
 		start = offset + sl.get_payload_offset()  # hack to calc last entrypoint offset
 
+		# TODO I'm sure this is a bitmask
 		t = 3
 		if (sl.first_slice_segment_in_pic_flag):
 			t = 3
@@ -437,48 +438,116 @@ class AVDH265HalV3(AVDHal):
 				col_bd[i + 1] = col_bd[i] + pps.column_width[i]
 			for i in range(pps.num_tile_rows):
 				row_bd[i + 1] = row_bd[i] + pps.row_height[i]
+
 		sx = pos // pps.num_tile_columns
 		sy = pos % pps.num_tile_columns
 
+		# Set top/left bound of CTB context search window
 		if (pps.tiles_enabled_flag):
-			rx = row_bd[sx]
-			cy = col_bd[sy]
+			rx = row_bd[sx + 0]  # Sliding window accumulator for tiles
+			cy = col_bd[sy + 0]
 		elif (sl.first_slice_segment_in_pic_flag == 0):
 			rx = sl.slice_segment_address // sps.ctb_width
 			cy = sl.slice_segment_address % sps.ctb_width
 		else:
-			rx = 0
+			rx = 0  # else, lower bound entire CTB
 			cy = 0
-		mx = (rx & 0xffff) << 12 | cy & 0xffff
+		mxy = (rx & 0xffff) << 12 | cy & 0xffff  # Motion vector window resets every time
 
 		if (sl.dependent_slice_segment_flag):
-			cx = c0x  # if it's a dependent slice, reuse the last slice's entropy
+			cxy = c0x  # if it's a dependent slice, reuse the last slice's entropy window
 		else:
-			cx = mx   # else, move up
-		push(0x2c000000 | cx, "cm3_cmd_set_cabac_xy")  # entropy pos
+			cxy = mxy  # else, move up
+		push(0x2c000000 | cxy, "cm3_cmd_set_cabac_xy") # CABAC window
 
 		if (sl.dependent_slice_segment_flag):
 			self.set_slice_dqtblk(ctx, ctx.active_sl)
 		else:
 			self.set_slice_dqtblk(ctx, sl)
 
-		if (has_tiles):  # tile || first slice; tiles change window so re-set it
-			push(0x2a000000 | cx, "cm3_cmd_set_ctb_xy")
+		# https://ieeexplore.ieee.org/document/6547985
+		# "Specifically, entropy coding and reconstruction dependencies
+		# are not allowed across a tile boundary. This includes motion
+		# vector prediction, intra prediction and context selection"
+		#
+		# We make use of 4 available quadrants qx (0, 4, 8, c) to manage
+		# mv/entropy/CTB context in the case tile boundaries cross slice
+		# boundaries. Everything else just uses quad 0.
+		#
+		#  0 | 4
+		#  8 | c
+		#
+		# Say we have,
+		# sx sy r0 c0 r1 c1 qx
+		#  0  0  0  0  6 13  0 | SLICE
+		#  0  1  0 13  6 18  0 | tile
+		#  0  2  0 18  6 22  0 | tile
+		#  0  3  0 22  6 26  0 | tile
+		#  0  4  0 26  6 30  0 | tile
+		#  1  0  6  0 12 13  4 | tile  <- Q1; new CTB row, same context
+		#
+		# The hw processes in rows/cache lines, but the 6th tile occurs on the
+		# CTB row below the last SLICE, we extend the current context to the
+		# right (hflip) by bitwise OR 0b0100 i.e. if the the last slice was a
+		# row above (and there hasn't been a slice in the same row), we | 4.
+		#
+		#  X x X x x  where x=0,y=4,z=8,w=c && slices are capitalized
+		#  x x x X x  <- no flips yet (all x)
+		#  y X x X x  <- hflip at (r2,c0) since the last slice (r0,c1) was row above
+		#  y X x x X     then resets after new slice
+		#  y y X x x
+		#
+		# The vflip (bitwise OR 0b1000) is slightly trickier.
+		# A) If it's below the last slice and it's on the same column or to
+		#     the right of the last slice.
+		#
+		# B) If it's it's below the last Q1 since the last slice and it's on
+		#    the same column or to the left of the last Q1 since the last slice.
+		#
+		#  X x x x x
+		#  y Z x x x  <- vflip even on the slice itself (c1,r1), then reset
+		#  y w Z x x  <- vflip starting from c2,r2 (where above Z was), until new slice (Z)
+		#  y y w Z x
+		#  y y y w w
+		#
+		if (has_tiles):  # Reset CTB context window only on tile || first slice
+			push(0x2a000000 | cxy, "cm3_cmd_set_ctb_xy")
 			if (pps.tiles_enabled_flag):
-				x = sy << 24 | ((row_bd[sx + 1] - 1) & 0xffff) << 12 | ((col_bd[sy + 1] - 1) & 0xffff)
+				rx = row_bd[sx + 1] - 1
+				cy = col_bd[sy + 1] - 1
+				qx = 0
+				# hflip doesn't apply since this is a slice itself
+				if (((sy and sy >= s.last_ctx_col) and (sx > s.last_ctx_row))
+				 or ((sy and sy <= s.last_q1_col) and (sx > s.last_q1_row))):
+					qx |= 8  # vflip
+				s.last_ctx_row = sx
+				s.last_ctx_col = sy
+				s.last_q1_row = -1  # null Q1 on slice
+				s.last_q1_col = -1
 			else:
-				x = sy << 24 | ((sps.ctb_height - 1) & 0xffff) << 12 | (sps.ctb_width - 1) & 0xffff
-			push(x, "cm3_set_ctb_xy")  # ctb pos
+				rx = sps.ctb_height - 1
+				cy = sps.ctb_width - 1
+				qx = 0  # quad 0
+			push(qx << 28 | sy << 24 | (rx & 0xffff) << 12 | cy & 0xffff, "cm3_set_ctb_xy")
 
 		if (sl.dependent_slice_segment_flag):
 			self.set_slice_mv(ctx, ctx.active_sl, 1)
 		else:
 			self.set_slice_mv(ctx, sl, 0)
-		push(0x01000000 | mx, "cm3_set_mv_xy")  # motion vector pos
-		if (not (sl.first_slice_segment_in_pic_flag == 0 and pps.entropy_coding_sync_enabled_flag)):
+		# Unlike entropy, motion vector window resets every time
+		# Not sure why their firmware uses column 1 for mv though; obv doesn't
+		# affect decode
+		push(0 << 28 | 1 << 24 | mxy, "cm3_set_mv_xy")
+
+		# This is a hack because we don't use pos in slice_segment_address but
+		# we also don't increment the decode command accumulation count for
+		# dependent slices. TODO refactor
+		if (not (sl.first_slice_segment_in_pic_flag == 0 and sl.dependent_slice_segment_flag == 1)):
 			pos += 1
 
-		if (HAS_TILES(sl)):
+		# Repeat for tiles/entry points. This should actually be a single loop
+		# contiuning from above, but things are bad as it is
+		if ((sl.pps.tiles_enabled_flag) and (sl.num_entry_point_offsets > 0)):
 			for n in range(sl.num_entry_point_offsets + 1 - 1):  # We did tile #0 above
 				push(0x2b000000, "cm3_cmd_inst_fifo_start")
 				if (n != sl.num_entry_point_offsets - 1):
@@ -489,22 +558,37 @@ class AVDH265HalV3(AVDHal):
 
 				sx = pos // pps.num_tile_columns
 				sy = pos % pps.num_tile_columns
-				ax = (row_bd[sx] & 0xffff) << 12 | col_bd[sy] & 0xffff
-				bx = ((row_bd[sx + 1] - 1) & 0xffff) << 12 | (col_bd[sy + 1] - 1) & 0xffff
-				bx |= sy << 24
+				mxy = (row_bd[sx] & 0xffff) << 12 | col_bd[sy] & 0xffff
+				xy = ((row_bd[sx + 1] - 1) & 0xffff) << 12 | (col_bd[sy + 1] - 1) & 0xffff
+
+				qx = 0
+				# vflip:
+				if (((sy and sy >= s.last_ctx_col) and (sx > s.last_ctx_row))
+				 or ((sy and sy <= s.last_q1_col) and (sx > s.last_q1_row))):
+					qx |= 8
+				# hflip: If the last slice was a row above
+				if (sx and (sx == (s.last_ctx_row + 1))):
+					qx |= 4
+					if (qx == 4):
+						s.last_q1_row = sx  # save Q1 position
+						s.last_q1_col = sy
+				assert(has_tiles)
 				if (has_tiles):
-					push(0x2a000000 | ax, "cm3_cmd_set_tile_ax")
-					push(bx, "cm3_set_tile_bx")
-				push(0x01000000 | ax, "cm3_set_tile_ax")
+					# tiles are mututally exclusive with dependent slice, so cxy == mxy
+					push(0x2a000000 | mxy, "cm3_cmd_set_tile_ctb_xy")
+					push(qx << 28 | sy << 24 | xy, "cm3_set_tile_ctb_xy")
+				push(0 << 28 | 1 << 24 | mxy, "cm3_set_tile_mv_xy")
 				pos += 1
 
 		push(0x2b000000 | boolify(last) << 10, "cm3_cmd_inst_fifo_end")
-
-		return pos, cx
+		return pos, cxy
 
 	def set_slices(self, ctx, sl):
 		sps = ctx.get_sps(sl)
 		pps = ctx.get_pps(sl)
+		self.s = dotdict()  # mini context for convenience
+		self.s.last_q1_row = -1
+		self.s.last_q1_row = -1
 
 		has_tiles = 0
 		if ((sl.first_slice_segment_in_pic_flag) and len(sl.slices)):
@@ -514,7 +598,8 @@ class AVDH265HalV3(AVDHal):
 		count = len(sl.slices)
 		pos = 0
 		c0x = -1
-		pos, c0x = self.set_slice(ctx, sl, pos, c0x, 1, last=count == 0)  # always set ctb on first slice
+		# always (re)-set CTB context window on first slice
+		pos, c0x = self.set_slice(ctx, sl, pos, c0x, has_tiles | 1, last=count == 0)
 		count -= 1
 		if ((sl.first_slice_segment_in_pic_flag) and len(sl.slices)):
 			for i,s in enumerate(sl.slices):
