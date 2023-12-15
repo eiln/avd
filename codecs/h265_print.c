@@ -323,8 +323,10 @@ void h265_print_nal_sps(struct hevc_sps *sps)
     h265_field("max_transform_hierarchy_depth_intra", sps->max_transform_hierarchy_depth_intra);
 
     h265_field("scaling_list_enable_flag", sps->scaling_list_enable_flag);
-    if (sps->scaling_list_enable_flag)
+    if (sps->scaling_list_enable_flag) {
+        h265_field("sps_scaling_list_data_present_flag", sps->sps_scaling_list_data_present_flag);
         h265_print_scaling_list(&sps->scaling_list, "seq");
+    }
 
     h265_field("amp_enabled_flag", sps->amp_enabled_flag);
     h265_field("sample_adaptive_offset_enabled_flag", sps->sample_adaptive_offset_enabled_flag);
