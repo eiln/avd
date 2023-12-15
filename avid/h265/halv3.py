@@ -81,15 +81,16 @@ class AVDH265HalV3(AVDHal):
 		sps = ctx.get_sps(sl)
 		pps = ctx.get_pps(sl)
 
-		if (not (sps.scaling_list_enable_flag or pps.pps_scaling_list_data_present_flag)):
+		if (not (sps.scaling_list_enable_flag)):
 			push(0x0, "cm3_mark_end_section")
+			return
 
 		mask = 0
 		if (pps.pps_scaling_list_data_present_flag): # Takes precedence if both SPS/PPS
 			for i in range(4):
 				for j in range(6):
 					mask |= set_bit(i*6 + j)  # Set unconditionally
-		elif (sps.scaling_list_enable_flag):
+		elif (sps.sps_scaling_list_data_present_flag):
 			for i in range(4):
 				for j in range(6):
 					if (((sps.seq_scaling_list_pred_mode_flag[i][j]) or (sps.seq_scaling_list_pred_matrix_id_delta[i][j])) or (i == 3)):
@@ -100,8 +101,13 @@ class AVDH265HalV3(AVDHal):
 			self.set_scaling_list(ctx, sl, pps.pic_scaling_list_4x4, pps.pic_scaling_list_8x8,
 				pps.pic_scaling_list_16x16, pps.pic_scaling_list_32x32, mask,
 				pps.pic_scaling_list_delta_coeff, 0)
-		elif (sps.scaling_list_enable_flag):
+		elif (sps.sps_scaling_list_data_present_flag):
 			push(0x127b377, "hdr_38_sps_scl_dims")
+			self.set_scaling_list(ctx, sl, sps.seq_scaling_list_4x4, sps.seq_scaling_list_8x8,
+				sps.seq_scaling_list_16x16, sps.seq_scaling_list_32x32, mask,
+				sps.seq_scaling_list_delta_coeff, 1)
+		elif (sps.scaling_list_enable_flag):
+			push(0x1000000, "hdr_38_sps_scl_dims")
 			self.set_scaling_list(ctx, sl, sps.seq_scaling_list_4x4, sps.seq_scaling_list_8x8,
 				sps.seq_scaling_list_16x16, sps.seq_scaling_list_32x32, mask,
 				sps.seq_scaling_list_delta_coeff, 1)
