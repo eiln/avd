@@ -374,7 +374,7 @@ class AVDH265HalV3(AVDHal):
 			if (sl.slice_type == HEVC_SLICE_B):
 				if (not sl.collocated_from_l0_flag):
 					x |= set_bit(4)
-				if (0):
+				if (sl.cabac_init_flag):
 					x |= set_bit(5)
 				if (not sl.mvd_l1_zero_flag):
 					x |= set_bit(6)
