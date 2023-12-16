@@ -438,15 +438,19 @@ class AVDH265HalV3(AVDHal):
 				col_bd[i + 1] = col_bd[i] + pps.column_width[i]
 			for i in range(pps.num_tile_rows):
 				row_bd[i + 1] = row_bd[i] + pps.row_height[i]
-
 		sx = pos // pps.num_tile_rows
 		sy = pos % pps.num_tile_columns
+
 		if (pps.tiles_enabled_flag):
-			mx = (row_bd[sx] & 0xffff) << 12 | col_bd[sy] & 0xffff
-		elif (sl.first_slice_segment_in_pic_flag == 0 and pps.entropy_coding_sync_enabled_flag):
-			mx = ((sl.slice_segment_address // sps.ctb_width) & 0xffff) << 12 | (sl.slice_segment_address % sps.ctb_width) & 0xffff
+			rx = row_bd[sx]
+			cy = col_bd[sy]
+		elif (sl.first_slice_segment_in_pic_flag == 0):
+			rx = sl.slice_segment_address // sps.ctb_width
+			cy = sl.slice_segment_address % sps.ctb_width
 		else:
-			mx = pos << 13
+			rx = 0
+			cy = 0
+		mx = (rx & 0xffff) << 12 | cy & 0xffff
 
 		if (sl.dependent_slice_segment_flag):
 			cx = c0x  # if it's a dependent slice, reuse the last slice's entropy
