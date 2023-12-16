@@ -46,29 +46,26 @@ https://github.com/eiln/avd/assets/113484710/e7ab13fb-6472-47bf-93d3-1dbfb266799
 
 - What works:
 	- High Profile i.e. 8-bit 4:2:0 I/P/B (i.e. normal x264 output)
-	- High 4:2:2 Profile; tested less than 4:2:0 but I haven't seen it not work
+	- High 4:2:2 Profile. Tested less than 4:2:0 but I haven't seen it not work
+	- High 10 Profile (10-bit)
+	- High 10 4:2:2 Profile
 	- Up to hardware cap of 4096x4096 (that includes 4K)
 
 - Works in macOS but not in mine:
-	- Long term references. This is mainly blocked by my RLM impl. But I have yet to see a sample.
 	- frame_num gaps. This is a 10-line fix if I can see a sample.
 	- Multiple slice groups. Ditto but 20
-	- ~~Scaling lists~~ Done
 
-- Don't know if it works in macOS:
-	- ~~Bitdepth > 8-bit~~ Hardware can't, sorry.
+- Unsupported by hardware:
+	- MBAFF/PAFF interlaced. Though you will not see this unless you work in broadcast.
 	- Top/bottom field coding (x264 doesn't support)
-	- Display formats other than NV12
-	- ~~I_PCM or anything else funny that I'll literally have to make a sample for~~ Works
 
-- No:
-	- SVC/MVC
-	- MBAFF/PAFF interlaced
 
 
 ### H.265 / HEVC
 
 - H.264 but worse. Doable
+
+- 12/16/2023: It works for normal videos encoded with normal parameters, e.g. a youtube video, but it's not passing all of the ITU-T conformance suite, which are samples designed to stress the decoder. We have most features down e.g. I/P/B, dequant/deblock, scaling lists, tiling/WPP, multiple slices, PCM, etc. Motion vector merging needs work. There's also some PPS extensions supported in hardware. Also 4:2:2 and 10-bit, but those shouldn't take long.
 
 
 ### VP9
