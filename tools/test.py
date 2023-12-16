@@ -69,21 +69,26 @@ class AVDUnitTest:
 
 	def init_hook(self):
 		if (self.args.debug_mode and self.args.show_headers):
-			if (self.dec.mode in ["h264", "h265"]):
+			if (self.dec.mode in ["h264"]):
 				for x in self.dec.ctx.sps_list:
 					if (x):
 						print(x)
-				if (self.dec.mode in ["h264"]):
-					for x in self.dec.ctx.pps_list:
-						if (x):
-							print(x)
+				for x in self.dec.ctx.pps_list:
+					if (x):
+						print(x)
 
-	def show_mini_header(self, sl):
+	def show_header(self, sl):
 		if (self.args.debug_mode) and (not self.args.show_headers):
 			print(sl.show_slice_header().strip())
 			if hasattr(sl, "slices"):
 				for s in sl.slices:
 					print(s.show_slice_header().strip())
+		if (self.args.show_sps):
+			print(sl.sps)
+		if (self.args.show_pps):
+			print(sl.pps)
+		if (self.args.show_headers):
+			print(sl)
 
 	def test_fp(self, args):
 		self.log(hl("Testing fp '%s'..." % (args.dir), None))
@@ -98,9 +103,7 @@ class AVDUnitTest:
 			fp0 = self.dec.fpcls.parse(open(path, "rb").read())
 
 			sl = slices[i]
-			self.show_mini_header(sl)
-			if (self.args.show_headers):
-				print(sl)
+			self.show_header(sl)
 			if (self.args.show_fp):
 				print(fp0)
 
@@ -189,9 +192,7 @@ class AVDUnitTest:
 			inst0_stream = self.emu.avd_cm3_cmd_decode(path)
 
 			sl = slices[i]
-			self.show_mini_header(sl)
-			if (self.args.show_headers):
-				print(sl)
+			self.show_header(sl)
 
 			inst1_stream = self.dec.decode(sl)
 			self.diff_emu(sl, inst0_stream, inst1_stream)
@@ -493,6 +494,8 @@ if __name__ == "__main__":
 	parser.add_argument('-si', '--show-index', action='store_true')
 	parser.add_argument('-sp', '--show-paths', action='store_true')
 	parser.add_argument('-sf', '--show-fp', action='store_true')
+	parser.add_argument('-ssp', '--show-sps', action='store_true')
+	parser.add_argument('-spp', '--show-pps', action='store_true')
 
 	args = parser.parse_args()
 	test(args)
