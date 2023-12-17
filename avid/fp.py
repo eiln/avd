@@ -79,22 +79,6 @@ class AVDFrameParams(ConstructClass):
         if (len(out) and sum(out) == 0): return ""
         return s + "\n"
 
-class AVDV3PiodmaHeader(AVDFrameParams):
-	subcon = Struct(
-		"pio_piodma1_word" / u32,
-		"pio_4_codec" / ExprValidator(u32, obj_ >= 0 and obj_ <= 4), # 32 fucking bits for max 4 codes it doesn't need, this will be a recurring theme
-		"pio_8_notused" / u32,
-		"pio_c_notused" / u32,
-		"pio_10_notused" / u32,
-		"pio_14_deadcafe_notused" / ExprValidator(u32, obj_ == 0xdeadcafe),
-		"pio_18_101_notused" / u32,
-		"pio_1c_slice_count" / u32,
-		"pio_20_piodma3_offset" / u32, #ExprValidator(u32, obj_ == 0x8b4c0)
-		"pio_24_pad" / ZPadding(0x4),
-	)
-	def __init__(self):
-		super().__init__()
-
 class AVDFakeFrameParams(dict):
     # fake dict to diff with parsed frame_params
     def __init__(self):
