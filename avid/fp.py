@@ -17,8 +17,16 @@ class AVDFrameParams(ConstructClass):
         super().__init__()
 
     def __str__(self, ignore=[], other=None, show_all=False) -> str:
-        s = "  \033[1;37m" + self.__class__.__name__ + ":\033[0m\n"
+        if (hasattr(self, "_reprkeys")):
+            s = ""
+            for x in self._reprkeys:
+                t = str(getattr(self, x))
+                if (t):
+                    s += "\n" + t
+            return s.strip() + "\n"
 
+        s = "  \033[1;37m" + self.__class__.__name__ + ":\033[0m\n"
+        out = []
         keys = list(self)
         keys.sort(key = lambda x: self._off.get(x, (-1, 0))[0])
         for key in keys:
@@ -31,14 +39,22 @@ class AVDFrameParams(ConstructClass):
             v = getattr(self, key)
             if isinstance(v, stringtypes):
                 val_repr = reprstring(v)
+                out.append(v)
             elif isinstance(v, int):
                 val_repr = hex(v)
-            elif isinstance(v, ListContainer) or isinstance(v, list):
+                out.append(v)
+            elif (isinstance(v, ListContainer) or isinstance(v, list)):
+                if (not (isinstance(v[0], int))):
+                    for n in v:
+                        s += "\n  " + str(n).strip() + "\n"
+                    continue
                 tmp = []
                 stride = 4
                 for n in range(ceil(len(v) / stride)):
                     y = v[n*stride:(n+1)*stride]
-                    if (not sum(y)):
+                    if (not (isinstance(y[0], int))):
+                        print(y)
+                    elif (not sum(y)):
                         t = "-"
                         continue
                     else:
@@ -60,6 +76,7 @@ class AVDFrameParams(ConstructClass):
                 s += "\n" + str(v).strip() + "\n"
                 continue
             s += sk + val_repr + "\n"
+        if (len(out) and sum(out) == 0): return ""
         return s + "\n"
 
 class AVDV3PiodmaHeader(AVDFrameParams):

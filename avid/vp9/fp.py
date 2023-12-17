@@ -172,8 +172,6 @@ class AVDVP9V3FrameParams(AVDFrameParams):
 		"til" / AVDVP9V3Tiles,
 	)
 	_ffpcls = AVDVP9V3FakeFrameParams
+	_reprkeys = ["pio", "hdr", "til"]
 	def __init__(self):
 		super().__init__()
-
-	def __str__(self):
-		return ''.join([str(getattr(self, x)) for x in ["pio", "hdr", "til"]])

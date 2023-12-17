@@ -153,8 +153,6 @@ class AVDH264V3FrameParams(AVDFrameParams):
 		#"inp" / AvdH264V3Input,
 	)
 	_ffpcls = AVDH264V3FakeFrameParams
+	_reprkeys = ["pio", "hdr", "scl", "slc"]
 	def __init__(self):
 		super().__init__()
-
-	def __str__(self):
-		return ''.join([str(getattr(self, x)) for x in ["pio", "hdr", "scl", "slc"]])
