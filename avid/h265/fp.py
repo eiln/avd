@@ -115,6 +115,34 @@ class AVDH265V3Slice(AVDFrameParams):
 	def __init__(self):
 		super().__init__()
 
+class AVDH265V3InputTile(AVDFrameParams):
+	subcon = Struct(
+		"til_0_pio_src_addr" / u32,
+		"til_4_index" / u32,
+		"til_8_x0_col" / u16,
+		"til_a_y0_row" / u16,
+		"til_c_count" / u16,
+		"til_e_group" / u16,
+		"til_10_x1_col" / u16,
+		"til_12_y1_row" / u16,
+		"til_14_tile_addr" / u32,
+		"til_18_tile_size" / u32,
+		"til_1c_acc_size" / u32,
+		"til_20_acc_size" / u32,
+		"til_24_acc_size" / u32,
+		"til_28_acc_size" / u32,
+	)
+	def __init__(self):
+		super().__init__()
+
+class AVDH265V3Input(AVDFrameParams):
+	subcon = Struct(
+		"pad" / Padding(0x34ce0 - 0xbe0),
+		"inp" / RepeatUntil(lambda obj,lst,ctx: lst[-1].til_0_pio_src_addr == 0, AVDH265V3InputTile),
+	)
+	def __init__(self):
+		super().__init__()
+
 class AVDH265V3FakeFrameParams(AVDFakeFrameParams):
 	def __init__(self):
 		super().__init__()
@@ -153,6 +181,7 @@ class AVDH265V3FrameParams(AVDFrameParams):
 		"hdr" / AVDH265V3InstHeader,
 		"scl" / AVDH265V3DFWScalingList,
 		"slc" / AVDH265V3Slice,
+		"inp" / AVDH265V3Input,
 	)
 	_ffpcls = AVDH265V3FakeFrameParams
 	def __init__(self):
