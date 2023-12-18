@@ -173,6 +173,8 @@ class AVDH265HalV3(AVDHal):
 			x |= set_bit(12)
 		if (pps.tiles_enabled_flag):
 			x |= set_bit(13)
+		if (pps.transquant_bypass_enabled_flag):
+			x |= set_bit(14)
 		if (pps.diff_cu_qp_delta_depth != 1 and pps.diff_cu_qp_delta_depth != 3):
 			x |= set_bit(15)
 		if (pps.diff_cu_qp_delta_depth != 3):
