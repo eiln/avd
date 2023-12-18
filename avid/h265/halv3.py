@@ -161,7 +161,6 @@ class AVDH265HalV3(AVDHal):
 			x |= set_bit(9)
 		push(x, "hdr_34_sps_flags")
 
-		#print(pps)
 		x = 0
 		if (1):
 			x |= set_bit(3)
@@ -175,10 +174,8 @@ class AVDH265HalV3(AVDHal):
 			x |= set_bit(13)
 		if (pps.transquant_bypass_enabled_flag):
 			x |= set_bit(14)
-		if (pps.diff_cu_qp_delta_depth != 1 and pps.diff_cu_qp_delta_depth != 3):
-			x |= set_bit(15)
-		if (pps.diff_cu_qp_delta_depth != 3):
-			x |= set_bit(16)
+		log2_ctb_size = sps.log2_min_cb_size + sps.log2_diff_max_min_coding_block_size
+		x |= ((log2_ctb_size - pps.diff_cu_qp_delta_depth - 3) & 3) << 15
 		if (pps.cu_qp_delta_enabled_flag):
 			x |= set_bit(17)
 		if (pps.transform_skip_enabled_flag):
