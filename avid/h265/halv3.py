@@ -438,7 +438,7 @@ class AVDH265HalV3(AVDHal):
 				col_bd[i + 1] = col_bd[i] + pps.column_width[i]
 			for i in range(pps.num_tile_rows):
 				row_bd[i + 1] = row_bd[i] + pps.row_height[i]
-		sx = pos // pps.num_tile_rows
+		sx = pos // pps.num_tile_columns
 		sy = pos % pps.num_tile_columns
 
 		if (pps.tiles_enabled_flag):
@@ -488,7 +488,7 @@ class AVDH265HalV3(AVDHal):
 					size = sl.get_payload_total_size() - offset - start
 				offset += self.set_coded_slice(sl, offset, size, 1)
 
-				sx = pos // pps.num_tile_rows
+				sx = pos // pps.num_tile_columns
 				sy = pos % pps.num_tile_columns
 				ax = (row_bd[sx] & 0xffff) << 12 | col_bd[sy] & 0xffff
 				bx = ((row_bd[sx + 1] - 1) & 0xffff) << 12 | (col_bd[sy + 1] - 1) & 0xffff
