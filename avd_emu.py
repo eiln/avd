@@ -422,9 +422,8 @@ class AVDEmulator:
 		word = struct.unpack("<I", self.dart1_space[piodma_iova:piodma_iova+word_size])[0]
 		self.log("PIODMA: src iova: 0x%x cmd: 0x%x word: 0x%x" % (piodma_iova, val, word))
 
-		dst_addr = word & ~0x3fd0001
-		dst_addr = dst_addr & ~(dst_addr & 0x20000) | ((dst_addr & 0x20000) >> 1)
-		dst_addr |= 0x1080000
+		x = word & ~0x3fd0001
+		dst_addr = AVD_CM3_SRAM_ADDR & 0xffff0000 | x & 0x1ffff | (x & 0x20000) >> 1
 
 		size = (val << 2) >> 8
 		self.log(f"PIODMA: transfer size {hex(size)} to cm3 dst {hex(dst_addr)}")
