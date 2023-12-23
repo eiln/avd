@@ -143,6 +143,7 @@ class AVDH265HalV3(AVDHal):
 		push = self.push
 		sps = ctx.get_sps(sl)
 		pps = ctx.get_pps(sl)
+		log2_ctb_size = sps.log2_min_cb_size + sps.log2_diff_max_min_coding_block_size
 
 		x = 0
 		if (sps.pcm_enabled_flag):
@@ -160,10 +161,7 @@ class AVDH265HalV3(AVDHal):
 		push(x, "hdr_34_sps_flags")
 
 		x = 0
-		if (1):
-			x |= set_bit(3)
-		if (1):
-			x |= set_bit(4)
+		x |= (log2_ctb_size - 3) << 3
 		x |= (pps.log2_parallel_merge_level - 2) << 9
 		if (pps.entropy_coding_sync_enabled_flag):
 			x |= set_bit(12)
@@ -171,7 +169,6 @@ class AVDH265HalV3(AVDHal):
 			x |= set_bit(13)
 		if (pps.transquant_bypass_enabled_flag):
 			x |= set_bit(14)
-		log2_ctb_size = sps.log2_min_cb_size + sps.log2_diff_max_min_coding_block_size
 		x |= ((log2_ctb_size - pps.diff_cu_qp_delta_depth - 3) & 3) << 15
 		if (pps.cu_qp_delta_enabled_flag):
 			x |= set_bit(17)
