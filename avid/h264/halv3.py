@@ -282,7 +282,7 @@ class AVDH264HalV3(AVDHal):
 		push(0x2a000000, "cm3_cmd_set_mb_dims")
 		push((((ctx.height - 1) >> 4) << 12) | ((ctx.width - 1) >> 4), "cm3_set_mb_dims")
 
-		x = 0x2d000000
+		x = 0
 		if   (sl.slice_type == H264_SLICE_TYPE_I):
 			x |= 0x20000
 		elif (sl.slice_type == H264_SLICE_TYPE_P):
@@ -290,14 +290,14 @@ class AVDH264HalV3(AVDHal):
 		elif (sl.slice_type == H264_SLICE_TYPE_B):
 			x |= 0x40000
 		if ((sl.slice_type == H264_SLICE_TYPE_P) or (sl.slice_type == H264_SLICE_TYPE_B)):
-			x |= sl.num_ref_idx_l0_active_minus1 << 11
+			if (pps.entropy_coding_mode_flag):
+				x |= sl.cabac_init_idc << 5
 			if (sl.slice_type == H264_SLICE_TYPE_B):
 				x |= sl.num_ref_idx_l1_active_minus1 << 7
 				if (not sl.direct_spatial_mb_pred_flag):
-					x |= 16 << 11
-			if (pps.entropy_coding_mode_flag):
-				x |= sl.cabac_init_idc << 5
-		push(x, "slc_6e4_cmd_ref_type")
+					x |= set_bit(15)
+			x |= sl.num_ref_idx_l0_active_minus1 << 11
+		push(0x2d000000 | x, "slc_6e4_cmd_ref_type")
 
 		if (sl.slice_type == H264_SLICE_TYPE_B):
 			# bidirectional reference of previous mv
