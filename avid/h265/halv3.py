@@ -164,8 +164,7 @@ class AVDH265HalV3(AVDHal):
 			x |= set_bit(3)
 		if (1):
 			x |= set_bit(4)
-		if (pps.log2_parallel_merge_level == 3):
-			x |= set_bit(9)
+		x |= (pps.log2_parallel_merge_level - 2) << 9
 		if (pps.entropy_coding_sync_enabled_flag):
 			x |= set_bit(12)
 		if (pps.tiles_enabled_flag):
