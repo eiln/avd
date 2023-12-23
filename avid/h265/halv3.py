@@ -584,7 +584,7 @@ class AVDH265HalV3(AVDHal):
 		pps = ctx.get_pps(sl)
 		self.s = dotdict()  # mini context for convenience
 		self.s.last_q1_row = -1
-		self.s.last_q1_row = -1
+		self.s.last_q1_col = -1
 
 		has_tiles = 0
 		if ((sl.first_slice_segment_in_pic_flag) and len(sl.slices)):
