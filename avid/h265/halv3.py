@@ -409,7 +409,7 @@ class AVDH265HalV3(AVDHal):
 		sps.ctb_width  = sps.width + ((1 << sps.log2_ctb_size) - 1) >> sps.log2_ctb_size
 		sps.ctb_height = (sps.height + (1 << sps.log2_ctb_size) - 1) >> sps.log2_ctb_size
 
-		if ((sl.pps.tiles_enabled_flag) and (sl.num_entry_point_offsets > 0)):
+		if ((pps.tiles_enabled_flag) and (sl.num_entry_point_offsets > 0)):
 			size = sl.entry_point_offset[0]
 		else:
 			size = sl.get_payload_size()
@@ -439,7 +439,7 @@ class AVDH265HalV3(AVDHal):
 		sy = pos % pps.num_tile_columns
 
 		# Set top/left bound of CTB context search window
-		if (pps.tiles_enabled_flag):
+		if ((has_tiles) and (not sl.dependent_slice_segment_flag == 1)):
 			rx = row_bd[sx + 0]  # Sliding window accumulator for tiles
 			cy = col_bd[sy + 0]
 		elif (sl.first_slice_segment_in_pic_flag == 0):
@@ -506,7 +506,10 @@ class AVDH265HalV3(AVDHal):
 		#  y y w Z x
 		#  y y y w w
 		#
-		if (has_tiles):  # Reset CTB context window only on tile || first slice
+		# Reset CTB context window only on tile || first slice
+		cond = sl.dependent_slice_segment_flag == 1 and s.last_dep
+		if ((has_tiles or sl.first_slice_segment_in_pic_flag) and not (sl.dependent_slice_segment_flag == 1 and s.last_dep)):
+			s.last_dep = 1
 			push(0x2a000000 | cxy, "cm3_cmd_set_ctb_xy")
 			if (pps.tiles_enabled_flag):
 				rx = row_bd[sx + 1] - 1
@@ -525,6 +528,10 @@ class AVDH265HalV3(AVDHal):
 				cy = sps.ctb_width - 1
 				qx = 0  # quad 0
 			push(qx << 28 | sy << 24 | (rx & 0xffff) << 12 | cy & 0xffff, "cm3_set_ctb_xy")
+		else:
+			s.last_dep = 0
+		if (not cond):
+			pos += 1
 
 		if (sl.dependent_slice_segment_flag):
 			self.set_slice_mv(ctx, ctx.active_sl, 1)
@@ -535,15 +542,9 @@ class AVDH265HalV3(AVDHal):
 		# affect decode
 		push(0 << 28 | 1 << 24 | mxy, "cm3_set_mv_xy")
 
-		# This is a hack because we don't use pos in slice_segment_address but
-		# we also don't increment the decode command accumulation count for
-		# dependent slices. TODO refactor
-		if (not (sl.first_slice_segment_in_pic_flag == 0 and sl.dependent_slice_segment_flag == 1)):
-			pos += 1
-
 		# Repeat for tiles/entry points. This should actually be a single loop
 		# contiuning from above, but things are bad as it is
-		if ((sl.pps.tiles_enabled_flag) and (sl.num_entry_point_offsets > 0)):
+		if ((pps.tiles_enabled_flag) and (sl.num_entry_point_offsets > 0)):
 			for n in range(sl.num_entry_point_offsets + 1 - 1):  # We did tile #0 above
 				push(0x2b000000, "cm3_cmd_inst_fifo_start")
 				if (n != sl.num_entry_point_offsets - 1):
@@ -568,11 +569,9 @@ class AVDH265HalV3(AVDHal):
 					if (qx == 4):
 						s.last_q1_row = sx  # save Q1 position
 						s.last_q1_col = sy
-				assert(has_tiles)
-				if (has_tiles):
-					# tiles are mututally exclusive with dependent slice, so cxy == mxy
-					push(0x2a000000 | mxy, "cm3_cmd_set_tile_ctb_xy")
-					push(qx << 28 | sy << 24 | xy, "cm3_set_tile_ctb_xy")
+				# tiles are mututally exclusive with dependent slice, so cxy == mxy
+				push(0x2a000000 | mxy, "cm3_cmd_set_tile_ctb_xy")
+				push(qx << 28 | sy << 24 | xy, "cm3_set_tile_ctb_xy")
 				push(0 << 28 | 1 << 24 | mxy, "cm3_set_tile_mv_xy")
 				pos += 1
 
@@ -585,6 +584,7 @@ class AVDH265HalV3(AVDHal):
 		self.s = dotdict()  # mini context for convenience
 		self.s.last_q1_row = -1
 		self.s.last_q1_col = -1
+		self.s.last_dep = 0
 
 		has_tiles = 0
 		if ((sl.first_slice_segment_in_pic_flag) and len(sl.slices)):
@@ -594,8 +594,7 @@ class AVDH265HalV3(AVDHal):
 		count = len(sl.slices)
 		pos = 0
 		c0x = -1
-		# always (re)-set CTB context window on first slice
-		pos, c0x = self.set_slice(ctx, sl, pos, c0x, has_tiles | 1, last=count == 0)
+		pos, c0x = self.set_slice(ctx, sl, pos, c0x, has_tiles, last=count == 0)
 		count -= 1
 		if ((sl.first_slice_segment_in_pic_flag) and len(sl.slices)):
 			for i,s in enumerate(sl.slices):
