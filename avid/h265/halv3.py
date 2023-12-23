@@ -416,15 +416,17 @@ class AVDH265HalV3(AVDHal):
 		offset = 0
 		start = offset + sl.get_payload_offset()  # hack to calc last entrypoint offset
 
-		# TODO I'm sure this is a bitmask
 		t = 3
 		if (sl.first_slice_segment_in_pic_flag):
 			t = 3
-			assert(not sl.dependent_slice_segment_flag)
-		elif (sl.dependent_slice_segment_flag):
+		elif (sl.dependent_slice_segment_flag and not has_tiles):
 			t = 0
+		elif (sl.dependent_slice_segment_flag and s.last_dep == 0):
+			t = 1
 		elif (not has_tiles):
 			t = 2
+		elif (sl.dependent_slice_segment_flag):
+			t = 0
 		offset += self.set_coded_slice(sl, offset, size, t)
 
 		if (pps.tiles_enabled_flag):
