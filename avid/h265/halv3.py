@@ -512,7 +512,7 @@ class AVDH265HalV3(AVDHal):
 		cond = sl.dependent_slice_segment_flag == 1 and s.last_dep
 		if ((has_tiles or sl.first_slice_segment_in_pic_flag) and not (sl.dependent_slice_segment_flag == 1 and s.last_dep)):
 			s.last_dep = 1
-			push(0x2a000000 | cxy, "cm3_cmd_set_ctb_xy")
+			push(0x2a000000 | (mxy if sl.dependent_slice_segment_flag else cxy), "cm3_cmd_set_ctb_xy")
 			if (pps.tiles_enabled_flag):
 				rx = row_bd[sx + 1] - 1
 				cy = col_bd[sy + 1] - 1
