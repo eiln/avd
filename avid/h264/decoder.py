@@ -224,6 +224,12 @@ class AVDH264Decoder(AVDDecoder):
 			ctx.dpb_pool.append(pic)
 			self.log(f"DPB Pool: {pic}")
 
+		ctx.sps_pool = []
+		for i in range(ctx.sps_tile_count):
+			pic = AVDH264Picture(addr=ctx.sps_tile_addrs[i], idx=i, pic_num=-1, poc=-1, frame_num_wrap=-1, flags=H264_FRAME_FLAG_UNUSED, access_idx=-1)
+			ctx.sps_pool.append(pic)
+			self.log(f"SPS Pool: {pic}")
+
 	def refresh(self, sl):
 		self.refresh_sps(sl)
 		self.realloc_rbsp_size(sl)

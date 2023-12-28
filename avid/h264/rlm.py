@@ -16,6 +16,7 @@ class AVDH264Picture:
 	flags: int
 	access_idx: int
 	sps_idx: int = 0xffffffff
+	sps_pic: None = None
 
 	def __repr__(self):
 		return f"[idx: {str(self.idx).rjust(2)} addr: {hex(self.addr >> 7).ljust(2+5)} pic_num: {str(self.pic_num).rjust(2)} poc: {str(self.poc).rjust(3)} fn: {str(self.frame_num_wrap).rjust(2)} flags: {format(self.flags, '010b')}]"
@@ -158,13 +159,40 @@ class AVDH264RLM:
 
 		return cand
 
+	def get_free_sps_pic(self):
+		ctx = self.ctx; sl = self.ctx.active_sl
+		for pic in ctx.sps_pool:
+			if (pic.flags & H264_FRAME_FLAG_UNUSED): # fill pool at init
+				pic.flags &= ~(H264_FRAME_FLAG_UNUSED)
+				return pic
+
+		cand = None
+		pic = sorted([pic for pic in ctx.sps_pool if not (pic.flags & H264_FRAME_FLAG_LONG_REF)], key=lambda pic: pic.access_idx)[0]
+		pic.flags &= ~(H264_FRAME_FLAG_SHORT_REF)
+		for pic in ctx.sps_pool:
+			if (not (pic.flags & (H264_FRAME_FLAG_SHORT_REF | H264_FRAME_FLAG_LONG_REF))):
+				cand = pic
+				break
+		if (cand == None):
+			raise RuntimeError("failed to find free pic")
+
+		if (sl.nal_unit_type == H264_NAL_SLICE_IDR):
+			for pic in ctx.sps_pool:
+				if (pic.idx > cand.idx):
+					pic.flags &= ~(H264_FRAME_FLAG_LONG_REF)
+
+		return cand
+
 	def init_slice(self):
 		ctx = self.ctx; sl = self.ctx.active_sl
 		sps = ctx.get_sps(sl)
 
 		sl.pic = self.get_free_pic()
 		sl.pic.flags |= H264_FRAME_FLAG_OUTPUT
-		sl.pic.sps_idx = ctx.access_idx % ctx.sps_tile_count
+		sl.pic.sps_pic = self.get_free_sps_pic()
+		sl.pic.sps_pic.flags |= H264_FRAME_FLAG_SHORT_REF
+		sl.pic.sps_idx = sl.pic.sps_pic.idx
+		sl.pic.sps_pic.access_idx = ctx.access_idx
 
 		if (sl.field_pic_flag):
 			sl.pic.pic_num = (2 * sl.frame_num) + 1
@@ -246,6 +274,8 @@ class AVDH264RLM:
 						pic_num_diff = sl.mmco_short_args[i] + 1  # abs_diff_pic_num_minus1
 						pic_num = sl.pic.pic_num - pic_num_diff
 						pic_num &= ctx.max_frame_num - 1
+						for pic in ctx.sps_pool:
+							pic.flags &= ~(H264_FRAME_FLAG_LONG_REF)
 						for pic in ctx.dpb_list:
 							if (pic.pic_num == pic_num):
 								self.log(f"MMCO: Short to long {pic}")
@@ -253,6 +283,8 @@ class AVDH264RLM:
 								pic.flags &= ~(H264_FRAME_FLAG_SHORT_REF)
 								pic.flags |= H264_FRAME_FLAG_LONG_REF
 								pic.pic_num = long_term_frame_idx
+								pic.sps_pic.pic_num = long_term_frame_idx
+								pic.sps_pic.flags |= H264_FRAME_FLAG_LONG_REF
 
 					elif (opcode == H264_MMCO_FORGET_LONG_MAX):
 						ctx.max_lt_idx = sl.mmco_long_args[i] - 1  # max_long_term_frame_idx_plus1
@@ -261,7 +293,7 @@ class AVDH264RLM:
 								self.log(f"MMCO: Removing long max {pic}")
 								assert(pic.flags & H264_FRAME_FLAG_LONG_REF)
 								pic.flags &= ~(H264_FRAME_FLAG_LONG_REF)
-
+								pic.sps_pic.flags &= ~(H264_FRAME_FLAG_LONG_REF)
 					else:
 						raise ValueError("opcode %d not implemented. probably LT ref. pls send sample" % (opcode))
 
