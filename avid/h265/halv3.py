@@ -364,11 +364,12 @@ class AVDH265HalV3(AVDHal):
 
 		if ((sl.slice_type == HEVC_SLICE_P) or (sl.slice_type == HEVC_SLICE_B)):
 			x |= sl.max_num_merge_cand << 1
-			if (sl.slice_type == HEVC_SLICE_B):
+			if (sl.slice_temporal_mvp_enabled_flag):
 				if (not sl.collocated_from_l0_flag):
 					x |= set_bit(4)
-				if (sl.cabac_init_flag):
-					x |= set_bit(5)
+			if (sl.cabac_init_flag):
+				x |= set_bit(5)
+			if (sl.slice_type == HEVC_SLICE_B):
 				if (not sl.mvd_l1_zero_flag):
 					x |= set_bit(6)
 				x |= sl.num_ref_idx_l1_active_minus1 << 7
