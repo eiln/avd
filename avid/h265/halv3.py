@@ -349,12 +349,8 @@ class AVDH265HalV3(AVDHal):
 
 	def set_slice_mv(self, ctx, sl, is_dep):
 		push = self.push
-		cond = self.get_cond(ctx, sl)
-		cond = cond and (not ctx.last_intra)
-		cond = cond or sl.slice_type == HEVC_SLICE_B
-		cond = cond and (not is_dep)
-		cond = cond and (not sl.first_slice_segment_in_pic_flag == 0)
-		#print(cond)
+		# bidirectional prediction
+		cond = (not is_dep) and (sl.slice_temporal_mvp_enabled_flag) and (not sl.first_slice_segment_in_pic_flag == 0) and (not (sl.slice_type == HEVC_SLICE_P and ctx.last_intra))
 
 		x = 0
 		if   (sl.slice_type == HEVC_SLICE_I):
@@ -375,20 +371,20 @@ class AVDH265HalV3(AVDHal):
 				x |= sl.num_ref_idx_l1_active_minus1 << 7
 			x |= sl.num_ref_idx_l0_active_minus1 << 11
 
-			if (self.get_cond(ctx, sl) or is_dep):
+			if (sl.slice_temporal_mvp_enabled_flag or is_dep):
 				x |= set_bit(15)
-			if (sl.slice_type == HEVC_SLICE_P):
-				n = 0
-			else:
-				n = not sl.collocated_from_l0_flag
-			ref = sl.reflist[n][0]
-			if ((not ref.rasl) and (cond)):
-				x |= set_bit(18)
-
+			if (cond):
+				if (sl.slice_type == HEVC_SLICE_P):
+					n = 0
+				else:
+					n = not sl.collocated_from_l0_flag
+				ref = sl.reflist[n][0]
+				if ((not ref.rasl)):
+					x |= set_bit(18)
 		push(0x2d000000 | x, "slc_a8c_cmd_ref_type")
 
-		if (sl.slice_type == HEVC_SLICE_P) or (sl.slice_type == HEVC_SLICE_B):
-			if ((not ref.rasl) and (cond)):
+		if ((sl.slice_type == HEVC_SLICE_P) or (sl.slice_type == HEVC_SLICE_B)):
+			if ((cond) and (not ref.rasl)):
 				push(ctx.sps_tile_addrs[ref.idx] >> 8, "slc_bd4_sps_tile_addr2_lsb8")
 
 	def set_coded_slice(self, sl, offset, size, t):
