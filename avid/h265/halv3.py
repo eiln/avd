@@ -174,7 +174,7 @@ class AVDH265HalV3(AVDHal):
 			x |= set_bit(21)
 		push(x, "hdr_5c_pps_flags")
 
-		x = pps.pps_cb_qp_offset << 5 | pps.pps_cr_qp_offset
+		x = swrap(pps.pps_cb_qp_offset, 1 << 5) << 5 | swrap(pps.pps_cr_qp_offset, 1 << 5)
 		push(x, "hdr_60_pps_qp")
 
 		push(0, "hdr_64_zero")
