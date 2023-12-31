@@ -10,14 +10,6 @@ class AVDH265HalV3(AVDHal):
 	def __init__(self):
 		super().__init__()
 
-	def get_cond(self, ctx, sl):
-		pps = ctx.get_pps(sl)
-		has_slices = (((sl.first_slice_segment_in_pic_flag) and len(sl.slices)) or (not sl.first_slice_segment_in_pic_flag))
-		has_tiles = (pps.tiles_enabled_flag) and (sl.num_entry_point_offsets > 0)
-		cond = (not has_slices) and (not has_tiles)
-		cond = cond or (sl.slice_type == HEVC_SLICE_B)
-		return cond
-
 	def set_scaling_list(self, ctx, sl, list_4x4, list_8x8, list_16x16, list_32x32,
 							   mask, dc_coef, is_sps):
 		push = self.push
@@ -178,7 +170,7 @@ class AVDH265HalV3(AVDHal):
 			x |= set_bit(19)
 		if (pps.sign_data_hiding_enabled_flag):
 			x |= set_bit(20)
-		if ((not IS_IDR2(sl)) and self.get_cond(ctx, sl)):
+		if ((not IS_IDR2(sl)) and sl.slice_temporal_mvp_enabled_flag):
 			x |= set_bit(21)
 		push(x, "hdr_5c_pps_flags")
 
