@@ -26,6 +26,8 @@ class AVDUnitTest:
 		self.args = dotdict(kwargs)
 		if (self.args.debug_mode):
 			self.dec.stfu = False
+			if (self.args.verbose):
+				self.dec.hal.stfu = False
 
 	def log(self, x, verbose=False):
 		if ((not self.args.stfu) and ((not verbose) or (verbose and self.args.verbose))):
@@ -176,7 +178,7 @@ class AVDUnitTest:
 
 	def test_emu(self, args):
 		from avd_emu import AVDEmulator
-		self.dec.hal.stfu = True
+		#self.dec.hal.stfu = True
 		self.emu = AVDEmulator(args.firmware, stfu=True)
 		self.emu.start()
 		self.log(hl("Testing emu '%s'..." % (args.dir), None))
